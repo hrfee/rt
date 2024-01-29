@@ -8,6 +8,30 @@ struct Vec3 {
     float x, y, z;
 };
 
+constexpr
+Vec3 operator+(Vec3 a, Vec3 b) noexcept {
+    return Vec3{ a.x+b.x, a.y+b.y, a.z+b.z };
+}
+
+constexpr
+Vec3 operator-(Vec3 a, Vec3 b) noexcept {
+    return Vec3{ a.x-b.x, a.y-b.y, a.z-b.z };
+}
+
+constexpr
+Vec3 operator*(Vec3 a, float b) noexcept {
+    return Vec3{ a.x*b, a.y*b, a.z*b };
+}
+constexpr
+Vec3 operator*(float a, Vec3 b) noexcept {
+    return b * a;
+}
+
+constexpr
+Vec3 operator/(Vec3 a, float b) noexcept {
+    return Vec3{ a.x/b, a.y/b, a.z/b };
+}
+
 struct Vec3ui {
     uint8_t x, y, z;
 };

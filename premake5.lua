@@ -20,6 +20,7 @@ project "main"
     links "map"
     links "img"
     links "bmp"
+    links "cam"
 
 project "map"
     kind "StaticLib"
@@ -45,3 +46,8 @@ project "img"
     kind "StaticLib"
     location "img"
     files { "img/**.cpp", "img/**.hpp" }
+
+project "cam"
+    kind "StaticLib"
+    location "cam"
+    files { "cam/**.cpp", "cam/**.hpp" }
