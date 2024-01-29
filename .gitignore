@@ -1,0 +1,9 @@
+*.d
+*.o
+*.obj
+*.so
+*.a
+*.lib
+bin/
+Makefile
+**/Makefile
