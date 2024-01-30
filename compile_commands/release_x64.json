@@ -1,0 +1,49 @@
+[
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/third_party",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/third_party/obj/x64/release/glad.o -MF /home/hrfee/projects/y3/Personal/rt/third_party/obj/x64/release/glad.d -c /home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/main",
+            "file": "/home/hrfee/projects/y3/Personal/rt/main/main.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/main/obj/x64/release/main.o -MF /home/hrfee/projects/y3/Personal/rt/main/obj/x64/release/main.d -c /home/hrfee/projects/y3/Personal/rt/main/main.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/map",
+            "file": "/home/hrfee/projects/y3/Personal/rt/map/map.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/map/obj/x64/release/map.o -MF /home/hrfee/projects/y3/Personal/rt/map/obj/x64/release/map.d -c /home/hrfee/projects/y3/Personal/rt/map/map.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/img",
+            "file": "/home/hrfee/projects/y3/Personal/rt/img/img.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/img/obj/x64/release/img.o -MF /home/hrfee/projects/y3/Personal/rt/img/obj/x64/release/img.d -c /home/hrfee/projects/y3/Personal/rt/img/img.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/cam",
+            "file": "/home/hrfee/projects/y3/Personal/rt/cam/cam.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/cam/obj/x64/release/cam.o -MF /home/hrfee/projects/y3/Personal/rt/cam/obj/x64/release/cam.d -c /home/hrfee/projects/y3/Personal/rt/cam/cam.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_bmp",
+            "file": "/home/hrfee/projects/y3/Personal/rt/render_bmp/bmp.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/render_bmp/obj/x64/release/bmp.o -MF /home/hrfee/projects/y3/Personal/rt/render_bmp/obj/x64/release/bmp.d -c /home/hrfee/projects/y3/Personal/rt/render_bmp/bmp.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/render_gl/gl.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/release/gl.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/release/gl.d -c /home/hrfee/projects/y3/Personal/rt/render_gl/gl.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/release/glad.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/release/glad.d -c /home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c"
+          }
+]

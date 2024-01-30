@@ -1,5 +1,5 @@
-#ifndef BMP
-#define BMP
+#ifndef RENDER_BMP
+#define RENDER_BMP
 
 #include <string>
 #include <cstdint>

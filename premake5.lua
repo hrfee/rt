@@ -3,6 +3,7 @@ workspace "rt"
     cppdialect "C++17"
     platforms { "x64" }
     configurations { "debug", "release" }
+includedirs { "third_party/glad/include" }
     filter "configurations:debug"
         defines { "DEBUG" }
         symbols "On"
@@ -19,8 +20,12 @@ project "main"
     links "shape"
     links "map"
     links "img"
-    links "bmp"
+    links "render_bmp"
+    links "glfw"
+    links "render_gl"
     links "cam"
+    filter { "system:linux" }
+        buildoptions { "-lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi" }
 
 project "map"
     kind "StaticLib"
@@ -37,11 +42,6 @@ project "vec"
     location "vec"
     files { "vec/**.cpp", "vec/**.hpp" }
 
-project "bmp"
-    kind "StaticLib"
-    location "bmp"
-    files { "bmp/**.cpp", "bmp/**.hpp" }
-
 project "img"
     kind "StaticLib"
     location "img"
@@ -51,3 +51,17 @@ project "cam"
     kind "StaticLib"
     location "cam"
     files { "cam/**.cpp", "cam/**.hpp" }
+
+project "render_bmp"
+    kind "StaticLib"
+    location "render_bmp"
+    files { "render_bmp/**.cpp", "render_bmp/**.hpp" }
+
+project "render_gl"
+    kind "StaticLib"
+    location "render_gl"
+    files { "render_gl/**.cpp", "render_gl/**.hpp", "third_party/glad/src/*.c" }
+    links "glfw"
+    filter { "system:linux" }
+        buildoptions { "-lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi" }
+

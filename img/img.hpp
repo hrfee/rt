@@ -8,6 +8,7 @@
 struct Image {
     int w, h;
     Vec3 *img;
+    std::uint8_t *rgbxImg;
 };
 
 Image *newImage(int w, int h);
