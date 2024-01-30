@@ -18,4 +18,6 @@ Vec3 getPixel(Image *img, int x, int y);
 
 void writeTestImage(Image *img);
 
+void clear(Image *img);
+
 #endif

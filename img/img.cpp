@@ -1,5 +1,7 @@
 #include "img.hpp"
 
+#include <cstring>
+
 Image *newImage(int w, int h) {
     Image *image = (Image*)malloc(sizeof(Image));
     image->w = w;
@@ -23,4 +25,8 @@ void writeTestImage(Image *img) {
             writePixel(img, x, y, c);
         }
     }
+}
+
+void clear(Image *img) {
+    memset(img->img, 0, sizeof(Vec3)*img->w*img->h);
 }

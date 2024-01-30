@@ -7,7 +7,6 @@ struct Camera {
     int w, h;
     float fov;
     float farFrustumDistance;
-    float nearFrustumDistance;
     Vec3 viewportCorner;
     Vec3 viewportRow, viewportCol;
     float phi, theta; // angle of rotation, y and x.

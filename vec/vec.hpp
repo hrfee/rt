@@ -32,6 +32,11 @@ Vec3 operator/(Vec3 a, float b) noexcept {
     return Vec3{ a.x/b, a.y/b, a.z/b };
 }
 
+constexpr
+float dot(Vec3 a, Vec3 b) noexcept {
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
 struct Vec3ui {
     uint8_t x, y, z;
 };

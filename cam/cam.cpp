@@ -37,8 +37,9 @@ Mat3 make_z_rotation(float radians) {
 // Given a camera object, calculate the position of the bottom-left corner of the viewport, and provide vectors for columns and rows.
 // position of camera must be applied manually!
 void calculateViewport(Camera *cam) {
-    Vec3 frustumVec = {cam->nearFrustumDistance, 0.f, 0.f};
-    float halfViewportWidth = cam->nearFrustumDistance * std::tan(cam->fov/2.f);
+    // Assume near frustum (viewport) is 1.f away from the camera. Makes things simpler!
+    Vec3 frustumVec = {1.f, 0.f, 0.f};
+    float halfViewportWidth = 1.f * std::tan(cam->fov/2.f);
     float halfViewportHeight = (halfViewportWidth / float(cam->w)) * float(cam->h);
    
     // Calculate and store the bottom-left corner of the viewport
@@ -74,7 +75,6 @@ Camera newCamera(int w, int h, float fov, Vec3 pos) {
     cam.position = pos;
     cam.phi = 0.f;
     cam.theta = 0.f;
-    cam.nearFrustumDistance = 1.f;
     cam.farFrustumDistance = 9999.f;
     return cam;
 }

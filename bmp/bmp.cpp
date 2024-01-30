@@ -42,8 +42,8 @@ void writeBMP(Image *img, std::string fname) {
 
     int pxCount = img->w * img->h;
     for (int i = 0; i < pxCount; i++) {
-        Vec3c px = { char(img->img[i].x*255.f), char(img->img[i].y*255.f), char(img->img[i].z*255.f) };
         // BGR, not RGB!
+        Vec3c px = { char(img->img[i].z*255.f), char(img->img[i].y*255.f), char(img->img[i].x*255.f) };
         f.write((char*)(&px), 3);
     }
 
