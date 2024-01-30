@@ -2,8 +2,8 @@
 
 #include <cmath>
 
-void appendSphere(WorldMap *m, Vec3 center, float radius, Vec3 color) {
-    m->spheres.emplace_back(Sphere{ center, radius, color });
+void appendSphere(WorldMap *m, Vec3 center, float radius, Vec3 color, float reflectiveness) {
+    m->spheres.emplace_back(Sphere{ center, radius, color, reflectiveness });
 }
 
 void castRays(WorldMap *m, Image *img) {
@@ -12,8 +12,8 @@ void castRays(WorldMap *m, Image *img) {
         // m->cam.viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = 0; x < m->cam.w; x++) {
-            RayResult res = castRay(m, m->cam.position, delta);
-            if (res.collisions != 0) {
+            RayResult res = castRay(m, m->cam.position, delta, 0);
+            if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
             
@@ -23,8 +23,9 @@ void castRays(WorldMap *m, Image *img) {
     }
 }
 
-RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta) {
+RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
+    if (callCount > MAX_BOUNCE) return res;
     for (Sphere s: m->spheres) {
         // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
         // substituted values for the camera position (x/y/z_0),
@@ -77,6 +78,12 @@ RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta) {
         } else {
             continue;
         }
+        if (s.reflectiveness == 0) continue;
+        Vec3 collisionPoint = p0 + (res.t0 * delta);
+        RayResult bounce = castRay(m, collisionPoint, collisionPoint-s.center, callCount+1);
+        Vec3 color = {0.f, 0.f, 0.f};
+        if (bounce.collisions > 0) color = bounce.color;
+        res.color = (1.f - s.reflectiveness)*s.color + (s.reflectiveness) * color;
     }
     return res;
 }
