@@ -37,7 +37,7 @@ void writeTestImage(Image *img) {
     }
 }
 
-void clear(Image *img) {
+void clearImage(Image *img) {
     memset(img->img, 0, sizeof(Vec3)*img->w*img->h);
     memset(img->rgbxImg, 0, sizeof(std::uint8_t)*img->w*img->h*4);
 }

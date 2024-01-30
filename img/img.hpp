@@ -17,8 +17,10 @@ void writePixel(Image *img, int x, int y, Vec3 color);
 
 Vec3 getPixel(Image *img, int x, int y);
 
+std::uint8_t *getPixelRGBx(Image *img, int x, int y);
+
 void writeTestImage(Image *img);
 
-void clear(Image *img);
+void clearImage(Image *img);
 
 #endif

@@ -130,13 +130,11 @@ void GLWindow::draw(Image *img) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void GLWindow::mainLoop(WorldMap *map, Image *img) {
+void GLWindow::mainLoop(Image* (*func)()) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        clear(img);
-        castRays(map, img);
-
+        Image *img = func();
         draw(img);
 
         glfwSwapBuffers(window);

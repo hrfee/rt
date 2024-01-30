@@ -8,12 +8,6 @@
 #include "../cam/cam.hpp"
 #include "../img/img.hpp"
 
-struct WorldMap {
-    float w, h, d;
-    std::vector<Sphere> spheres;
-    Camera cam;
-};
-
 struct RayResult {
     int collisions;
     float t0;
@@ -21,9 +15,16 @@ struct RayResult {
     Vec3 color;
 };
 
-void appendSphere(WorldMap *m, Vec3 center, float radius, Vec3 color, float reflectiveness); 
-void castRays(WorldMap *m, Image *img);
-
-RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta, int callCount);
+class WorldMap {
+    public:
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth) {};
+        float w, h, d;
+        std::vector<Sphere> spheres;
+        Camera *cam;
+        void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness); 
+        void castRays(Image *img);
+    private:
+        RayResult castRay(Vec3 p0, Vec3 delta, int callCount);
+};
 
 #endif

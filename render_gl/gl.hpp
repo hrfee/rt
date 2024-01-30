@@ -12,7 +12,7 @@ class GLWindow {
         GLFWwindow* window;
         GLWindow(int w, int h);
         ~GLWindow();
-        void mainLoop(WorldMap *map, Image* img);
+        void mainLoop(Image* (*func)());
         void draw(Image *img);
 
     private:

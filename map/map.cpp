@@ -2,31 +2,31 @@
 
 #include <cmath>
 
-void appendSphere(WorldMap *m, Vec3 center, float radius, Vec3 color, float reflectiveness) {
-    m->spheres.emplace_back(Sphere{ center, radius, color, reflectiveness });
+void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness) {
+    spheres.emplace_back(Sphere{ center, radius, color, reflectiveness });
 }
 
-void castRays(WorldMap *m, Image *img) {
-    Vec3 baseRowVec = m->cam.viewportCorner;
-    for (int y = 0; y < m->cam.h; y++) {
-        // m->cam.viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
+void WorldMap::castRays(Image *img) {
+    Vec3 baseRowVec = cam->viewportCorner;
+    for (int y = 0; y < cam->h; y++) {
+        // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
-        for (int x = 0; x < m->cam.w; x++) {
-            RayResult res = castRay(m, m->cam.position, delta, 0);
+        for (int x = 0; x < cam->w; x++) {
+            RayResult res = castRay(cam->position, delta, 0);
             if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
             
-            delta = delta + m->cam.viewportCol; 
+            delta = delta + cam->viewportCol; 
         }
-        baseRowVec = baseRowVec + m->cam.viewportRow;
+        baseRowVec = baseRowVec + cam->viewportRow;
     }
 }
 
-RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta, int callCount) {
+RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
-    for (Sphere s: m->spheres) {
+    for (Sphere s: spheres) {
         // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
         // substituted values for the camera position (x/y/z_0),
         // pixel vec from camera (delta x/y/z),
@@ -83,7 +83,7 @@ RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta, int callCount) {
         Vec3 sphereDelta = collisionPoint-s.center;
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
         collisionPoint = collisionPoint + (0.001 * sphereDelta);
-        RayResult bounce = castRay(m, collisionPoint, sphereDelta, callCount+1);
+        RayResult bounce = castRay(collisionPoint, sphereDelta, callCount+1);
         Vec3 color = {0.f, 0.f, 0.f};
         if (bounce.collisions > 0) color = bounce.color;
         res.color = (1.f - s.reflectiveness)*s.color + (s.reflectiveness) * color;

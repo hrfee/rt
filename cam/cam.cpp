@@ -36,56 +36,54 @@ Mat3 make_z_rotation(float radians) {
 
 // Given a camera object, calculate the position of the bottom-left corner of the viewport, and provide vectors for columns and rows.
 // position of camera must be applied manually!
-void calculateViewport(Camera *cam) {
+void Camera::calculateViewport() {
     // Assume near frustum (viewport) is 1.f away from the camera. Makes things simpler!
     Vec3 frustumVec = {1.f, 0.f, 0.f};
-    float halfViewportWidth = 1.f * std::tan(cam->fov/2.f);
-    float halfViewportHeight = (halfViewportWidth / float(cam->w)) * float(cam->h);
+    float halfViewportWidth = 1.f * std::tan(fov/2.f);
+    float halfViewportHeight = (halfViewportWidth / float(w)) * float(h);
    
     // Calculate and store the bottom-left corner of the viewport
-    cam->viewportCorner = frustumVec;
-    cam->viewportCorner.z -= halfViewportWidth;
-    cam->viewportCorner.y -= halfViewportHeight;
+    viewportCorner = frustumVec;
+    viewportCorner.z -= halfViewportWidth;
+    viewportCorner.y -= halfViewportHeight;
 
-    Mat3 rotZ = make_z_rotation(cam->phi);
-    Mat3 rotY = make_y_rotation(cam->theta);
+    Mat3 rotZ = make_z_rotation(phi);
+    Mat3 rotY = make_y_rotation(theta);
     
-    cam->viewportCorner =  rotY * (rotZ * cam->viewportCorner);
-    cam->viewportCol = frustumVec;
-    cam->viewportCol.y -= halfViewportHeight;
-    cam->viewportCol = rotY * (rotZ * cam->viewportCol);
-    cam->viewportCol = cam->viewportCol - cam->viewportCorner;
-    // cam->viewportCol - cam->viewportCorner is now a vector along the viewport plane with width equivalent to cam->w/2, so scale it down to 1px:
-    cam->viewportCol = 2.f * cam->viewportCol / float(cam->w);
+    viewportCorner =  rotY * (rotZ * viewportCorner);
+    viewportCol = frustumVec;
+    viewportCol.y -= halfViewportHeight;
+    viewportCol = rotY * (rotZ * viewportCol);
+    viewportCol = viewportCol - viewportCorner;
+    // viewportCol - viewportCorner is now a vector along the viewport plane with width equivalent to w/2, so scale it down to 1px:
+    viewportCol = 2.f * viewportCol / float(w);
 
-    cam->viewportRow = frustumVec;
-    cam->viewportRow.z -= halfViewportWidth;
-    cam->viewportRow = rotY * (rotZ * cam->viewportRow);
-    cam->viewportRow = cam->viewportRow - cam->viewportCorner;
+    viewportRow = frustumVec;
+    viewportRow.z -= halfViewportWidth;
+    viewportRow = rotY * (rotZ * viewportRow);
+    viewportRow = viewportRow - viewportCorner;
 
     // and the equivalent for the row vector:
-    cam->viewportRow = 2.f * cam->viewportRow / float(cam->h);
+    viewportRow = 2.f * viewportRow / float(h);
 }
 
-Camera newCamera(int w, int h, float fov, Vec3 pos) {
-    Camera cam;
-    cam.w = w;
-    cam.h = h;
-    cam.fov = fov;
-    cam.position = pos;
-    cam.phi = 0.f;
-    cam.theta = 0.f;
-    cam.farFrustumDistance = 9999.f;
-    return cam;
+Camera::Camera(int width, int height, float fieldOfView, Vec3 pos) {
+    w = width;
+    h = height;
+    fov = fieldOfView;
+    position = pos;
+    phi = 0.f;
+    theta = 0.f;
+    farFrustumDistance = 9999.f;
 }
 
-void debugPrintCorners(Camera *cam) {
+void Camera::debugPrintCorners() {
     std::vector<Vec3> corners;
-    corners.emplace_back(cam->position);
-    corners.emplace_back(cam->position + cam->viewportCorner);
-    corners.emplace_back(cam->position + cam->viewportCorner + (cam->viewportRow*cam->h));
-    corners.emplace_back(cam->position + cam->viewportCorner + (cam->viewportCol*cam->w));
-    corners.emplace_back(cam->position + cam->viewportCorner + (cam->viewportCol*cam->w) + (cam->viewportRow*cam->h));
+    corners.emplace_back(position);
+    corners.emplace_back(position + viewportCorner);
+    corners.emplace_back(position + viewportCorner + (viewportRow*h));
+    corners.emplace_back(position + viewportCorner + (viewportCol*w));
+    corners.emplace_back(position + viewportCorner + (viewportCol*w) + (viewportRow*h));
     char ch = 'A';
     for (Vec3 c: corners) {
         std::printf("%c = (%f, %f, %f)\n", ch, c.x, c.z, c.y);
