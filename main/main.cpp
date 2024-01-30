@@ -14,7 +14,8 @@ int main(void) {
     debugPrintCorners(&(map.cam));
 
     // A yellow sphere
-    appendSphere(&map, {9.f, 0.f, 1.f}, 0.3f, {0.8f, 0.82f, 0.2f}); 
+    appendSphere(&map, {5.f, 0.f, 1.f}, 0.3f, {0.8f, 0.82f, 0.2f}); 
+    appendSphere(&map, {4.f, 0.f, 0.8f}, 0.2f, {0.25f, 0.82f, 0.82f}); 
     
 
     Image *img = newImage(1920, 1080);
