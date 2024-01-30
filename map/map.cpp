@@ -80,7 +80,10 @@ RayResult castRay(WorldMap *m, Vec3 p0, Vec3 delta, int callCount) {
         }
         if (s.reflectiveness == 0) continue;
         Vec3 collisionPoint = p0 + (res.t0 * delta);
-        RayResult bounce = castRay(m, collisionPoint, collisionPoint-s.center, callCount+1);
+        Vec3 sphereDelta = collisionPoint-s.center;
+        // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
+        collisionPoint = collisionPoint + (0.001 * sphereDelta);
+        RayResult bounce = castRay(m, collisionPoint, sphereDelta, callCount+1);
         Vec3 color = {0.f, 0.f, 0.f};
         if (bounce.collisions > 0) color = bounce.color;
         res.color = (1.f - s.reflectiveness)*s.color + (s.reflectiveness) * color;

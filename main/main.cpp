@@ -5,13 +5,14 @@
 #include <math.h>
 #include <cstdio>
 
-#define TEST_W 7000
-#define TEST_H 4000
+#define TEST_W 1920 
+#define TEST_H 1080
+#define TEST_RES_MULTIPLIER 2.f
 #define TEST_FOV 60.f
 
 int main(void) {
     WorldMap map = {50.f, 50.f, 50.f};
-    map.cam = newCamera(TEST_W, TEST_H, TEST_FOV*M_PI / 180.f, {0.f, 0.f, 0.f});
+    map.cam = newCamera(int(float(TEST_W)*TEST_RES_MULTIPLIER), int(float(TEST_H)*TEST_RES_MULTIPLIER), TEST_FOV*M_PI / 180.f, {0.f, 0.f, 0.f});
     map.cam.theta = 0.f * M_PI / 180.f;
     map.cam.phi = 0.f * M_PI / 180.f;
     calculateViewport(&(map.cam));
@@ -23,7 +24,7 @@ int main(void) {
     appendSphere(&map, {2.f, -0.8f, -1.4f}, 0.4f, {0.82f, 0.25f, 0.82f}, 0.1f); 
     
 
-    Image *img = newImage(TEST_W, TEST_H);
+    Image *img = newImage(int(float(TEST_W)*TEST_RES_MULTIPLIER), int(float(TEST_H)*TEST_RES_MULTIPLIER));
     clear(img);
     castRays(&map, img);
     // writeTestImage(img);
