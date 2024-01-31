@@ -1,9 +1,11 @@
 #include "gl.hpp"
 
+#include <GLFW/glfw3.h>
 #include <string>
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
+#include <math.h>
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
 
@@ -98,6 +100,19 @@ GLWindow::GLWindow(int width, int height, float scale) {
     
     // Create texture
     genTexture();
+
+    // Bind controls
+    {
+        // Mouse
+        state.mouse.enabled = false;
+        state.mouse.sensitivity = 0.003f;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        glfwSetCursorPosCallback(window, &mouseCallback);
+    }
+    {
+        // Keyboard
+        glfwSetKeyCallback(window, &keyCallback);
+    }
 }
 
 void GLWindow::genTexture(int w, int h) {
@@ -157,15 +172,44 @@ void GLWindow::mainLoop(Image* (*func)()) {
         glfwPollEvents();
     
         glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-        if (state.fbWidth != state.w || state.fbHeight != state.h) {
+        if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight) {
             glViewport(0, 0, state.fbWidth, state.fbHeight);
             genTexture(state.fbWidth, state.fbHeight);
+            state.prevFbWidth = state.fbWidth;
+            state.prevFbHeight = state.fbHeight;
         }
 
         Image *img = func();
         draw(img);
 
         glfwSwapBuffers(window);
+    }
+}
+
+void mouseCallback(GLFWwindow *window, double x, double y) {
+    GLWindowState* state = static_cast<GLWindowState*>(glfwGetWindowUserPointer(window));
+    if (state->mouse.enabled) {;
+        float dx = x - state->mouse.prevX;
+        float dy = y - state->mouse.prevY;
+        state->mouse.phi -= dx * state->mouse.sensitivity;
+        state->mouse.theta -= dy * state->mouse.sensitivity;
+        if (state->mouse.phi > M_PI/2.f)
+            state->mouse.phi = M_PI/2.f;
+        else if (state->mouse.phi < -M_PI/2.f)
+            state->mouse.phi = -M_PI/2.f;
+    }
+    state->mouse.prevX = x;
+    state->mouse.prevY = y;
+}
+
+void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
+    GLWindowState* state = static_cast<GLWindowState*>(glfwGetWindowUserPointer(window));
+    if (key == GLFW_KEY_M && action == GLFW_PRESS && !state->mouse.enabled) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        state->mouse.enabled = true;
+    } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && action == GLFW_PRESS && state->mouse.enabled) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        state->mouse.enabled = false;
     }
 }
 

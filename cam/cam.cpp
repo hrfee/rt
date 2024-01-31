@@ -47,8 +47,8 @@ void Camera::calculateViewport() {
     viewportCorner.z -= halfViewportWidth;
     viewportCorner.y -= halfViewportHeight;
 
-    Mat3 rotZ = make_z_rotation(phi);
-    Mat3 rotY = make_y_rotation(theta);
+    Mat3 rotZ = make_z_rotation(theta);
+    Mat3 rotY = make_y_rotation(phi);
     
     viewportCorner =  rotY * (rotZ * viewportCorner);
     viewportCol = frustumVec;
@@ -89,20 +89,32 @@ void Camera::setDimensions(int width, int height, float fieldOfView) {
     calculateViewport();
 }
 
+void Camera::rotateXRad(float thetaRad) {
+    theta = thetaRad;
+    calculateViewport();
+}
+
 void Camera::rotateX(float thetaDeg) {
-    theta = thetaDeg * M_PI / 180.f;
+    rotateXRad(thetaDeg * M_PI / 180.f);
+}
+
+void Camera::rotateYRad(float phiRad) {
+    phi = phiRad;
     calculateViewport();
 }
 
 void Camera::rotateY(float phiDeg) {
-    phi = phiDeg * M_PI / 180.f;
+    rotateYRad(phiDeg * M_PI / 180.f);
+}
+
+void Camera::rotateRad(float thetaRad, float phiRad) {
+    theta = thetaRad;
+    phi = phiRad;
     calculateViewport();
 }
 
 void Camera::rotate(float thetaDeg, float phiDeg) {
-    theta = thetaDeg * M_PI / 180.f;
-    phi = phiDeg * M_PI / 180.f;
-    calculateViewport();
+    rotateRad(thetaDeg * M_PI / 180.f, phiDeg * M_PI / 180.f);
 }
 
 void Camera::debugPrintCorners() {

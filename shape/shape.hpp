@@ -2,6 +2,7 @@
 #define SHAPE
 
 #include "../vec/vec.hpp"
+#include <string>
 
 struct Sphere {
     // (x-a^2) + (y-b^2) + (z-c^2) = r^2
@@ -11,5 +12,9 @@ struct Sphere {
     Vec3 color;
     float reflectiveness; // 0-1
 };
+
+std::string encodeSphere(Sphere *s);
+
+Sphere decodeSphere(std::string in);
 
 #endif

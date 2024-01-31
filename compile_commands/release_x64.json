@@ -1,11 +1,5 @@
 [
           {
-            "directory": "/home/hrfee/projects/y3/Personal/rt/third_party",
-            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c",
-            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/third_party/obj/x64/release/glad.o -MF /home/hrfee/projects/y3/Personal/rt/third_party/obj/x64/release/glad.d -c /home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c"
-          }
-,
-          {
             "directory": "/home/hrfee/projects/y3/Personal/rt/main",
             "file": "/home/hrfee/projects/y3/Personal/rt/main/main.cpp",
             "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/main/obj/x64/release/main.o -MF /home/hrfee/projects/y3/Personal/rt/main/obj/x64/release/main.d -c /home/hrfee/projects/y3/Personal/rt/main/main.cpp"
@@ -15,6 +9,12 @@
             "directory": "/home/hrfee/projects/y3/Personal/rt/map",
             "file": "/home/hrfee/projects/y3/Personal/rt/map/map.cpp",
             "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/map/obj/x64/release/map.o -MF /home/hrfee/projects/y3/Personal/rt/map/obj/x64/release/map.d -c /home/hrfee/projects/y3/Personal/rt/map/map.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/shape",
+            "file": "/home/hrfee/projects/y3/Personal/rt/shape/shape.cpp",
+            "command": "cc -MD -MP -DNDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -O2 -o /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/release/shape.o -MF /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/release/shape.d -c /home/hrfee/projects/y3/Personal/rt/shape/shape.cpp"
           }
 ,
           {

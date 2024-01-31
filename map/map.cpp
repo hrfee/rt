@@ -1,6 +1,10 @@
 #include "map.hpp"
 
 #include <cmath>
+#include <fstream>
+#include <string>
+#include <iostream>
+#include <sstream>
 
 void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness) {
     spheres.emplace_back(Sphere{ center, radius, color, reflectiveness });
@@ -89,4 +93,52 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
         res.color = (1.f - s.reflectiveness)*s.color + (s.reflectiveness) * color;
     }
     return res;
+}
+
+namespace {
+    const char* w_dimensions = "dimensions";
+    const char* w_sphere = "sphere";
+}
+
+void WorldMap::encode(char const* path) {
+    std::ofstream out(path);
+    if (!path) {
+        throw std::runtime_error("Failed to open " + std::string(path));
+        return;
+    }
+    {
+        // FIXME: camera
+    }
+    {
+        // World dimensions
+        std::ostringstream fmt;
+        fmt << w_dimensions << " " << w << " " << h << " " << d << std::endl;
+        out << fmt.str();
+    }
+    // spheres
+    for (Sphere s: spheres) {
+        out << encodeSphere(&s);
+    }
+    out.close();
+    std::printf("Current map saved to %s\n", path);
+}
+
+WorldMap::WorldMap(char const* path) {
+    std::ifstream in(path);
+    std::string line;
+    while (std::getline(in, line)) {
+        std::istringstream lstream(line);
+        std::string token;
+        lstream >> token;
+        if (token == w_dimensions) {
+            lstream >> token;
+            w = std::stof(token);
+            lstream >> token;
+            h = std::stof(token);
+            lstream >> token;
+            d = std::stof(token);
+        } else if (token == w_sphere) {
+            spheres.emplace_back(decodeSphere(line));
+        }
+    }
 }

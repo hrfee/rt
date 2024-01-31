@@ -34,6 +34,9 @@ Image *mainLoop() {
         map->cam->setDimensions(window.state.w, window.state.h);
         resizeImage(img, window.state.w, window.state.h);
     }
+    if (map->cam->phi != window.state.mouse.phi || map->cam->theta != window.state.mouse.theta) {
+        map->cam->rotateRad(window.state.mouse.theta, window.state.mouse.phi);
+    }
     clearImage(img);
     map->castRays(img);
     std::fprintf(stderr, "Rays casted\n");
@@ -42,18 +45,17 @@ Image *mainLoop() {
 }
 
 int main(void) {
-    map = new WorldMap(50.f, 50.f, 50.f);
+    map = new WorldMap("maps/3sphere.map");
 
     map->cam = new Camera(window.state.w, window.state.h, initialFOV, {0.f, 0.f, 0.f});
-    map->cam->rotate(0.f, 0.f);
+    window.state.mouse.phi = 0.f;
+    window.state.mouse.theta = 0.f;
+    map->cam->rotateRad(window.state.mouse.theta, window.state.mouse.phi);
    
     map->cam->debugPrintCorners();
 
-    // A yellow sphere
-    map->appendSphere({5.f, 0.f, 1.f}, 0.3f, {0.8f, 0.82f, 0.2f}, 0.4f); 
-    map->appendSphere({5.2f, 0.f, -0.2f}, 0.4f, {0.25f, 0.82f, 0.82f}, 0.5f); 
-    map->appendSphere({2.f, -0.8f, -1.4f}, 0.4f, {0.82f, 0.25f, 0.82f}, 0.1f); 
-    
+   
+
 
     img = newImage(window.state.w, window.state.h);
     clearImage(img);

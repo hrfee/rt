@@ -17,8 +17,8 @@ project "main"
     targetdir "bin/${cfg.buildcfg}"
     location "main"
     files { "main/**.hpp", "main/**.cpp" }
-    links "shape"
     links "map"
+    links "shape"
     links "img"
     links "render_bmp"
     links "glfw"
@@ -30,6 +30,7 @@ project "main"
 project "map"
     kind "StaticLib"
     location "map"
+    links "shape"
     files { "map/**.cpp", "map/**.hpp" }
 
 project "shape"

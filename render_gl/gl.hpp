@@ -4,13 +4,20 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "../img/img.hpp"
+#include "../cam/cam.hpp"
 #include <string>
 
 struct GLWindowState {
     int w, h;
-    int fbWidth, fbHeight;
+    int fbWidth, fbHeight, prevFbWidth, prevFbHeight;
     float scale;
     double lastFrameTime;
+    struct Mouse {
+        bool enabled;
+        float sensitivity;
+        float prevX, prevY;
+        float phi, theta;
+    } mouse;
 };
 
 class GLWindow {
@@ -27,5 +34,8 @@ class GLWindow {
         GLuint tex, vert, frag, prog, vao;
         void loadShader(GLuint *s, GLenum shaderType, char const *fname);
 };
+
+void mouseCallback(GLFWwindow *, double, double);
+void keyCallback(GLFWwindow *, int, int, int, int);
 
 #endif

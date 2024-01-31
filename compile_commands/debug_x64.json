@@ -1,11 +1,5 @@
 [
           {
-            "directory": "/home/hrfee/projects/y3/Personal/rt/third_party",
-            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/third_party/obj/x64/debug/glad.o -MF /home/hrfee/projects/y3/Personal/rt/third_party/obj/x64/debug/glad.d -c /home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c"
-          }
-,
-          {
             "directory": "/home/hrfee/projects/y3/Personal/rt/main",
             "file": "/home/hrfee/projects/y3/Personal/rt/main/main.cpp",
             "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/main/obj/x64/debug/main.o -MF /home/hrfee/projects/y3/Personal/rt/main/obj/x64/debug/main.d -c /home/hrfee/projects/y3/Personal/rt/main/main.cpp"
@@ -15,6 +9,12 @@
             "directory": "/home/hrfee/projects/y3/Personal/rt/map",
             "file": "/home/hrfee/projects/y3/Personal/rt/map/map.cpp",
             "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/map/obj/x64/debug/map.o -MF /home/hrfee/projects/y3/Personal/rt/map/obj/x64/debug/map.d -c /home/hrfee/projects/y3/Personal/rt/map/map.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/shape",
+            "file": "/home/hrfee/projects/y3/Personal/rt/shape/shape.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/debug/shape.o -MF /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/debug/shape.d -c /home/hrfee/projects/y3/Personal/rt/shape/shape.cpp"
           }
 ,
           {
