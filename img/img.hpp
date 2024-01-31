@@ -13,6 +13,10 @@ struct Image {
 
 Image *newImage(int w, int h);
 
+void closeImage(Image *img);
+
+void resizeImage(Image *img, int w, int h);
+
 void writePixel(Image *img, int x, int y, Vec3 color);
 
 Vec3 getPixel(Image *img, int x, int y);

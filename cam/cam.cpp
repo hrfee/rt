@@ -72,9 +72,37 @@ Camera::Camera(int width, int height, float fieldOfView, Vec3 pos) {
     h = height;
     fov = fieldOfView;
     position = pos;
-    phi = 0.f;
-    theta = 0.f;
     farFrustumDistance = 9999.f;
+    rotate(0.f, 0.f);
+}
+
+void Camera::setDimensions(int width, int height) {
+    w = width;
+    h = height;
+    calculateViewport();
+}
+
+void Camera::setDimensions(int width, int height, float fieldOfView) {
+    w = width;
+    h = height;
+    fov = fieldOfView;
+    calculateViewport();
+}
+
+void Camera::rotateX(float thetaDeg) {
+    theta = thetaDeg * M_PI / 180.f;
+    calculateViewport();
+}
+
+void Camera::rotateY(float phiDeg) {
+    phi = phiDeg * M_PI / 180.f;
+    calculateViewport();
+}
+
+void Camera::rotate(float thetaDeg, float phiDeg) {
+    theta = thetaDeg * M_PI / 180.f;
+    phi = phiDeg * M_PI / 180.f;
+    calculateViewport();
 }
 
 void Camera::debugPrintCorners() {

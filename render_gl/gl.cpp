@@ -32,9 +32,10 @@ void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
     }
 }
 
-GLWindow::GLWindow(int width, int height) {
-    w = width;
-    h = height;
+GLWindow::GLWindow(int width, int height, float scale) {
+    state.w = width;
+    state.h = height;
+    state.scale = scale;
     int success = glfwInit();
     if (!success) {
         char const* error = nullptr;
@@ -50,14 +51,16 @@ GLWindow::GLWindow(int width, int height) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
     glfwWindowHint(GLFW_DEPTH_BITS, 24);
 
-    window = glfwCreateWindow(w, h, WINDOW_TITLE, nullptr, nullptr);
+    window = glfwCreateWindow(state.w, state.h, WINDOW_TITLE, nullptr, nullptr);
     if (!window) {
         char const* error = nullptr;
         int code = glfwGetError(&error);
         glfwTerminate();
         throw std::runtime_error("Failed creating window (" + std::to_string(code) + "): " + std::string(error));
     }
-   
+  
+    glfwSetWindowUserPointer(window, &state);
+
     glfwMakeContextCurrent(window);
     
     glfwSwapInterval(1);
@@ -88,9 +91,24 @@ GLWindow::GLWindow(int width, int height) {
         throw std::runtime_error("Shader linking failed");
     }
 
+    glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
+    state.w = state.fbWidth;
+    state.h = state.fbHeight;
+    glViewport(0, 0, state.w, state.h);
+    
     // Create texture
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
+    genTexture();
+}
+
+void GLWindow::genTexture(int w, int h) {
+    if (w == 0) w = state.w;
+    if (h == 0) h = state.h;
+    w = int(float(w) * state.scale);
+    h = int(float(h) * state.scale);
+    std::fprintf(stderr, "Resizing to %dx%d\n", w, h);
+    GLuint newTex = 0;
+    glGenTextures(1, &newTex);
+    glBindTexture(GL_TEXTURE_2D, newTex);
     glTexStorage2D(
             GL_TEXTURE_2D,
             1,
@@ -103,8 +121,12 @@ GLWindow::GLWindow(int width, int height) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-    
-    glViewport(0, 0, w, h);
+
+    if (newTex != 0) {
+        // No-op if no texture is bound already, so no checks needed.
+        glDeleteTextures(1, &tex);
+        tex = newTex;
+    }
 }
 
 void GLWindow::draw(Image *img) {
@@ -116,7 +138,7 @@ void GLWindow::draw(Image *img) {
             GL_TEXTURE_2D,
             0,
             0, 0,
-            GLsizei(w), GLsizei(h),
+            GLsizei(state.w), GLsizei(state.h),
             GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV,
             img->rgbxImg
     );
@@ -133,6 +155,12 @@ void GLWindow::draw(Image *img) {
 void GLWindow::mainLoop(Image* (*func)()) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+    
+        glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
+        if (state.fbWidth != state.w || state.fbHeight != state.h) {
+            glViewport(0, 0, state.fbWidth, state.fbHeight);
+            genTexture(state.fbWidth, state.fbHeight);
+        }
 
         Image *img = func();
         draw(img);

@@ -2,13 +2,31 @@
 
 #include <cstring>
 
+void allocateImage(Image *img, int w, int h) {
+    img->img = (Vec3*)malloc(sizeof(Vec3)*w*h);
+    img->rgbxImg = (std::uint8_t*)malloc(sizeof(std::uint8_t)*w*h*4);
+}
+
 Image *newImage(int w, int h) {
     Image *image = (Image*)malloc(sizeof(Image));
     image->w = w;
     image->h = h;
-    image->img = (Vec3*)malloc(sizeof(Vec3)*w*h);
-    image->rgbxImg = (std::uint8_t*)malloc(sizeof(std::uint8_t)*w*h*4);
+    allocateImage(image, w, h);
     return image;
+}
+
+void closeImage(Image *img) {
+    free(img->img);
+    free(img->rgbxImg);
+    free(img);
+}
+
+void resizeImage(Image *img, int w, int h) {
+    free(img->img);
+    free(img->rgbxImg);
+    img->w = w;
+    img->h = h;
+    allocateImage(img, w, h);
 }
 
 void writePixel(Image *img, int x, int y, Vec3 color) {

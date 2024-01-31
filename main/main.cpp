@@ -11,31 +11,42 @@
 #define TEST_RES_MULTIPLIER .5f
 #define TEST_FOV 60
 
+#define FRAMETIME
+
 namespace {
     constexpr int initialWidth = int(float(TEST_W)*TEST_RES_MULTIPLIER);
     constexpr int initialHeight = int(float(TEST_H)*TEST_RES_MULTIPLIER);
     constexpr float initialFOV = float(TEST_FOV)*M_PI / 180.f;
     WorldMap *map;
-    int renderWidth = initialWidth;
-    int renderHeight = initialHeight;
     Image *img;
-    GLWindow window(renderWidth, renderHeight);
+    GLWindow window(TEST_W, TEST_H, TEST_RES_MULTIPLIER);
 }
 
 Image *mainLoop() {
+#ifdef FRAMETIME
+    double frameTime = glfwGetTime();
+    std::fprintf(stderr, "Frame time: %dms (%.2f FPS)\n", int((frameTime-window.state.lastFrameTime)*1000.f), 1.f/(frameTime-window.state.lastFrameTime));
+    window.state.lastFrameTime = glfwGetTime();
+#endif
+    if (window.state.fbWidth != window.state.w || window.state.fbHeight != window.state.h) {
+        window.state.w = float(window.state.fbWidth) * window.state.scale;
+        window.state.h = float(window.state.fbHeight) * window.state.scale;
+        map->cam->setDimensions(window.state.w, window.state.h);
+        resizeImage(img, window.state.w, window.state.h);
+    }
     clearImage(img);
     map->castRays(img);
+    std::fprintf(stderr, "Rays casted\n");
+
     return img;
 }
 
 int main(void) {
     map = new WorldMap(50.f, 50.f, 50.f);
 
-    map->cam = new Camera(renderWidth, renderHeight, initialFOV, {0.f, 0.f, 0.f});
-    map->cam->theta = 0.f * M_PI / 180.f;
-    map->cam->phi = 0.f * M_PI / 180.f;
+    map->cam = new Camera(window.state.w, window.state.h, initialFOV, {0.f, 0.f, 0.f});
+    map->cam->rotate(0.f, 0.f);
    
-    map->cam->calculateViewport();
     map->cam->debugPrintCorners();
 
     // A yellow sphere
@@ -44,10 +55,9 @@ int main(void) {
     map->appendSphere({2.f, -0.8f, -1.4f}, 0.4f, {0.82f, 0.25f, 0.82f}, 0.1f); 
     
 
-    img = newImage(initialWidth, initialHeight);
+    img = newImage(window.state.w, window.state.h);
     clearImage(img);
 
-    GLWindow window(initialWidth, initialHeight);
     // castRays(&map, img);
     window.mainLoop(mainLoop);
 

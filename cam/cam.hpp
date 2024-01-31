@@ -8,6 +8,11 @@ class Camera {
         Camera(int width, int height, float fieldOfView, Vec3 pos);
         void calculateViewport();
         void debugPrintCorners();
+        void setDimensions(int width, int height);
+        void setDimensions(int width, int height, float fieldOfView);
+        void rotateX(float thetaDeg);
+        void rotateY(float phiDeg);
+        void rotate(float thetaDeg, float phiDeg);
         int w, h;
         float fov;
         float farFrustumDistance;
