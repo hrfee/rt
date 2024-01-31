@@ -21,12 +21,15 @@ class WorldMap {
         WorldMap(char const* path);
         float w, h, d;
         std::vector<Sphere> spheres;
+        std::vector<Triangle> triangles;
         Camera *cam;
         void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness); 
+        void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness); 
         void castRays(Image *img);
         void encode(char const* path);
     private:
         RayResult castRay(Vec3 p0, Vec3 delta, int callCount);
 };
 
+bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c);
 #endif

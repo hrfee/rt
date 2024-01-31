@@ -8,7 +8,7 @@
 #include <string>
 
 struct GLWindowState {
-    int w, h;
+    int w, h, prevW, prevH;
     int fbWidth, fbHeight, prevFbWidth, prevFbHeight;
     float scale;
     double lastFrameTime;

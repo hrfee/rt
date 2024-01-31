@@ -177,6 +177,8 @@ void GLWindow::mainLoop(Image* (*func)()) {
             genTexture(state.fbWidth, state.fbHeight);
             state.prevFbWidth = state.fbWidth;
             state.prevFbHeight = state.fbHeight;
+            state.w = float(state.fbWidth) * state.scale;
+            state.h = float(state.fbHeight) * state.scale;
         }
 
         Image *img = func();
@@ -193,10 +195,10 @@ void mouseCallback(GLFWwindow *window, double x, double y) {
         float dy = y - state->mouse.prevY;
         state->mouse.phi -= dx * state->mouse.sensitivity;
         state->mouse.theta -= dy * state->mouse.sensitivity;
-        if (state->mouse.phi > M_PI/2.f)
-            state->mouse.phi = M_PI/2.f;
-        else if (state->mouse.phi < -M_PI/2.f)
-            state->mouse.phi = -M_PI/2.f;
+        if (state->mouse.theta > M_PI/2.f)
+            state->mouse.theta = M_PI/2.f;
+        else if (state->mouse.theta < -M_PI/2.f)
+            state->mouse.theta = -M_PI/2.f;
     }
     state->mouse.prevX = x;
     state->mouse.prevY = y;

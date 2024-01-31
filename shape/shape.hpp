@@ -17,4 +17,14 @@ std::string encodeSphere(Sphere *s);
 
 Sphere decodeSphere(std::string in);
 
+struct Triangle {
+    Vec3 a, b, c;
+    Vec3 color;
+    float reflectiveness;
+};
+
+std::string encodeTriangle(Triangle *t);
+
+Triangle decodeTriangle(std::string in);
+
 #endif

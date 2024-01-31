@@ -35,4 +35,21 @@ Mat3 operator*(Mat3 const& a, Mat3 const& b) noexcept {
     return res;
 }
 
+struct Mat2 {
+    float v[4];
+
+    constexpr float& operator() (std::size_t i, std::size_t j) noexcept {
+        return v[i*2 + j];
+    }
+    
+    constexpr float const& operator() (std::size_t i, std::size_t j) const noexcept {
+        return v[i*2 + j];
+    }
+};
+
+constexpr
+float det(Mat2 a) noexcept {
+    return a(0,0)*a(1,1) - a(1, 0)*a(0, 1);
+}
+
 #endif
