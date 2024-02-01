@@ -3,6 +3,7 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include "imgui.h"
 #include "../img/img.hpp"
 #include "../cam/cam.hpp"
 #include <string>
@@ -22,6 +23,11 @@ struct GLWindowState {
     } mouse;
 };
 
+struct GLWindowUI {
+    ImGuiContext *ctx;
+    ImGuiIO *io;
+};
+
 class GLWindow {
     public:
         GLFWwindow* window;
@@ -36,6 +42,8 @@ class GLWindow {
         std::string vertString, fragString;
         GLuint tex, vert, frag, prog, vao;
         void loadShader(GLuint *s, GLenum shaderType, char const *fname);
+        GLWindowUI ui;
+        void loadUI();
 };
 
 void mouseCallback(GLFWwindow *, double, double);

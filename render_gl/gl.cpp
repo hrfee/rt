@@ -1,11 +1,14 @@
 #include "gl.hpp"
 
-#include <GLFW/glfw3.h>
 #include <string>
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
 #include <math.h>
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
     std::ifstream f(fname);
@@ -116,6 +119,20 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
         // Keyboard
         glfwSetKeyCallback(window, &keyCallback);
     }
+
+    // Load UI
+    loadUI();
+}
+
+void GLWindow::loadUI() {
+    //  FIXME: Hookup imgui and cleanup
+    //  see https://github.com/ocornut/imgui/wiki/Getting-Started#example-if-you-are-using-glfw--openglwebgl
+    ui.ctx = ImGui::CreateContext();
+    ui.io = &(ImGui::GetIO());
+    ui.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init();
 }
 
 void GLWindow::genTexture(int fbWidth, int fbHeight) {
@@ -173,6 +190,11 @@ void GLWindow::draw(Image *img) {
 void GLWindow::mainLoop(Image* (*func)()) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
     
         glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
         if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight) {
@@ -186,6 +208,9 @@ void GLWindow::mainLoop(Image* (*func)()) {
 
         Image *img = func();
         draw(img);
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
     }
@@ -219,5 +244,8 @@ void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int 
 }
 
 GLWindow::~GLWindow() {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
 }

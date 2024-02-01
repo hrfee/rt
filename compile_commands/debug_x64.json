@@ -2,48 +2,90 @@
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/main",
             "file": "/home/hrfee/projects/y3/Personal/rt/main/main.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/main/obj/x64/debug/main.o -MF /home/hrfee/projects/y3/Personal/rt/main/obj/x64/debug/main.d -c /home/hrfee/projects/y3/Personal/rt/main/main.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/main/obj/x64/debug/main.o -MF /home/hrfee/projects/y3/Personal/rt/main/obj/x64/debug/main.d -c /home/hrfee/projects/y3/Personal/rt/main/main.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/map",
             "file": "/home/hrfee/projects/y3/Personal/rt/map/map.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/map/obj/x64/debug/map.o -MF /home/hrfee/projects/y3/Personal/rt/map/obj/x64/debug/map.d -c /home/hrfee/projects/y3/Personal/rt/map/map.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -o /home/hrfee/projects/y3/Personal/rt/map/obj/x64/debug/map.o -MF /home/hrfee/projects/y3/Personal/rt/map/obj/x64/debug/map.d -c /home/hrfee/projects/y3/Personal/rt/map/map.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/shape",
             "file": "/home/hrfee/projects/y3/Personal/rt/shape/shape.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/debug/shape.o -MF /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/debug/shape.d -c /home/hrfee/projects/y3/Personal/rt/shape/shape.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -o /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/debug/shape.o -MF /home/hrfee/projects/y3/Personal/rt/shape/obj/x64/debug/shape.d -c /home/hrfee/projects/y3/Personal/rt/shape/shape.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/img",
             "file": "/home/hrfee/projects/y3/Personal/rt/img/img.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/img/obj/x64/debug/img.o -MF /home/hrfee/projects/y3/Personal/rt/img/obj/x64/debug/img.d -c /home/hrfee/projects/y3/Personal/rt/img/img.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -o /home/hrfee/projects/y3/Personal/rt/img/obj/x64/debug/img.o -MF /home/hrfee/projects/y3/Personal/rt/img/obj/x64/debug/img.d -c /home/hrfee/projects/y3/Personal/rt/img/img.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/cam",
             "file": "/home/hrfee/projects/y3/Personal/rt/cam/cam.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/cam/obj/x64/debug/cam.o -MF /home/hrfee/projects/y3/Personal/rt/cam/obj/x64/debug/cam.d -c /home/hrfee/projects/y3/Personal/rt/cam/cam.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -o /home/hrfee/projects/y3/Personal/rt/cam/obj/x64/debug/cam.o -MF /home/hrfee/projects/y3/Personal/rt/cam/obj/x64/debug/cam.d -c /home/hrfee/projects/y3/Personal/rt/cam/cam.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/render_bmp",
             "file": "/home/hrfee/projects/y3/Personal/rt/render_bmp/bmp.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -o /home/hrfee/projects/y3/Personal/rt/render_bmp/obj/x64/debug/bmp.o -MF /home/hrfee/projects/y3/Personal/rt/render_bmp/obj/x64/debug/bmp.d -c /home/hrfee/projects/y3/Personal/rt/render_bmp/bmp.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -o /home/hrfee/projects/y3/Personal/rt/render_bmp/obj/x64/debug/bmp.o -MF /home/hrfee/projects/y3/Personal/rt/render_bmp/obj/x64/debug/bmp.d -c /home/hrfee/projects/y3/Personal/rt/render_bmp/bmp.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
             "file": "/home/hrfee/projects/y3/Personal/rt/render_gl/gl.cpp",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/gl.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/gl.d -c /home/hrfee/projects/y3/Personal/rt/render_gl/gl.cpp"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/gl.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/gl.d -c /home/hrfee/projects/y3/Personal/rt/render_gl/gl.cpp"
           }
 ,
           {
             "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
             "file": "/home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c",
-            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/glad.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/glad.d -c /home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c"
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/glad.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/glad.d -c /home/hrfee/projects/y3/Personal/rt/third_party/glad/src/glad.c"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backend/imgui_impl_opengl3.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_impl_opengl3.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_impl_opengl3.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/backend/imgui_impl_opengl3.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends/imgui_impl_glfw.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_impl_glfw.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_impl_glfw.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends/imgui_impl_glfw.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_demo.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_demo.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_demo.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_demo.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_draw.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_draw.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_draw.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_draw.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_tables.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_tables.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_tables.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_tables.cpp"
+          }
+,
+          {
+            "directory": "/home/hrfee/projects/y3/Personal/rt/render_gl",
+            "file": "/home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_widgets.cpp",
+            "command": "cc -MD -MP -DDEBUG -I/home/hrfee/projects/y3/Personal/rt/third_party/glad/include -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui -I/home/hrfee/projects/y3/Personal/rt/third_party/imgui/backends -m64 -g -lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi -o /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_widgets.o -MF /home/hrfee/projects/y3/Personal/rt/render_gl/obj/x64/debug/imgui_widgets.d -c /home/hrfee/projects/y3/Personal/rt/third_party/imgui/imgui_widgets.cpp"
           }
 ]

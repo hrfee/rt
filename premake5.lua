@@ -3,7 +3,7 @@ workspace "rt"
     cppdialect "C++17"
     platforms { "x64" }
     configurations { "debug", "release" }
-includedirs { "third_party/glad/include" }
+includedirs { "third_party/glad/include", "third_party/imgui", "third_party/imgui/backends" }
     filter "configurations:debug"
         defines { "DEBUG" }
         symbols "On"
@@ -61,7 +61,7 @@ project "render_bmp"
 project "render_gl"
     kind "StaticLib"
     location "render_gl"
-    files { "render_gl/**.cpp", "render_gl/**.hpp", "third_party/glad/src/*.c" }
+    files { "render_gl/**.cpp", "render_gl/**.hpp", "third_party/glad/src/*.c", "third_party/imgui/*.cpp", "third_party/imgui/*.h", "third_party/imgui/backends/imgui_impl_glfw.cpp", "third_party/imgui/backends/imgui_impl_glfw.h", "third_party/imgui/backends/imgui_impl_opengl3.cpp", "third_party/imgui/backends/imgui_impl_opengl3.h" }
     links "glfw"
     filter { "system:linux" }
         buildoptions { "-lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi" }
