@@ -5,44 +5,44 @@
 #include "../cam/cam.hpp"
 #include <math.h>
 #include <cstdio>
+#include <getopt.h>
 
-#define TEST_W 1920 
-#define TEST_H 1080
-#define TEST_RES_MULTIPLIER .2f
-#define TEST_FOV 60
+#define INIT_W 1920 
+#define INIT_H 1080
+#define INIT_SCALE_FACTOR .2f
+#define INIT_FOV 60
+
+#define WINDOW_TITLE "COMP3931 Individual Project - rt"
 
 // Uncomment to get printouts of frametime & fps. Forces re-rendering every frame.
 // #define FRAMETIME
 
 namespace {
-    constexpr int initialWidth = int(float(TEST_W)*TEST_RES_MULTIPLIER);
-    constexpr int initialHeight = int(float(TEST_H)*TEST_RES_MULTIPLIER);
-    constexpr float initialFOV = float(TEST_FOV)*M_PI / 180.f;
     WorldMap *map;
     Image *img;
-    GLWindow window(TEST_W, TEST_H, TEST_RES_MULTIPLIER);
+    GLWindow *window;
 }
 
 Image *mainLoop() {
 #ifdef FRAMETIME
     double frameTime = glfwGetTime();
-    std::fprintf(stderr, "Frame time: %dms (%.2f FPS)\n", int((frameTime-window.state.lastFrameTime)*1000.f), 1.f/(frameTime-window.state.lastFrameTime));
-    window.state.lastFrameTime = glfwGetTime();
+    std::fprintf(stderr, "Frame time: %dms (%.2f FPS)\n", int((frameTime-window->state.lastFrameTime)*1000.f), 1.f/(frameTime-window->state.lastFrameTime));
+    window->state.lastFrameTime = glfwGetTime();
 #endif
 #ifndef FRAMETIME
     bool change = false;
 #endif
-    if (window.state.w != window.state.prevW || window.state.h != window.state.prevH) {
-        map->cam->setDimensions(window.state.w, window.state.h);
-        resizeImage(img, window.state.w, window.state.h);
-        window.state.prevW = window.state.w;
-        window.state.prevH = window.state.h;
+    if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
+        map->cam->setDimensions(window->state.w, window->state.h);
+        resizeImage(img, window->state.w, window->state.h);
+        window->state.prevW = window->state.w;
+        window->state.prevH = window->state.h;
 #ifndef FRAMETIME
         change = true;
 #endif
     }
-    if (map->cam->phi != window.state.mouse.phi || map->cam->theta != window.state.mouse.theta) {
-        map->cam->rotateRad(window.state.mouse.theta, window.state.mouse.phi);
+    if (map->cam->phi != window->state.mouse.phi || map->cam->theta != window->state.mouse.theta) {
+        map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);
 #ifndef FRAMETIME
         change = true;
 #endif
@@ -60,32 +60,60 @@ Image *mainLoop() {
     return img;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+    int windowWidth = INIT_W;
+    int windowHeight = INIT_H;
+    float windowScaleFactor = INIT_SCALE_FACTOR;
+    float cameraFOV = float(INIT_FOV)*M_PI / 180.f;
 
-    /*if (pointInTriangle({7.27, -0.21}, {8, 0}, {7, -1}, {6, 5})) {
-        std::printf("i work!\n");
-    } else {
-        std::printf("i don't work!\n");
+    int flag;
+    while ((flag = getopt(argc, argv, "hW:H:s:f:")) != -1) {
+        switch (flag) {
+            case 'W': {
+                windowWidth = std::stoi(std::string(optarg));
+            }; break;
+            case 'H': {
+                windowHeight = std::stoi(std::string(optarg));
+            }; break;
+            case 's': {
+                windowScaleFactor = std::stof(std::string(optarg));
+            }; break;
+            case 'f': {
+                cameraFOV = float(std::stoi(std::string(optarg))) * M_PI / 180.f;
+            }; break;
+            case 'h': {
+                std::fprintf(stderr, "%s\n%s -W <window width> -H <window height> -s <render scale factor> -f <fov (degrees)>\n", WINDOW_TITLE, argv[0]);
+                return 0;
+            }; break;
+            case '?': {
+                if (optopt == 'W' || optopt == 'H') {
+                    std::fprintf(stderr, "-%c requires an integer argument.\n", optopt);
+                } else if (optopt == 's') {
+                    std::fprintf(stderr, "-%c requires a number scale value.\n", optopt);
+                }
+                return 1;
+            };
+        }
     }
-    return 0;*/
 
+    window = new GLWindow(windowWidth, windowHeight, windowScaleFactor, WINDOW_TITLE);
     map = new WorldMap("maps/3sphere.map");
 
-    map->cam = new Camera(window.state.w, window.state.h, initialFOV, {0.f, -0.5f, 0.f});
-    window.state.mouse.phi = 0.f;
-    window.state.mouse.theta = 0.f;
-    map->cam->rotateRad(window.state.mouse.theta, window.state.mouse.phi);
+    map->cam = new Camera(window->state.w, window->state.h, cameraFOV, {0.f, -0.5f, 0.f});
+    window->state.mouse.phi = 0.f;
+    window->state.mouse.theta = 0.f;
+    map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);
    
     map->cam->debugPrintCorners();
 
    
 
 
-    img = newImage(window.state.w, window.state.h);
+    img = newImage(window->state.w, window->state.h);
     clearImage(img);
 
     // castRays(&map, img);
-    window.mainLoop(mainLoop);
+    window->mainLoop(mainLoop);
 
     // writeBMP(img, "/tmp/test.bmp");
 

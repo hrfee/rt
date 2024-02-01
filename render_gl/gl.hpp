@@ -8,7 +8,9 @@
 #include <string>
 
 struct GLWindowState {
+    // The render resolution
     int w, h, prevW, prevH;
+    // The window resolution
     int fbWidth, fbHeight, prevFbWidth, prevFbHeight;
     float scale;
     double lastFrameTime;
@@ -23,13 +25,14 @@ struct GLWindowState {
 class GLWindow {
     public:
         GLFWwindow* window;
-        GLWindow(int w, int h, float scale);
+        GLWindow(int w, int h, float scale, const char *windowTitle);
         ~GLWindow();
         void mainLoop(Image* (*func)());
         void draw(Image *img);
         GLWindowState state;
     private:
-        void genTexture(int w = 0, int h = 0);
+        const char *title;
+        void genTexture(int fbWidth = 0, int fbHeight = 0);
         std::string vertString, fragString;
         GLuint tex, vert, frag, prog, vao;
         void loadShader(GLuint *s, GLenum shaderType, char const *fname);

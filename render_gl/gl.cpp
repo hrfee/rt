@@ -7,8 +7,6 @@
 #include <sstream>
 #include <math.h>
 
-#define WINDOW_TITLE "COMP3931 Individual Project - rt"
-
 void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
     std::ifstream f(fname);
     if (!f) {
@@ -34,10 +32,13 @@ void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
     }
 }
 
-GLWindow::GLWindow(int width, int height, float scale) {
-    state.w = width;
-    state.h = height;
+GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) {
+    state.fbWidth = width;
+    state.fbHeight = height;
+    state.w = float(width)*scale;
+    state.h = float(height)*scale;
     state.scale = scale;
+    title = windowTitle;
     int success = glfwInit();
     if (!success) {
         char const* error = nullptr;
@@ -55,7 +56,7 @@ GLWindow::GLWindow(int width, int height, float scale) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
     glfwWindowHint(GLFW_DEPTH_BITS, 24);
 
-    window = glfwCreateWindow(state.w, state.h, WINDOW_TITLE, nullptr, nullptr);
+    window = glfwCreateWindow(state.fbWidth, state.fbHeight, title, nullptr, nullptr);
     if (!window) {
         char const* error = nullptr;
         int code = glfwGetError(&error);
@@ -96,9 +97,9 @@ GLWindow::GLWindow(int width, int height, float scale) {
     }
 
     glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-    state.w = state.fbWidth;
-    state.h = state.fbHeight;
-    glViewport(0, 0, state.w, state.h);
+    state.w = float(state.fbWidth) * scale;
+    state.h = float(state.fbHeight) * scale;
+    glViewport(0, 0, state.fbWidth, state.fbHeight);
     
     // Create texture
     genTexture();
@@ -117,11 +118,11 @@ GLWindow::GLWindow(int width, int height, float scale) {
     }
 }
 
-void GLWindow::genTexture(int w, int h) {
-    if (w == 0) w = state.w;
-    if (h == 0) h = state.h;
-    w = int(float(w) * state.scale);
-    h = int(float(h) * state.scale);
+void GLWindow::genTexture(int fbWidth, int fbHeight) {
+    if (fbWidth == 0) fbWidth = state.fbWidth;
+    if (fbHeight == 0) fbHeight = state.fbWidth;
+    int w = int(float(fbWidth) * state.scale);
+    int h = int(float(fbHeight) * state.scale);
     std::fprintf(stderr, "Resizing to %dx%d\n", w, h);
     GLuint newTex = 0;
     glGenTextures(1, &newTex);
