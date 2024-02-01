@@ -1,6 +1,7 @@
 #ifndef VEC
 #define VEC
 
+#include <cmath>
 #include <cstdio>
 #include <cstdint>
 
@@ -72,6 +73,16 @@ Vec3 cross(Vec3 a, Vec3 b) noexcept {
         a.z*b.x - a.x*b.z,
         a.x*b.y - a.y*b.x
     };
+}
+
+constexpr
+float mag(Vec3 a) noexcept {
+    return std::sqrt(dot(a, a));
+}
+
+constexpr
+Vec3 norm(Vec3 a) noexcept {
+    return a/mag(a);
 }
 
 struct Vec3ui {

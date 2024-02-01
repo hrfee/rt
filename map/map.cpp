@@ -86,6 +86,21 @@ bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c) {
     return collisions == 1;
 }
 
+// Finds the normal of a triangle (abc) that points towards given vector p0
+Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
+    Vec3 norms[2] = {cross(a - c, b - c), cross(c - a, b - a)};
+    float components[2] = {0, 0};
+    for (int i = 0; i < 2; i++) {
+        // Roughly computing component of each normal along vector v0,
+        // a.k.a (n_i \dot v0)/|v0|.
+        // but since we just want the lowest one (most negative), the denom. can be ignored.
+        components[i] = dot(norms[i], v0);
+    }
+    if (components[0] <= components[1])
+        return norms[0];
+    return norms[1];
+}
+
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
@@ -143,26 +158,26 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
         }
         if (sphere.reflectiveness == 0) continue;
         Vec3 collisionPoint = p0 + (res.t0 * delta);
-        Vec3 sphereDelta = collisionPoint-sphere.center;
+        Vec3 sphereNormal = collisionPoint-sphere.center;
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-        collisionPoint = collisionPoint + (0.001 * sphereDelta);
-        RayResult bounce = castRay(collisionPoint, sphereDelta, callCount+1);
+        collisionPoint = collisionPoint + (0.001 * sphereNormal);
+        RayResult bounce = castRay(collisionPoint, sphereNormal, callCount+1);
         Vec3 color = {0.f, 0.f, 0.f};
         if (bounce.collisions > 0) color = bounce.color;
         res.color = (1.f - sphere.reflectiveness)*sphere.color + (sphere.reflectiveness) * color;
     }
     for (Triangle tri: triangles) {
-        Vec3 norm = cross(tri.a - tri.c, tri.b - tri.c);
+        Vec3 normal = norm(getVisibleTriNormal(delta, tri.a, tri.b, tri.c));
         // dot product of a line on the plane with the normal is zero, hence (p - t.a) \dot norm = 0, where p is a random point (x, y, z)
         // p \dot norm = t.a \dot norm
         // compute the right side, expand the left side and subtract it:
         // (norm.x)x + (norm.y)y + (norm.z)z - (t.a \dot norm) = 0
         // Take values in equation of a plane (CGPaP in C p. 703 eq. 15.18): Ax + By + Cz + D = 0
         // where A = norm.x, B = norm.y, C = norm.z
-        float d = -dot(tri.a, norm);
+        float d = -dot(tri.a, normal);
         // CGPaP in C p.703 eq. 15.21, using dot products to make more readable
-        float t = -(dot(norm, p0) + d);
-        float denom = dot(norm, delta);
+        float t = -(dot(normal, p0) + d);
+        float denom = dot(normal, delta);
         if (denom == 0) { // Plane parallel to ray, ignore
             continue;
         }
@@ -172,13 +187,13 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
         Vec3 collisionPoint = p0 + (t * delta);
         // project orthographically as big as possible
         Vec2 ao, bo, co, po;
-        if (norm.x >= norm.y && norm.x >= norm.z) {
+        if (normal.x >= normal.y && normal.x >= normal.z) {
             // std::printf("projecting onto x\n");
             ao = Vec2{tri.a.y, tri.a.z};
             bo = Vec2{tri.b.y, tri.b.z};
             co = Vec2{tri.c.y, tri.c.z};
             po = Vec2{collisionPoint.y, collisionPoint.z};
-        } else if (norm.y >= norm.x && norm.y >= norm.z) {
+        } else if (normal.y >= normal.x && normal.y >= normal.z) {
             // std::printf("projecting onto y\n");
             ao = Vec2{tri.a.x, tri.a.z};
             bo = Vec2{tri.b.x, tri.b.z};
@@ -203,8 +218,8 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
         // FIXME: The normal probably isn't the right one, as no reflections.
         // norm = cross(tri.c - tri.b, tri.a - tri.b);
-        collisionPoint = collisionPoint + (0.001 * norm);
-        RayResult bounce = castRay(collisionPoint, norm, callCount+1);
+        collisionPoint = collisionPoint + (0.001 * normal);
+        RayResult bounce = castRay(collisionPoint, normal, callCount+1);
         Vec3 color = {0.f, 0.f, 0.f};
         if (bounce.collisions > 0) color = bounce.color;
         res.color = (1.f - tri.reflectiveness)*tri.color + (tri.reflectiveness) * color;
