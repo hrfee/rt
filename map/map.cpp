@@ -252,7 +252,7 @@ WorldMap::WorldMap(char const* path) {
     std::ifstream in(path);
     std::string line;
     while (std::getline(in, line)) {
-        std::istringstream lstream(line);
+        std::stringstream lstream(line);
         std::string token;
         lstream >> token;
         if (token == w_dimensions) {

@@ -4,4 +4,4 @@ sphere center 5 0 1 radius 0.6 color 0.8 0.82 0.2 reflectiveness 0.4
 sphere center 5.2 0 -0.2 radius 0.4 color 0.25 0.82 0.82 reflectiveness 0.5
 sphere center 2 -0.8 -1.4 radius 0.4 color 0.82 0.25 0.82 reflectiveness 0.1
 
-triangle a 5.2 0 -0.2 b 2 -0.8 -1.4 c 5 1 1 color 1 1 1 reflectiveness 0.9
+triangle a 5.2 0 -0.2 b 2 -0.8 -1.4 c 5 1 1 color #2094ab reflectiveness 0.0

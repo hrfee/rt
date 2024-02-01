@@ -3,6 +3,8 @@
 
 #include "../vec/vec.hpp"
 #include <string>
+#include <iostream>
+#include <sstream>
 
 struct Sphere {
     // (x-a^2) + (y-b^2) + (z-c^2) = r^2
@@ -26,5 +28,9 @@ struct Triangle {
 std::string encodeTriangle(Triangle *t);
 
 Triangle decodeTriangle(std::string in);
+
+std::string encodeColour(Vec3 c);
+
+Vec3 decodeColour(std::stringstream *in);
 
 #endif
