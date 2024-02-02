@@ -64,5 +64,5 @@ project "render_gl"
     files { "render_gl/**.cpp", "render_gl/**.hpp", "third_party/glad/src/*.c", "third_party/imgui/*.cpp", "third_party/imgui/*.h", "third_party/imgui/backends/imgui_impl_glfw.cpp", "third_party/imgui/backends/imgui_impl_glfw.h", "third_party/imgui/backends/imgui_impl_opengl3.cpp", "third_party/imgui/backends/imgui_impl_opengl3.h" }
     links "glfw"
     filter { "system:linux" }
-        buildoptions { "-lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi" }
+        buildoptions { "-lglfw -lrt -lm -ldl -lwayland-client -pthread -lrt -lffi" }
 

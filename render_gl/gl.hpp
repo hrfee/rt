@@ -13,8 +13,11 @@ struct GLWindowState {
     int w, h, prevW, prevH;
     // The window resolution
     int fbWidth, fbHeight, prevFbWidth, prevFbHeight;
-    float scale;
+    int requestedFbW, requestedFbH;
+    float scale, prevScale;
     double lastFrameTime;
+    double lastRenderTime;
+    int lastRenderW, lastRenderH;
     struct Mouse {
         bool enabled;
         float sensitivity;
@@ -26,6 +29,7 @@ struct GLWindowState {
 struct GLWindowUI {
     ImGuiContext *ctx;
     ImGuiIO *io;
+    bool renderOnChange;
 };
 
 class GLWindow {
@@ -33,7 +37,7 @@ class GLWindow {
         GLFWwindow* window;
         GLWindow(int w, int h, float scale, const char *windowTitle);
         ~GLWindow();
-        void mainLoop(Image* (*func)());
+        void mainLoop(Image* (*func)(bool renderOnChange, bool renderNow));
         void draw(Image *img);
         GLWindowState state;
     private:

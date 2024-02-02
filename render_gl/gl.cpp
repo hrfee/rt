@@ -38,9 +38,12 @@ void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
 GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) {
     state.fbWidth = width;
     state.fbHeight = height;
+    state.requestedFbW = width;
+    state.requestedFbH = height;
     state.w = float(width)*scale;
     state.h = float(height)*scale;
     state.scale = scale;
+    state.prevScale = scale;
     title = windowTitle;
     int success = glfwInit();
     if (!success) {
@@ -53,6 +56,8 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     glfwInitHint(0x00053001, 0x00038002);
     // The line above is equivalent to below, but won't fail to compile on older versions.
     // glfwInitHint(GLFW_WAYLAND_LIBDECOR, GLFW_WAYLAND_PREFER_LIBDECOR);
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -66,7 +71,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
         glfwTerminate();
         throw std::runtime_error("Failed creating window (" + std::to_string(code) + "): " + std::string(error));
     }
-  
+ 
     glfwSetWindowUserPointer(window, &state);
 
     glfwMakeContextCurrent(window);
@@ -131,13 +136,15 @@ void GLWindow::loadUI() {
     ui.io = &(ImGui::GetIO());
     ui.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
+    ui.renderOnChange = false;
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
 }
 
 void GLWindow::genTexture(int fbWidth, int fbHeight) {
     if (fbWidth == 0) fbWidth = state.fbWidth;
-    if (fbHeight == 0) fbHeight = state.fbWidth;
+    if (fbHeight == 0) fbHeight = state.fbHeight;
     int w = int(float(fbWidth) * state.scale);
     int h = int(float(fbHeight) * state.scale);
     std::fprintf(stderr, "Resizing to %dx%d\n", w, h);
@@ -187,27 +194,59 @@ void GLWindow::draw(Image *img) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void GLWindow::mainLoop(Image* (*func)()) {
+void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        ImGui::ShowDemoWindow();
-    
+
+        bool renderNow = false;
+        ImGui::Begin("rt controls");
+        {
+            if (state.mouse.enabled) {
+                ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
+            } else {
+                ImGui::Text("Press <M> to enter movement mode");
+            }
+            // FIXME: Add option to disable drawing to window, draw to file instead.
+            ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(ui.renderOnChange));
+
+            // ImGui::BeginChild("Window Resolution");
+            ImGui::Text("Window Resolution");
+            ImGui::InputInt("Width", &(state.requestedFbW));
+            ImGui::InputInt("Height", &(state.requestedFbH));
+            // resizeWindow = ImGui::Button("Resize", ImVec2(100, 30));
+            // ImGui::EndChild();
+
+            ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, ui.renderOnChange ? 2.f : 10.f);
+            ImGui::Text("Effective resolution: %dx%d", int(float(state.fbWidth) * state.scale), int(float(state.fbHeight) * state.scale));
+            if (!ui.renderOnChange) renderNow = ImGui::Button("Render", ImVec2(120, 40));
+            if (state.lastRenderTime != 0.f)
+                ImGui::Text("Last frame took %dms (%.5fs) at %dx%d.", int(state.lastRenderTime*1000.f), state.lastRenderTime, state.lastRenderW, state.lastRenderH);
+        }
+        ImGui::End();
+
+        if ((renderNow || ui.renderOnChange) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
+            glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
+        }
+
         glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-        if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight) {
+        if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight || ((renderNow || ui.renderOnChange) && state.scale != state.prevScale)) {
             glViewport(0, 0, state.fbWidth, state.fbHeight);
             genTexture(state.fbWidth, state.fbHeight);
             state.prevFbWidth = state.fbWidth;
             state.prevFbHeight = state.fbHeight;
             state.w = float(state.fbWidth) * state.scale;
             state.h = float(state.fbHeight) * state.scale;
+            state.requestedFbW = state.fbWidth;
+            state.requestedFbH = state.fbHeight;
         }
-
-        Image *img = func();
+        
+        Image *img = func(ui.renderOnChange, renderNow);
         draw(img);
+       
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

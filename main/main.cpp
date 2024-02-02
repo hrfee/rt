@@ -23,37 +23,42 @@ namespace {
     GLWindow *window;
 }
 
-Image *mainLoop() {
+Image *mainLoop(bool renderOnChange, bool renderNow) {
 #ifdef FRAMETIME
     double frameTime = glfwGetTime();
     std::fprintf(stderr, "Frame time: %dms (%.2f FPS)\n", int((frameTime-window->state.lastFrameTime)*1000.f), 1.f/(frameTime-window->state.lastFrameTime));
     window->state.lastFrameTime = glfwGetTime();
 #endif
 #ifndef FRAMETIME
-    bool change = false;
+    bool change = renderNow;
 #endif
-    if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
-        map->cam->setDimensions(window->state.w, window->state.h);
-        resizeImage(img, window->state.w, window->state.h);
-        window->state.prevW = window->state.w;
-        window->state.prevH = window->state.h;
+    if (renderOnChange || renderNow) {
+        if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
+            map->cam->setDimensions(window->state.w, window->state.h);
+            resizeImage(img, window->state.w, window->state.h);
+            window->state.prevW = window->state.w;
+            window->state.prevH = window->state.h;
+            window->state.prevScale = window->state.scale;
 #ifndef FRAMETIME
-        change = true;
+            change = true;
 #endif
+        }
     }
     if (map->cam->phi != window->state.mouse.phi || map->cam->theta != window->state.mouse.theta) {
         map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);
 #ifndef FRAMETIME
         change = true;
 #endif
-
     }
 #ifndef FRAMETIME
     if (change) {
 #endif
         clearImage(img);
+        window->state.lastRenderTime = glfwGetTime();
         map->castRays(img);
-        std::fprintf(stderr, "Rays casted\n");
+        window->state.lastRenderTime = glfwGetTime() - window->state.lastRenderTime;
+        window->state.lastRenderW = window->state.w;
+        window->state.lastRenderH = window->state.h;
 #ifndef FRAMETIME
     }
 #endif
