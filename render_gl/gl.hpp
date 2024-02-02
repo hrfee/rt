@@ -5,7 +5,6 @@
 #include <GLFW/glfw3.h>
 #include "imgui.h"
 #include "../img/img.hpp"
-#include "../cam/cam.hpp"
 #include <string>
 
 struct GLWindowState {
@@ -19,6 +18,8 @@ struct GLWindowState {
     double lastRenderTime;
     int lastRenderW, lastRenderH;
     float fovDeg, prevFovDeg;
+    bool renderOnChange;
+    std::string filePath;
     struct Mouse {
         bool enabled;
         float sensitivity;
@@ -30,7 +31,6 @@ struct GLWindowState {
 struct GLWindowUI {
     ImGuiContext *ctx;
     ImGuiIO *io;
-    bool renderOnChange;
 };
 
 class GLWindow {

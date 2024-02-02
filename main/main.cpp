@@ -1,6 +1,5 @@
 #include "../map/map.hpp"
 #include "../img/img.hpp"
-#include "../render_bmp/bmp.hpp"
 #include "../render_gl/gl.hpp"
 #include "../cam/cam.hpp"
 #include <math.h>

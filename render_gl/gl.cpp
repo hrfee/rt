@@ -6,7 +6,9 @@
 #include <sstream>
 #include <cmath>
 
+#include "../render_tga/tga.hpp"
 #include "imgui.h"
+#include "imgui_stdlib.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
@@ -136,7 +138,7 @@ void GLWindow::loadUI() {
     ui.io = &(ImGui::GetIO());
     ui.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
-    ui.renderOnChange = false;
+    state.renderOnChange = false;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -204,24 +206,29 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
 
         bool renderNow = false;
         bool widthApply, heightApply;
+        bool saveToTGA;
         ImGui::Begin("render controls");
         {
             // FIXME: Add option to disable drawing to window, draw to file instead.
-            ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(ui.renderOnChange));
+            ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(state.renderOnChange));
 
             // ImGui::BeginChild("Window Resolution");
             ImGui::Text("Window Resolution");
-            if (ui.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
+            if (state.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
             else ImGui::Text("Changes will be applied when \"Render\" is pressed.");
-            widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, ui.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
-            heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, ui.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+            widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+            heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
             // ImGui::EndChild();
 
-            ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, ui.renderOnChange ? 2.f : 10.f);
+            ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.renderOnChange ? 2.f : 10.f);
             ImGui::Text("Effective resolution: %dx%d", int(float(state.fbWidth) * state.scale), int(float(state.fbHeight) * state.scale));
-            if (!ui.renderOnChange) renderNow = ImGui::Button("Render", ImVec2(120, 40));
+            if (!state.renderOnChange) renderNow = ImGui::Button("Render", ImVec2(120, 40));
             if (state.lastRenderTime != 0.f)
                 ImGui::Text("Last frame took %dms (%.5fs) at %dx%d.", int(state.lastRenderTime*1000.f), state.lastRenderTime, state.lastRenderW, state.lastRenderH);
+            
+            ImGui::Text("Dump render to .tga file");
+            ImGui::InputText("Filepath", &(state.filePath));
+            saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
         }
         ImGui::End();
         ImGui::Begin("camera controls");
@@ -240,12 +247,12 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
         }
         ImGui::End();
 
-        if ((renderNow || (ui.renderOnChange && (widthApply || heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
+        if ((renderNow || (state.renderOnChange && (widthApply || heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
             glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
         }
 
         glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-        if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight || ((renderNow || ui.renderOnChange) && state.scale != state.prevScale)) {
+        if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight || ((renderNow || state.renderOnChange) && state.scale != state.prevScale)) {
             glViewport(0, 0, state.fbWidth, state.fbHeight);
             genTexture(state.fbWidth, state.fbHeight);
             state.prevFbWidth = state.fbWidth;
@@ -254,9 +261,12 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
             state.h = float(state.fbHeight) * state.scale;
         }
         
-        Image *img = func(ui.renderOnChange, renderNow);
+        Image *img = func(state.renderOnChange, renderNow);
         draw(img);
-       
+      
+        if (saveToTGA && !state.filePath.empty()) {
+            writeTGA(img, state.filePath);
+        }
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
