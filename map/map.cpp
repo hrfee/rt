@@ -286,3 +286,7 @@ WorldMap::WorldMap(char const* path) {
         }
     }
 }
+
+WorldMap::~WorldMap() {
+    delete cam;
+}

@@ -117,17 +117,13 @@ int main(int argc, char **argv) {
     window->state.mouse.theta = 0.f;
     map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);
    
-    map->cam->debugPrintCorners();
-
-   
-
+    // map->cam->debugPrintCorners();
 
     img = newImage(window->state.w, window->state.h);
     clearImage(img);
 
-    // castRays(&map, img);
     window->mainLoop(mainLoop);
-
-    // writeBMP(img, "/tmp/test.bmp");
-
+    delete window;
+    delete map;
+    closeImage(img);
 }

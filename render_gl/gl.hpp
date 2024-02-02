@@ -53,4 +53,6 @@ class GLWindow {
 void mouseCallback(GLFWwindow *, double, double);
 void keyCallback(GLFWwindow *, int, int, int, int);
 
+void showKeyboardHelp();
+
 #endif

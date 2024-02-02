@@ -19,6 +19,7 @@ class WorldMap {
     public:
         WorldMap(int width, int height, int depth): w(width), h(height), d(depth) {};
         WorldMap(char const* path);
+        ~WorldMap();
         float w, h, d;
         std::vector<Sphere> spheres;
         std::vector<Triangle> triangles;

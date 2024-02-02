@@ -132,11 +132,9 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
 }
 
 void GLWindow::loadUI() {
-    //  FIXME: Hookup imgui and cleanup
-    //  see https://github.com/ocornut/imgui/wiki/Getting-Started#example-if-you-are-using-glfw--openglwebgl
     ui.ctx = ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     state.renderOnChange = false;
 
@@ -149,7 +147,7 @@ void GLWindow::genTexture(int fbWidth, int fbHeight) {
     if (fbHeight == 0) fbHeight = state.fbHeight;
     int w = int(float(fbWidth) * state.scale);
     int h = int(float(fbHeight) * state.scale);
-    std::fprintf(stderr, "Resizing to %dx%d\n", w, h);
+    std::fprintf(stderr, "Will render @ %dx%d\n", w, h);
     GLuint newTex = 0;
     glGenTextures(1, &newTex);
     glBindTexture(GL_TEXTURE_2D, newTex);
@@ -224,7 +222,7 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
             ImGui::Text("Effective resolution: %dx%d", int(float(state.fbWidth) * state.scale), int(float(state.fbHeight) * state.scale));
             if (!state.renderOnChange) renderNow = ImGui::Button("Render", ImVec2(120, 40));
             if (state.lastRenderTime != 0.f)
-                ImGui::Text("Last frame took %dms (%.5fs) at %dx%d.", int(state.lastRenderTime*1000.f), state.lastRenderTime, state.lastRenderW, state.lastRenderH);
+                ImGui::Text("Last frame took %dms (%.5fs, %dfps) at %dx%d.", int(state.lastRenderTime*1000.f), state.lastRenderTime, int(1.f/state.lastRenderTime), state.lastRenderW, state.lastRenderH);
             
             ImGui::Text("Dump render to .tga file");
             ImGui::InputText("Filepath", &(state.filePath));
@@ -235,17 +233,16 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
         {
             if (state.mouse.enabled) {
                 ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
-            } else {
-                ImGui::Text("Press <M> to enter movement mode");
             }
             // ImGui::BeginChild("Camera Angle");
             ImGui::Text("Camera Angle");
-            ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), 0, 2*M_PI);
-            ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), 0, 2*M_PI);
+            ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
+            ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), -M_PI/2.f, M_PI/2.f);
             // ImGui::EndChild();
             ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
         }
         ImGui::End();
+        showKeyboardHelp();
 
         if ((renderNow || (state.renderOnChange && (widthApply || heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
             glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
@@ -286,9 +283,27 @@ void mouseCallback(GLFWwindow *window, double x, double y) {
             state->mouse.theta = M_PI/2.f;
         else if (state->mouse.theta < -M_PI/2.f)
             state->mouse.theta = -M_PI/2.f;
+        // Functionally this makes no difference, but it makes the values look nicer on the UI slider.
+        if (state->mouse.phi > M_PI) state->mouse.phi = -M_PI + (state->mouse.phi - M_PI);
+        if (state->mouse.phi < -M_PI) state->mouse.phi = M_PI - (state->mouse.phi + M_PI);
     }
     state->mouse.prevX = x;
     state->mouse.prevY = y;
+}
+
+
+void showKeyboardHelp() {
+    ImGui::Begin("keyboard controls");
+    {
+        ImGui::Text(R"(
+<M>: Movement mode (use mouse to control camera)
+   - Frames will be rendered with every movement,
+     so make sure resolution scale is low enough.
+<ESC>: Exit
+<Ctrl+LMB> on a slider: set exact value
+        )");
+    }
+    ImGui::End();
 }
 
 void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
@@ -301,6 +316,8 @@ void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int 
     } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && action == GLFW_PRESS && state->mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         state->mouse.enabled = false;
+    } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && !state->mouse.enabled) {
+        glfwSetWindowShouldClose(window, GL_TRUE);
     }
 }
 
@@ -308,5 +325,6 @@ GLWindow::~GLWindow() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    glfwDestroyWindow(window);
     glfwTerminate();
 }
