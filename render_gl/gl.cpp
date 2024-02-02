@@ -1,5 +1,6 @@
 #include "gl.hpp"
 
+#include <GLFW/glfw3.h>
 #include <string>
 #include <stdexcept>
 #include <fstream>
@@ -74,7 +75,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
         throw std::runtime_error("Failed creating window (" + std::to_string(code) + "): " + std::string(error));
     }
  
-    glfwSetWindowUserPointer(window, &state);
+    glfwSetWindowUserPointer(window, this);
 
     glfwMakeContextCurrent(window);
     
@@ -106,14 +107,12 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
         throw std::runtime_error("Shader linking failed");
     }
 
+    // Apply the actual window size and generate the texture for it,
+    // and bind the callback so this happens on resizes.
     glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-    state.w = float(state.fbWidth) * scale;
-    state.h = float(state.fbHeight) * scale;
-    glViewport(0, 0, state.fbWidth, state.fbHeight);
+    resizeWindowCallback(window, state.fbWidth, state.fbHeight);
+    glfwSetFramebufferSizeCallback(window, &resizeWindowCallback);
     
-    // Create texture
-    genTexture();
-
     // Bind controls
     {
         // Mouse
@@ -129,6 +128,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
 
     // Load UI
     loadUI();
+    
 }
 
 void GLWindow::loadUI() {
@@ -142,12 +142,8 @@ void GLWindow::loadUI() {
     ImGui_ImplOpenGL3_Init();
 }
 
-void GLWindow::genTexture(int fbWidth, int fbHeight) {
-    if (fbWidth == 0) fbWidth = state.fbWidth;
-    if (fbHeight == 0) fbHeight = state.fbHeight;
-    int w = int(float(fbWidth) * state.scale);
-    int h = int(float(fbHeight) * state.scale);
-    std::fprintf(stderr, "Will render @ %dx%d\n", w, h);
+void GLWindow::reloadTexture() {
+    std::fprintf(stderr, "Will render @ %dx%d\n", state.w, state.h);
     GLuint newTex = 0;
     glGenTextures(1, &newTex);
     glBindTexture(GL_TEXTURE_2D, newTex);
@@ -155,7 +151,7 @@ void GLWindow::genTexture(int fbWidth, int fbHeight) {
             GL_TEXTURE_2D,
             1,
             GL_SRGB8_ALPHA8,
-            GLsizei(w), GLsizei(h)
+            GLsizei(state.w), GLsizei(state.h)
     );
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -194,6 +190,64 @@ void GLWindow::draw(Image *img) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+std::string GLWindow::frameInfo() {
+    std::ostringstream out;
+    out.precision(5);
+    out << "Frame took " << int(state.lastRenderTime*1000.f) << "ms ";
+    out << "(";
+    if (state.lastRenderTime > 1.f) {
+        out << state.lastRenderTime << "s, ";
+        out.precision(2);
+        out << 1.f/state.lastRenderTime;
+    } else {
+        out << int(1.f/state.lastRenderTime);
+    }
+    out << "fps) ";
+    out << "at " << state.lastRenderW << 'x' << state.lastRenderH << ".";
+    return out.str();
+}
+
+void GLWindow::showUI() {
+    ImGui::Begin("render controls");
+    {
+        ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(state.renderOnChange));
+
+        // ImGui::BeginChild("Window Resolution");
+        ImGui::Text("Window Resolution");
+        if (state.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
+        else ImGui::Text("Changes will be applied when \"Render\" is pressed.");
+        ui.widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+        ui.heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+        // ImGui::EndChild();
+
+        ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.renderOnChange ? 2.f : 10.f);
+        ImGui::Text("Effective resolution: %dx%d", int(float(state.requestedFbW) * state.scale), int(float(state.requestedFbH) * state.scale));
+        if (!state.renderOnChange) ui.renderNow = ImGui::Button("Render", ImVec2(120, 40));
+        if (state.lastRenderTime != 0.f)
+            ImGui::Text(frameInfo().c_str());
+        
+        ImGui::Text("Dump render to .tga file");
+        ImGui::InputText("Filepath", &(state.filePath));
+        ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
+    }
+    ImGui::End();
+    ImGui::Begin("camera controls");
+    {
+        if (state.mouse.enabled) {
+            ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
+        }
+        // ImGui::BeginChild("Camera Angle");
+        ImGui::Text("Camera Angle");
+        ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
+        ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), -M_PI/2.f, M_PI/2.f);
+        // ImGui::EndChild();
+        ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
+    }
+    ImGui::End();
+    showKeyboardHelp();
+}
+
+
 void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -202,67 +256,25 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        bool renderNow = false;
-        bool widthApply, heightApply;
-        bool saveToTGA;
-        ImGui::Begin("render controls");
-        {
-            // FIXME: Add option to disable drawing to window, draw to file instead.
-            ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(state.renderOnChange));
+        ui.renderNow = false;
+        ui.widthApply = false, ui.heightApply = false;
+        ui.saveToTGA = false;
 
-            // ImGui::BeginChild("Window Resolution");
-            ImGui::Text("Window Resolution");
-            if (state.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
-            else ImGui::Text("Changes will be applied when \"Render\" is pressed.");
-            widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
-            heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
-            // ImGui::EndChild();
+        showUI();
 
-            ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.renderOnChange ? 2.f : 10.f);
-            ImGui::Text("Effective resolution: %dx%d", int(float(state.fbWidth) * state.scale), int(float(state.fbHeight) * state.scale));
-            if (!state.renderOnChange) renderNow = ImGui::Button("Render", ImVec2(120, 40));
-            if (state.lastRenderTime != 0.f)
-                ImGui::Text("Last frame took %dms (%.5fs, %dfps) at %dx%d.", int(state.lastRenderTime*1000.f), state.lastRenderTime, int(1.f/state.lastRenderTime), state.lastRenderW, state.lastRenderH);
-            
-            ImGui::Text("Dump render to .tga file");
-            ImGui::InputText("Filepath", &(state.filePath));
-            saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
-        }
-        ImGui::End();
-        ImGui::Begin("camera controls");
-        {
-            if (state.mouse.enabled) {
-                ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
-            }
-            // ImGui::BeginChild("Camera Angle");
-            ImGui::Text("Camera Angle");
-            ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
-            ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), -M_PI/2.f, M_PI/2.f);
-            // ImGui::EndChild();
-            ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
-        }
-        ImGui::End();
-        showKeyboardHelp();
-
-        if ((renderNow || (state.renderOnChange && (widthApply || heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
+        if ((ui.renderNow || (state.renderOnChange && (ui.widthApply || ui.heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
             glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
         }
 
-        glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-        if (state.fbWidth != state.prevFbWidth || state.fbHeight != state.prevFbHeight || ((renderNow || state.renderOnChange) && state.scale != state.prevScale)) {
-            glViewport(0, 0, state.fbWidth, state.fbHeight);
-            genTexture(state.fbWidth, state.fbHeight);
-            state.prevFbWidth = state.fbWidth;
-            state.prevFbHeight = state.fbHeight;
-            state.w = float(state.fbWidth) * state.scale;
-            state.h = float(state.fbHeight) * state.scale;
+        if ((ui.renderNow || state.renderOnChange) && state.scale != state.prevScale) {
+            reloadScaledResolution();
         }
         
-        Image *img = func(state.renderOnChange, renderNow);
+        Image *img = func(state.renderOnChange, ui.renderNow);
         draw(img);
       
-        if (saveToTGA && !state.filePath.empty()) {
-            writeTGA(img, state.filePath);
+        if (ui.saveToTGA && !state.filePath.empty()) {
+            writeTGA(img, state.filePath, frameInfo());
         }
 
         ImGui::Render();
@@ -272,23 +284,39 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
     }
 }
 
+void resizeWindowCallback(GLFWwindow *window, int width, int height) {
+    GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
+    w->state.fbWidth = width;
+    w->state.fbHeight = height;
+    w->state.requestedFbW = width;
+    w->state.requestedFbH = height;
+    glViewport(0, 0, width, height);
+    w->reloadScaledResolution();
+}
+
+void GLWindow::reloadScaledResolution() {
+    state.w = float(state.fbWidth) * state.scale;
+    state.h = float(state.fbHeight) * state.scale;
+    reloadTexture();
+}
+
 void mouseCallback(GLFWwindow *window, double x, double y) {
-    GLWindowState* state = static_cast<GLWindowState*>(glfwGetWindowUserPointer(window));
-    if (state->mouse.enabled) {;
-        float dx = x - state->mouse.prevX;
-        float dy = y - state->mouse.prevY;
-        state->mouse.phi -= dx * state->mouse.sensitivity;
-        state->mouse.theta -= dy * state->mouse.sensitivity;
-        if (state->mouse.theta > M_PI/2.f)
-            state->mouse.theta = M_PI/2.f;
-        else if (state->mouse.theta < -M_PI/2.f)
-            state->mouse.theta = -M_PI/2.f;
+    GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
+    if (w->state.mouse.enabled) {;
+        float dx = x - w->state.mouse.prevX;
+        float dy = y - w->state.mouse.prevY;
+        w->state.mouse.phi -= dx * w->state.mouse.sensitivity;
+        w->state.mouse.theta -= dy * w->state.mouse.sensitivity;
+        if (w->state.mouse.theta > M_PI/2.f)
+            w->state.mouse.theta = M_PI/2.f;
+        else if (w->state.mouse.theta < -M_PI/2.f)
+            w->state.mouse.theta = -M_PI/2.f;
         // Functionally this makes no difference, but it makes the values look nicer on the UI slider.
-        if (state->mouse.phi > M_PI) state->mouse.phi = -M_PI + (state->mouse.phi - M_PI);
-        if (state->mouse.phi < -M_PI) state->mouse.phi = M_PI - (state->mouse.phi + M_PI);
+        if (w->state.mouse.phi > M_PI) w->state.mouse.phi = -M_PI + (w->state.mouse.phi - M_PI);
+        if (w->state.mouse.phi < -M_PI) w->state.mouse.phi = M_PI - (w->state.mouse.phi + M_PI);
     }
-    state->mouse.prevX = x;
-    state->mouse.prevY = y;
+    w->state.mouse.prevX = x;
+    w->state.mouse.prevY = y;
 }
 
 
@@ -309,14 +337,14 @@ void showKeyboardHelp() {
 void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
     // Ignore if any imgui fields are being typed in.
     if (ImGui::GetIO().WantTextInput) return;
-    GLWindowState* state = static_cast<GLWindowState*>(glfwGetWindowUserPointer(window));
-    if (key == GLFW_KEY_M && action == GLFW_PRESS && !state->mouse.enabled) {
+    GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
+    if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        state->mouse.enabled = true;
-    } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && action == GLFW_PRESS && state->mouse.enabled) {
+        w->state.mouse.enabled = true;
+    } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && action == GLFW_PRESS && w->state.mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        state->mouse.enabled = false;
-    } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && !state->mouse.enabled) {
+        w->state.mouse.enabled = false;
+    } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && !w->state.mouse.enabled) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
 }

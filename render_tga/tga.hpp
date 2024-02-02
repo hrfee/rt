@@ -4,5 +4,5 @@
 #include <string>
 #include "../img/img.hpp"
 
-void writeTGA(Image *img, std::string fname);
+void writeTGA(Image *img, std::string fname, std::string id);
 #endif

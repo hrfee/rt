@@ -28,22 +28,27 @@ void encodeDescriptor(TGAHeader *header, int w, int h) {
     header->imageSpec[6] = 255 & h; // Lower bits of the height
     header->imageSpec[7] = 255 & (h>> 8); // Higher bits
     header->imageSpec[8] = 24; // bits per pixel
-    header->imageSpec[9] = 0b00000000; // FIXME: check the 6th bit?
+    // Only thing that matters is the 6th bit being zero.
+    header->imageSpec[9] = 0b00000000; 
 }
 
-void writeTGA(Image *img, std::string fname) {
+void writeTGA(Image *img, std::string fname, std::string id) {
     TGAHeader header;
-    header.idLength = 0; // FIXME: Put render info in the ID.
+    header.idLength = id.length(); // FIXME: Put render info in the ID.
     header.colorMapType = 0;
     header.imageType = 0b00000010; // 2
     encodeDescriptor(&header, img->w, img->h);
 
     std::ofstream f(fname, std::ios_base::binary|std::ios_base::trunc);
+    // Write header
     f.write(&(header.idLength), 1);
     f.write(&(header.colorMapType), 1);
     f.write(&(header.imageType), 1);
     f.seekp(5, std::ios_base::cur); // Skip of cmapSpec space
     f.write(&(header.imageSpec[0]), 10);
+    // Write ID
+    f.write(id.c_str(), header.idLength);
+    // Write Image
     int pxCount = img->w * img->h;
     for (int i = 0; i < pxCount; i++) {
         // BGR, not RGB!

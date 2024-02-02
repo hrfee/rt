@@ -30,6 +30,7 @@ struct GLWindowState {
 
 struct GLWindowUI {
     ImGuiContext *ctx;
+    bool renderNow, widthApply, heightApply, saveToTGA;
 };
 
 class GLWindow {
@@ -40,16 +41,20 @@ class GLWindow {
         void mainLoop(Image* (*func)(bool renderOnChange, bool renderNow));
         void draw(Image *img);
         GLWindowState state;
+        void reloadTexture();
+        void reloadScaledResolution();
+        std::string frameInfo();
     private:
         const char *title;
-        void genTexture(int fbWidth = 0, int fbHeight = 0);
         std::string vertString, fragString;
         GLuint tex, vert, frag, prog, vao;
         void loadShader(GLuint *s, GLenum shaderType, char const *fname);
         GLWindowUI ui;
         void loadUI();
+        void showUI();
 };
 
+void resizeWindowCallback(GLFWwindow *, int, int);
 void mouseCallback(GLFWwindow *, double, double);
 void keyCallback(GLFWwindow *, int, int, int, int);
 
