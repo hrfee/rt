@@ -7,8 +7,8 @@
 #include <cstdio>
 #include <getopt.h>
 
-#define INIT_W 1920 
-#define INIT_H 1080
+#define INIT_W 1280 
+#define INIT_H 720
 #define INIT_SCALE_FACTOR .2f
 #define INIT_FOV 60
 
@@ -39,6 +39,13 @@ Image *mainLoop(bool renderOnChange, bool renderNow) {
             window->state.prevW = window->state.w;
             window->state.prevH = window->state.h;
             window->state.prevScale = window->state.scale;
+#ifndef FRAMETIME
+            change = true;
+#endif
+        }
+        if (window->state.fovDeg != window->state.prevFovDeg) {
+            map->cam->setFOV(window->state.fovDeg * M_PI / 180.f);
+            window->state.prevFovDeg = window->state.fovDeg;
 #ifndef FRAMETIME
             change = true;
 #endif
@@ -105,6 +112,8 @@ int main(int argc, char **argv) {
     map = new WorldMap("maps/3sphere.map");
 
     map->cam = new Camera(window->state.w, window->state.h, cameraFOV, {0.f, -0.5f, 0.f});
+    window->state.fovDeg = cameraFOV * 180.f / M_PI;
+    window->state.prevFovDeg = window->state.fovDeg;
     window->state.mouse.phi = 0.f;
     window->state.mouse.theta = 0.f;
     map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);

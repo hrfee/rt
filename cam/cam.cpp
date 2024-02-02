@@ -89,6 +89,11 @@ void Camera::setDimensions(int width, int height, float fieldOfView) {
     calculateViewport();
 }
 
+void Camera::setFOV(float fieldOfView) {
+    fov = fieldOfView;
+    calculateViewport();
+}
+
 void Camera::rotateXRad(float thetaRad) {
     theta = thetaRad;
     calculateViewport();

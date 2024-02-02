@@ -10,6 +10,7 @@ class Camera {
         void debugPrintCorners();
         void setDimensions(int width, int height);
         void setDimensions(int width, int height, float fieldOfView);
+        void setFOV(float fieldOfView);
         void rotateX(float thetaDeg);
         void rotateXRad(float thetaRad);
         void rotateY(float phiDeg);

@@ -18,6 +18,7 @@ struct GLWindowState {
     double lastFrameTime;
     double lastRenderTime;
     int lastRenderW, lastRenderH;
+    float fovDeg, prevFovDeg;
     struct Mouse {
         bool enabled;
         float sensitivity;

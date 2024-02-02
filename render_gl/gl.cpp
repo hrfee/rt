@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
-#include <math.h>
+#include <cmath>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -203,21 +203,18 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
         ImGui::NewFrame();
 
         bool renderNow = false;
-        ImGui::Begin("rt controls");
+        bool widthApply, heightApply;
+        ImGui::Begin("render controls");
         {
-            if (state.mouse.enabled) {
-                ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
-            } else {
-                ImGui::Text("Press <M> to enter movement mode");
-            }
             // FIXME: Add option to disable drawing to window, draw to file instead.
             ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(ui.renderOnChange));
 
             // ImGui::BeginChild("Window Resolution");
             ImGui::Text("Window Resolution");
-            ImGui::InputInt("Width", &(state.requestedFbW));
-            ImGui::InputInt("Height", &(state.requestedFbH));
-            // resizeWindow = ImGui::Button("Resize", ImVec2(100, 30));
+            if (ui.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
+            else ImGui::Text("Changes will be applied when \"Render\" is pressed.");
+            widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, ui.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+            heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, ui.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
             // ImGui::EndChild();
 
             ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, ui.renderOnChange ? 2.f : 10.f);
@@ -227,8 +224,23 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
                 ImGui::Text("Last frame took %dms (%.5fs) at %dx%d.", int(state.lastRenderTime*1000.f), state.lastRenderTime, state.lastRenderW, state.lastRenderH);
         }
         ImGui::End();
+        ImGui::Begin("camera controls");
+        {
+            if (state.mouse.enabled) {
+                ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
+            } else {
+                ImGui::Text("Press <M> to enter movement mode");
+            }
+            // ImGui::BeginChild("Camera Angle");
+            ImGui::Text("Camera Angle");
+            ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), 0, 2*M_PI);
+            ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), 0, 2*M_PI);
+            // ImGui::EndChild();
+            ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
+        }
+        ImGui::End();
 
-        if ((renderNow || ui.renderOnChange) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
+        if ((renderNow || (ui.renderOnChange && (widthApply || heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
             glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
         }
 
@@ -240,8 +252,6 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
             state.prevFbHeight = state.fbHeight;
             state.w = float(state.fbWidth) * state.scale;
             state.h = float(state.fbHeight) * state.scale;
-            state.requestedFbW = state.fbWidth;
-            state.requestedFbH = state.fbHeight;
         }
         
         Image *img = func(ui.renderOnChange, renderNow);
