@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <fstream>
 
+// Rough implementation of TGA v1.0
+// Source used for header format: https://en.wikipedia.org/wiki/Truevision_TGA
 struct TGAHeader {
     char idLength; // Length of ID string, human-readable identifier.
     char colorMapType; // Not used, so we'll set to zero
