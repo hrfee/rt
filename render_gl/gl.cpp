@@ -135,8 +135,8 @@ void GLWindow::loadUI() {
     //  FIXME: Hookup imgui and cleanup
     //  see https://github.com/ocornut/imgui/wiki/Getting-Started#example-if-you-are-using-glfw--openglwebgl
     ui.ctx = ImGui::CreateContext();
-    ui.io = &(ImGui::GetIO());
-    ui.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
     state.renderOnChange = false;
 
@@ -292,6 +292,8 @@ void mouseCallback(GLFWwindow *window, double x, double y) {
 }
 
 void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
+    // Ignore if any imgui fields are being typed in.
+    if (ImGui::GetIO().WantTextInput) return;
     GLWindowState* state = static_cast<GLWindowState*>(glfwGetWindowUserPointer(window));
     if (key == GLFW_KEY_M && action == GLFW_PRESS && !state->mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);

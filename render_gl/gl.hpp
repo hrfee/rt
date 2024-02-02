@@ -30,7 +30,6 @@ struct GLWindowState {
 
 struct GLWindowUI {
     ImGuiContext *ctx;
-    ImGuiIO *io;
 };
 
 class GLWindow {
