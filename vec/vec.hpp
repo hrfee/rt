@@ -62,6 +62,14 @@ Vec3 operator/(Vec3 a, float b) noexcept {
 }
 
 constexpr
+bool operator==(Vec3 a, Vec3 b) noexcept {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+constexpr
+bool operator!=(Vec3 a, Vec3 b) noexcept { return !(a == b); }
+
+constexpr
 float dot(Vec3 a, Vec3 b) noexcept {
     return a.x*b.x + a.y*b.y + a.z*b.z;
 }

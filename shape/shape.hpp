@@ -14,6 +14,7 @@ struct Sphere {
     Vec3 color;
     float reflectiveness; // 0-1
     float emissiveness;
+    Vec3 emissionColor;
 };
 
 std::string encodeSphere(Sphere *s);
@@ -25,6 +26,7 @@ struct Triangle {
     Vec3 color;
     float reflectiveness;
     float emissiveness;
+    Vec3 emissionColor;
 };
 
 std::string encodeTriangle(Triangle *t);

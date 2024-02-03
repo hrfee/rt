@@ -11,6 +11,7 @@ namespace {
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
     const char* w_reflectiveness = "reflectiveness";
+    const char* w_emission = "emission";
     const char* w_a = "a";
     const char* w_b = "b";
     const char* w_c = "c";
@@ -26,7 +27,12 @@ std::string encodeSphere(Sphere *s) {
     fmt << w_color << " ";
     fmt << s->color.x << " " << s->color.y << " " << s->color.z << " ";
     fmt << w_reflectiveness << " ";
-    fmt << s->reflectiveness;
+    fmt << s->reflectiveness << " ";
+    fmt << w_emission << " ";
+    if (s->color != s->emissionColor) {
+        fmt << w_color << " " << s->emissionColor.x << " " << s->emissionColor.y << " " << s->emissionColor.z << " ";
+    }
+    fmt << s->emissiveness << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -52,6 +58,15 @@ Sphere decodeSphere(std::string in) {
         } else if (w == w_reflectiveness) {
             stream >> w;
             s.reflectiveness = std::stof(w);
+        } else if (w == w_emission) {
+            stream >> w;
+            if (w == w_color) {
+                s.emissionColor = decodeColour(&stream);
+                stream >> w;
+            } else {
+                s.emissionColor = s.color;
+            }
+            s.emissiveness = std::stof(w);
         }
     } while (stream);
     return s;
@@ -68,7 +83,12 @@ std::string encodeTriangle(Triangle *t) {
     fmt << t->c.x << " " << t->c.y << " " << t->c.z << " ";
     fmt << encodeColour(t->color) << " ";
     fmt << w_reflectiveness << " ";
-    fmt << t->reflectiveness;
+    fmt << t->reflectiveness << " ";
+    fmt << w_emission << " ";
+    if (t->color != t->emissionColor) {
+        fmt << w_color << " " << t->emissionColor.x << " " << t->emissionColor.y << " " << t->emissionColor.z << " ";
+    }
+    fmt << t->emissiveness << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -105,6 +125,15 @@ Triangle decodeTriangle(std::string in) {
         } else if (w == w_reflectiveness) {
             stream >> w;
             t.reflectiveness = std::stof(w);
+        } else if (w == w_emission) {
+            stream >> w;
+            if (w == w_color) {
+                t.emissionColor = decodeColour(&stream);
+                stream >> w;
+            } else {
+                t.emissionColor = t.color;
+            }
+            t.emissiveness = std::stof(w);
         }
     } while (stream);
     return t;
