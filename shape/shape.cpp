@@ -11,7 +11,8 @@ namespace {
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
     const char* w_reflectiveness = "reflectiveness";
-    const char* w_emission = "emission";
+    // const char* w_emission = "emission";
+    const char* w_brightness = "brightness";
     const char* w_a = "a";
     const char* w_b = "b";
     const char* w_c = "c";
@@ -28,11 +29,6 @@ std::string encodeSphere(Sphere *s) {
     fmt << s->color.x << " " << s->color.y << " " << s->color.z << " ";
     fmt << w_reflectiveness << " ";
     fmt << s->reflectiveness << " ";
-    fmt << w_emission << " ";
-    if (s->color != s->emissionColor) {
-        fmt << w_color << " " << s->emissionColor.x << " " << s->emissionColor.y << " " << s->emissionColor.z << " ";
-    }
-    fmt << s->emissiveness << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -58,18 +54,45 @@ Sphere decodeSphere(std::string in) {
         } else if (w == w_reflectiveness) {
             stream >> w;
             s.reflectiveness = std::stof(w);
-        } else if (w == w_emission) {
-            stream >> w;
-            if (w == w_color) {
-                s.emissionColor = decodeColour(&stream);
-                stream >> w;
-            } else {
-                s.emissionColor = s.color;
-            }
-            s.emissiveness = std::stof(w);
         }
     } while (stream);
     return s;
+}
+
+std::string encodePointLight(PointLight *p) {
+    std::ostringstream fmt;
+    fmt << "plight ";
+    fmt << w_center << " ";
+    fmt << p->center.x << " " << p->center.y << " " << p->center.z << " ";
+    fmt << w_color << " ";
+    fmt << p->color.x << " " << p->color.y << " " << p->color.z << " ";
+    fmt << w_brightness << " ";
+    fmt << p->brightness << " ";
+    fmt << std::endl;
+    return fmt.str();
+}
+
+PointLight decodePointLight(std::string in) {
+    std::stringstream stream(in);
+    PointLight p;
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_center) {
+            stream >> w;
+            p.center.x = std::stof(w);
+            stream >> w;
+            p.center.y = std::stof(w);
+            stream >> w;
+            p.center.z = std::stof(w);
+        } else if (w == w_color) {
+            p.color = decodeColour(&stream);
+        } else if (w == w_brightness) {
+            stream >> w;
+            p.brightness = std::stof(w);
+        }
+    } while (stream);
+    return p;
 }
 
 std::string encodeTriangle(Triangle *t) {
@@ -84,11 +107,6 @@ std::string encodeTriangle(Triangle *t) {
     fmt << encodeColour(t->color) << " ";
     fmt << w_reflectiveness << " ";
     fmt << t->reflectiveness << " ";
-    fmt << w_emission << " ";
-    if (t->color != t->emissionColor) {
-        fmt << w_color << " " << t->emissionColor.x << " " << t->emissionColor.y << " " << t->emissionColor.z << " ";
-    }
-    fmt << t->emissiveness << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -125,15 +143,6 @@ Triangle decodeTriangle(std::string in) {
         } else if (w == w_reflectiveness) {
             stream >> w;
             t.reflectiveness = std::stof(w);
-        } else if (w == w_emission) {
-            stream >> w;
-            if (w == w_color) {
-                t.emissionColor = decodeColour(&stream);
-                stream >> w;
-            } else {
-                t.emissionColor = t.color;
-            }
-            t.emissiveness = std::stof(w);
         }
     } while (stream);
     return t;

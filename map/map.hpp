@@ -13,6 +13,8 @@ struct RenderConfig {
     bool renderNow;
     bool lighting;
     bool reflections;
+    float distanceDivisor;
+    float baseBrightness;
 };
 
 struct RayResult {
@@ -20,6 +22,11 @@ struct RayResult {
     float t0;
     float t1;
     Vec3 color;
+    float reflectiveness;
+    float emissiveness;
+    Vec3 emissionColor;
+    Vec3 p0;
+    Vec3 normal;
 };
 
 class WorldMap {
@@ -30,14 +37,17 @@ class WorldMap {
         float w, h, d;
         std::vector<Sphere> spheres;
         std::vector<Triangle> triangles;
+        std::vector<PointLight> pointLights;
         Camera *cam;
         void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness); 
         void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness); 
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);
     private:
-        RayResult castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount);
+        RayResult castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
+        void calculateBounce(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
 };
+
 
 bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c);
 #endif

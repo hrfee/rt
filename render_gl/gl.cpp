@@ -137,6 +137,7 @@ void GLWindow::loadUI() {
 
     state.rc.renderOnChange = false;
     ui.renderMode = 1;
+    state.rc.distanceDivisor = 1.f;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -214,21 +215,22 @@ namespace {
 void GLWindow::showUI() {
     ImGui::Begin("render controls");
     {
-        if ((state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes)))) {
-            switch (ui.renderMode) {
-                case 0:
-                    state.rc.reflections = false;
-                    state.rc.lighting = false;
-                    break;
-                case 1:
-                    state.rc.reflections = true;
-                    state.rc.lighting = false;
-                    break;
-                case 2:
-                    state.rc.reflections = true;
-                    state.rc.lighting = true;
-                    break;
-            }
+        state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes));
+        switch(ui.renderMode) {
+            case 0:
+                state.rc.reflections = false;
+                state.rc.lighting = false;
+                break;
+            case 1:
+                state.rc.reflections = true;
+                state.rc.lighting = false;
+                break;
+            case 2:
+                state.rc.reflections = true;
+                state.rc.lighting = true;
+                state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 1.f, 100.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f) ? true : state.rc.renderNow;
+                break;
         }
     }
     ImGui::End();

@@ -21,7 +21,7 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = 0; x < cam->w; x++) {
-            RayResult res = castRay(cam->position, delta, rc, 0);
+            RayResult res = castRay(cam->position, delta, rc);
             if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
@@ -101,7 +101,20 @@ Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
     return norms[1];
 }
 
+void WorldMap::calculateBounce(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
+    RayResult bounce = castRay(p0, delta, rc, callCount);
+    Vec3 color = {0.f, 0.f, 0.f};
+    if (bounce.collisions > 0) {
+        color = bounce.color;
+    }
+    res->color = ((1.f - res->reflectiveness)*res->color + (res->reflectiveness) * color);
+    if (!(rc->lighting)) {
+        return;
+    }
+}
+
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
+    // FIXME: Triangles with the same z coords for a,b,c don't work, probably same for x,y.
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
     float a = dot(delta, delta);
@@ -136,10 +149,12 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
                 if (t_0 < res.t0) {
                     res.t0 = t_0;
                     res.color = sphere.color;
+                    res.reflectiveness = sphere.reflectiveness;
                 }
                 if (t_1 < res.t1) {
                     res.t1 = t_1;
                     res.color = sphere.color;
+                    res.reflectiveness = sphere.reflectiveness;
                 }
             }
             res.collisions += collisions;
@@ -151,20 +166,17 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             if (t0 < res.t0) {
                 res.t0 = t0;
                 res.color = sphere.color;
+                res.reflectiveness = sphere.reflectiveness;
             }
             res.collisions += collisions;
         } else {
             continue;
         }
-        if (!(rc->reflections) || sphere.reflectiveness == 0) continue;
+
         Vec3 collisionPoint = p0 + (res.t0 * delta);
-        Vec3 sphereNormal = collisionPoint-sphere.center;
+        res.normal = collisionPoint-sphere.center;
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-        collisionPoint = collisionPoint + (0.001 * sphereNormal);
-        RayResult bounce = castRay(collisionPoint, sphereNormal, rc, callCount+1);
-        Vec3 color = {0.f, 0.f, 0.f};
-        if (bounce.collisions > 0) color = bounce.color;
-        res.color = (1.f - sphere.reflectiveness)*sphere.color + (sphere.reflectiveness) * color;
+        res.p0 = collisionPoint + (0.001 * res.normal);
     }
     for (Triangle tri: triangles) {
         Vec3 normal = norm(getVisibleTriNormal(delta, tri.a, tri.b, tri.c));
@@ -207,24 +219,23 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             po = Vec2{collisionPoint.x, collisionPoint.y};
         }
 
+        // FIXME: Check we're the nearest triangle/shape
         if (!pointInTriangle(po, ao, bo, co)) {
             continue;
         }
         res.collisions += 1;
+        if (t >= res.t0) continue;
         res.t0 = t;
         res.color = tri.color;
-        if (!(rc->reflections) || tri.reflectiveness == 0) continue;
-
+        res.reflectiveness = tri.reflectiveness;
+        res.normal = normal;
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-        // FIXME: The normal probably isn't the right one, as no reflections.
-        // norm = cross(tri.c - tri.b, tri.a - tri.b);
-        collisionPoint = collisionPoint + (0.001 * normal);
-        RayResult bounce = castRay(collisionPoint, normal, rc, callCount+1);
-        Vec3 color = {0.f, 0.f, 0.f};
-        if (bounce.collisions > 0) color = bounce.color;
-        res.color = (1.f - tri.reflectiveness)*tri.color + (tri.reflectiveness) * color;
-
+        res.p0 = collisionPoint + (0.001f * normal);
     }
+    if (!(rc->reflections) || res.reflectiveness == 0) {
+        return res;
+    }
+    calculateBounce(res.p0, res.normal, rc, &res, callCount+1);
     return res;
 }
 

@@ -57,6 +57,11 @@ Vec3 operator*(float a, Vec3 b) noexcept {
 }
 
 constexpr
+Vec3 operator*(Vec3 a, Vec3 b) noexcept {
+    return Vec3{a.x*b.x, a.y*b.y, a.z*b.z};
+}
+
+constexpr
 Vec3 operator/(Vec3 a, float b) noexcept {
     return Vec3{ a.x/b, a.y/b, a.z/b };
 }
