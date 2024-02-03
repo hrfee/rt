@@ -138,6 +138,9 @@ void GLWindow::loadUI() {
     state.rc.renderOnChange = false;
     ui.renderMode = 1;
     state.rc.distanceDivisor = 1.f;
+    state.rc.baseBrightness = 0.f;
+    state.rc.triangles = true;
+    state.rc.spheres = true;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -231,7 +234,9 @@ void GLWindow::showUI() {
                 state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 1.f, 100.f) ? true : state.rc.renderNow;
                 state.rc.renderNow = ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f) ? true : state.rc.renderNow;
                 break;
-        }
+        };
+        state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
     }
     ImGui::End();
     ImGui::Begin("output controls");

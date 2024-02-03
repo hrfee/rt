@@ -35,7 +35,7 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
 // CGPaP in C p.339 Sect. 7.12.2 "PtInPolygon":
 // Cast a ray from our point in any direction.
 // If the ray hits an edge once, we're inside. If twice, we're outside.
-// Uses cramer's o find point where ray meets edge.
+// Uses cramer's rule to find point where ray meets edge.
 bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c) {
     // std::printf("tri %f %f %f %f %f %f\n", a.x, a.y, b.x, b.y, c.x, c.y);
     // std::printf("point %f %f\n", p.x, p.y);
@@ -101,7 +101,7 @@ Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
     return norms[1];
 }
 
-void WorldMap::calculateBounce(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
+void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
     RayResult bounce = castRay(p0, delta, rc, callCount);
     Vec3 color = {0.f, 0.f, 0.f};
     if (bounce.collisions > 0) {
@@ -113,129 +113,105 @@ void WorldMap::calculateBounce(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult 
     }
 }
 
+float meetsSphere(Vec3 p0, Vec3 delta, Sphere sphere) {
+    // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
+    // substituted values for the camera position (x/y/z_0),
+    // pixel vec from camera (delta x/y/z),
+    // and normalized distance along pixel vector (t).
+    Vec3 originToSphere = {p0.x - sphere.center.x, p0.y - sphere.center.y, p0.z - sphere.center.z};
+    float a = dot(delta, delta);
+    float b = 2.f * (delta.x*originToSphere.x + delta.y*originToSphere.y + delta.z*originToSphere.z);
+    float c = dot(originToSphere, originToSphere) - sphere.radius*sphere.radius;
+    float discrim = b*b - 4.f*a*c;
+    if (discrim < 0) return -1;
+    float discrimRoot = std::sqrt(discrim);
+    float t = (-b - discrimRoot) / (2.f*a);
+    if (discrim > 0 && t < 0) {
+        float t1 = (-b + discrimRoot) / (2.f*a);
+        if (t < 0) t = t1;
+    }
+    return t;
+}
+
+float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle tri) {
+    // dot product of a line on the plane with the normal is zero, hence (p - t.a) \dot norm = 0, where p is a random point (x, y, z)
+    // p \dot norm = t.a \dot norm
+    // compute the right side, expand the left side and subtract it:
+    // (norm.x)x + (norm.y)y + (norm.z)z - (t.a \dot norm) = 0
+    // Take values in equation of a plane (CGPaP in C p. 703 eq. 15.18): Ax + By + Cz + D = 0
+    // where A = norm.x, B = norm.y, C = norm.z
+    float d = -dot(tri.a, normal);
+    // CGPaP in C p.703 eq. 15.21, using dot products to make more readable
+    float t = -(dot(normal, p0) + d);
+    float denom = dot(normal, delta);
+    if (denom == 0) { // Plane parallel to ray, ignore
+        return -1;
+    }
+    return t / denom;
+}
+
+bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri) {
+    // project orthographically as big as possible
+    Vec2 ao, bo, co, po;
+    if (normal.x >= normal.y && normal.x >= normal.z) {
+        // std::printf("projecting onto x\n");
+        ao = Vec2{tri.a.y, tri.a.z};
+        bo = Vec2{tri.b.y, tri.b.z};
+        co = Vec2{tri.c.y, tri.c.z};
+        po = Vec2{collisionPoint.y, collisionPoint.z};
+    } else if (normal.y >= normal.x && normal.y >= normal.z) {
+        // std::printf("projecting onto y\n");
+        ao = Vec2{tri.a.x, tri.a.z};
+        bo = Vec2{tri.b.x, tri.b.z};
+        co = Vec2{tri.c.x, tri.c.z};
+        po = Vec2{collisionPoint.x, collisionPoint.z};
+    } else { 
+        // std::printf("projecting onto z\n");
+        ao = Vec2{tri.a.x, tri.a.y};
+        bo = Vec2{tri.b.x, tri.b.y};
+        co = Vec2{tri.c.x, tri.c.y};
+        po = Vec2{collisionPoint.x, collisionPoint.y};
+    }
+
+    return pointInTriangle(po, ao, bo, co);
+}
+
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
     // FIXME: Triangles with the same z coords for a,b,c don't work, probably same for x,y.
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
-    float a = dot(delta, delta);
-    for (Sphere sphere: spheres) {
-        // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
-        // substituted values for the camera position (x/y/z_0),
-        // pixel vec from camera (delta x/y/z),
-        // and normalized distance along pixel vector (t).
-        Vec3 originToSphere = {p0.x - sphere.center.x, p0.y - sphere.center.y, p0.z - sphere.center.z};
-        float b = 2.f * (delta.x*originToSphere.x + delta.y*originToSphere.y + delta.z*originToSphere.z);
-        float c = dot(originToSphere, originToSphere) - sphere.radius*sphere.radius;
-
-        float discrim = b*b - 4.f*a*c;
-        float discrimRoot = std::sqrt(discrim);
-        if (discrim > 0) {
-            int collisions = 2;
-            float t0 = (-b + discrimRoot) / (2.f*a);
-            float t1 = (-b - discrimRoot) / (2.f*a);
-            if (t0 < 0) {
-                t0 = t1;
-                collisions = 1;
-            }
-            if (t1 < 0) {
-                if (t0 == t1) {
-                    continue;
-                }
-                collisions = 1;
-            }
-            if (t0 >= 0 && t1 >= 0) {
-                float t_0 = std::min(t0, t1);
-                float t_1 = std::max(t0, t1);
-                if (t_0 < res.t0) {
-                    res.t0 = t_0;
-                    res.color = sphere.color;
-                    res.reflectiveness = sphere.reflectiveness;
-                }
-                if (t_1 < res.t1) {
-                    res.t1 = t_1;
-                    res.color = sphere.color;
-                    res.reflectiveness = sphere.reflectiveness;
-                }
-            }
-            res.collisions += collisions;
-
-        } else if (discrim == 0) {
-            int collisions = 1;
-            float t0 = (-b + discrimRoot) / (2.f*a);
-            if (t0 < 0) continue;
-            if (t0 < res.t0) {
-                res.t0 = t0;
-                res.color = sphere.color;
-                res.reflectiveness = sphere.reflectiveness;
-            }
-            res.collisions += collisions;
-        } else {
-            continue;
+    if (rc->spheres) for (Sphere sphere: spheres) {
+        float t = meetsSphere(p0, delta, sphere);
+        if (t >= 0) res.collisions += 1;
+        if (t >= 0 && t < res.t) {
+            res.t = t;
+            res.color = sphere.color;
+            res.reflectiveness = sphere.reflectiveness;
+            Vec3 collisionPoint = p0 + (res.t * delta);
+            res.normal = collisionPoint-sphere.center;
+            res.p0 = collisionPoint;
         }
-
-        Vec3 collisionPoint = p0 + (res.t0 * delta);
-        res.normal = collisionPoint-sphere.center;
-        // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-        res.p0 = collisionPoint + (0.001 * res.normal);
     }
-    for (Triangle tri: triangles) {
+    if (rc->triangles) for (Triangle tri: triangles) {
         Vec3 normal = norm(getVisibleTriNormal(delta, tri.a, tri.b, tri.c));
-        // dot product of a line on the plane with the normal is zero, hence (p - t.a) \dot norm = 0, where p is a random point (x, y, z)
-        // p \dot norm = t.a \dot norm
-        // compute the right side, expand the left side and subtract it:
-        // (norm.x)x + (norm.y)y + (norm.z)z - (t.a \dot norm) = 0
-        // Take values in equation of a plane (CGPaP in C p. 703 eq. 15.18): Ax + By + Cz + D = 0
-        // where A = norm.x, B = norm.y, C = norm.z
-        float d = -dot(tri.a, normal);
-        // CGPaP in C p.703 eq. 15.21, using dot products to make more readable
-        float t = -(dot(normal, p0) + d);
-        float denom = dot(normal, delta);
-        if (denom == 0) { // Plane parallel to ray, ignore
-            continue;
-        }
-        t = t / denom;
-        if (t == 0 || t <= 0) continue;
-        if (t >= res.t0) continue;
+        float t = meetsTrianglePlane(p0, delta, normal, tri);
+        if (t <= 0 || t >= res.t) continue;
         Vec3 collisionPoint = p0 + (t * delta);
-        // project orthographically as big as possible
-        Vec2 ao, bo, co, po;
-        if (normal.x >= normal.y && normal.x >= normal.z) {
-            // std::printf("projecting onto x\n");
-            ao = Vec2{tri.a.y, tri.a.z};
-            bo = Vec2{tri.b.y, tri.b.z};
-            co = Vec2{tri.c.y, tri.c.z};
-            po = Vec2{collisionPoint.y, collisionPoint.z};
-        } else if (normal.y >= normal.x && normal.y >= normal.z) {
-            // std::printf("projecting onto y\n");
-            ao = Vec2{tri.a.x, tri.a.z};
-            bo = Vec2{tri.b.x, tri.b.z};
-            co = Vec2{tri.c.x, tri.c.z};
-            po = Vec2{collisionPoint.x, collisionPoint.z};
-        } else { 
-            // std::printf("projecting onto z\n");
-            ao = Vec2{tri.a.x, tri.a.y};
-            bo = Vec2{tri.b.x, tri.b.y};
-            co = Vec2{tri.c.x, tri.c.y};
-            po = Vec2{collisionPoint.x, collisionPoint.y};
+        if (meetsTriangle(normal, collisionPoint, tri)) {
+            res.collisions += 1;
+            res.t = t;
+            res.color = tri.color;
+            res.reflectiveness = tri.reflectiveness;
+            res.normal = normal;
+            res.p0 = collisionPoint;
         }
-
-        // FIXME: Check we're the nearest triangle/shape
-        if (!pointInTriangle(po, ao, bo, co)) {
-            continue;
-        }
-        res.collisions += 1;
-        if (t >= res.t0) continue;
-        res.t0 = t;
-        res.color = tri.color;
-        res.reflectiveness = tri.reflectiveness;
-        res.normal = normal;
-        // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-        res.p0 = collisionPoint + (0.001f * normal);
     }
+    // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
+    res.p0 = res.p0 + (0.001f * res.normal);
     if (!(rc->reflections) || res.reflectiveness == 0) {
         return res;
     }
-    calculateBounce(res.p0, res.normal, rc, &res, callCount+1);
+    castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
     return res;
 }
 
@@ -243,6 +219,7 @@ namespace {
     const char* w_dimensions = "dimensions";
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
+    const char* w_pointLight = "plight";
     const char* w_comment = "//";
 }
 
@@ -292,6 +269,8 @@ WorldMap::WorldMap(char const* path) {
             spheres.emplace_back(decodeSphere(line));
         } else if (token == w_triangle) {
             triangles.emplace_back(decodeTriangle(line));
+        } else if (token == w_pointLight) {
+            pointLights.emplace_back(decodePointLight(line));
         } else if (token == w_comment) {
             continue;
         }

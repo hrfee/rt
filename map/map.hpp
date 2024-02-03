@@ -15,12 +15,12 @@ struct RenderConfig {
     bool reflections;
     float distanceDivisor;
     float baseBrightness;
+    bool triangles, spheres;
 };
 
 struct RayResult {
     int collisions;
-    float t0;
-    float t1;
+    float t;
     Vec3 color;
     float reflectiveness;
     float emissiveness;
@@ -41,13 +41,17 @@ class WorldMap {
         Camera *cam;
         void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness); 
         void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness); 
+        void appendPointLight(Vec3 center, Vec3 color, float brightness);
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);
     private:
         RayResult castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
-        void calculateBounce(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
+        void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
 };
 
 
+float meetsSphere(Vec3 p0, Vec3 delta, Sphere sphere);
+float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle tri);
+bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri);
 bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c);
 #endif
