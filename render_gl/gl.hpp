@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include "imgui.h"
 #include "../img/img.hpp"
+#include "../map/map.hpp"
 #include <string>
 
 struct GLWindowState {
@@ -18,7 +19,7 @@ struct GLWindowState {
     double lastRenderTime;
     int lastRenderW, lastRenderH;
     float fovDeg, prevFovDeg;
-    bool renderOnChange;
+    RenderConfig rc;
     std::string filePath;
     struct Mouse {
         bool enabled;
@@ -30,7 +31,8 @@ struct GLWindowState {
 
 struct GLWindowUI {
     ImGuiContext *ctx;
-    bool renderNow, widthApply, heightApply, saveToTGA;
+    bool widthApply, heightApply, saveToTGA;
+    int renderMode;
 };
 
 class GLWindow {
@@ -38,7 +40,7 @@ class GLWindow {
         GLFWwindow* window;
         GLWindow(int w, int h, float scale, const char *windowTitle);
         ~GLWindow();
-        void mainLoop(Image* (*func)(bool renderOnChange, bool renderNow));
+        void mainLoop(Image* (*func)(RenderConfig *c));
         void draw(Image *img);
         GLWindowState state;
         void reloadTexture();

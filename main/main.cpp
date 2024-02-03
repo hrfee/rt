@@ -22,16 +22,16 @@ namespace {
     GLWindow *window;
 }
 
-Image *mainLoop(bool renderOnChange, bool renderNow) {
+Image *mainLoop(RenderConfig *rc) {
 #ifdef FRAMETIME
     double frameTime = glfwGetTime();
     std::fprintf(stderr, "Frame time: %dms (%.2f FPS)\n", int((frameTime-window->state.lastFrameTime)*1000.f), 1.f/(frameTime-window->state.lastFrameTime));
     window->state.lastFrameTime = glfwGetTime();
 #endif
 #ifndef FRAMETIME
-    bool change = renderNow;
+    bool change = rc->renderNow;
 #endif
-    if (renderOnChange || renderNow) {
+    if (rc->renderOnChange || rc->renderNow) {
         if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
             map->cam->setDimensions(window->state.w, window->state.h);
             resizeImage(img, window->state.w, window->state.h);
@@ -61,7 +61,7 @@ Image *mainLoop(bool renderOnChange, bool renderNow) {
 #endif
         clearImage(img);
         window->state.lastRenderTime = glfwGetTime();
-        map->castRays(img);
+        map->castRays(img, rc);
         window->state.lastRenderTime = glfwGetTime() - window->state.lastRenderTime;
         window->state.lastRenderW = window->state.w;
         window->state.lastRenderH = window->state.h;

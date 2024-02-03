@@ -15,13 +15,13 @@ void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflecti
     triangles.emplace_back(Triangle{a, b, c, color, reflectiveness});
 }
 
-void WorldMap::castRays(Image *img) {
+void WorldMap::castRays(Image *img, RenderConfig *rc) {
     Vec3 baseRowVec = cam->viewportCorner;
     for (int y = 0; y < cam->h; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = 0; x < cam->w; x++) {
-            RayResult res = castRay(cam->position, delta, 0);
+            RayResult res = castRay(cam->position, delta, rc, 0);
             if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
@@ -101,7 +101,7 @@ Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
     return norms[1];
 }
 
-RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
+RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
     float a = dot(delta, delta);
@@ -156,12 +156,12 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
         } else {
             continue;
         }
-        if (sphere.reflectiveness == 0) continue;
+        if (!(rc->reflections) || sphere.reflectiveness == 0) continue;
         Vec3 collisionPoint = p0 + (res.t0 * delta);
         Vec3 sphereNormal = collisionPoint-sphere.center;
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
         collisionPoint = collisionPoint + (0.001 * sphereNormal);
-        RayResult bounce = castRay(collisionPoint, sphereNormal, callCount+1);
+        RayResult bounce = castRay(collisionPoint, sphereNormal, rc, callCount+1);
         Vec3 color = {0.f, 0.f, 0.f};
         if (bounce.collisions > 0) color = bounce.color;
         res.color = (1.f - sphere.reflectiveness)*sphere.color + (sphere.reflectiveness) * color;
@@ -213,13 +213,13 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, int callCount) {
         res.collisions += 1;
         res.t0 = t;
         res.color = tri.color;
-        if (tri.reflectiveness == 0) continue;
+        if (!(rc->reflections) || tri.reflectiveness == 0) continue;
 
         // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
         // FIXME: The normal probably isn't the right one, as no reflections.
         // norm = cross(tri.c - tri.b, tri.a - tri.b);
         collisionPoint = collisionPoint + (0.001 * normal);
-        RayResult bounce = castRay(collisionPoint, normal, callCount+1);
+        RayResult bounce = castRay(collisionPoint, normal, rc, callCount+1);
         Vec3 color = {0.f, 0.f, 0.f};
         if (bounce.collisions > 0) color = bounce.color;
         res.color = (1.f - tri.reflectiveness)*tri.color + (tri.reflectiveness) * color;

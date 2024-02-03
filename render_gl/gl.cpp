@@ -128,7 +128,6 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
 
     // Load UI
     loadUI();
-    
 }
 
 void GLWindow::loadUI() {
@@ -136,7 +135,8 @@ void GLWindow::loadUI() {
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    state.renderOnChange = false;
+    state.rc.renderOnChange = false;
+    ui.renderMode = 1;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -207,22 +207,46 @@ std::string GLWindow::frameInfo() {
     return out.str();
 }
 
+namespace {
+    const char *modes[] = {"Raycasting", "Raycasting w/ Reflections", "Basic Lighting"};
+}
+
 void GLWindow::showUI() {
     ImGui::Begin("render controls");
     {
-        ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(state.renderOnChange));
+        if ((state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes)))) {
+            switch (ui.renderMode) {
+                case 0:
+                    state.rc.reflections = false;
+                    state.rc.lighting = false;
+                    break;
+                case 1:
+                    state.rc.reflections = true;
+                    state.rc.lighting = false;
+                    break;
+                case 2:
+                    state.rc.reflections = true;
+                    state.rc.lighting = true;
+                    break;
+            }
+        }
+    }
+    ImGui::End();
+    ImGui::Begin("output controls");
+    {
+        ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(state.rc.renderOnChange));
 
         // ImGui::BeginChild("Window Resolution");
         ImGui::Text("Window Resolution");
-        if (state.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
+        if (state.rc.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
         else ImGui::Text("Changes will be applied when \"Render\" is pressed.");
-        ui.widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
-        ui.heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, state.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+        ui.widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, state.rc.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+        ui.heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, state.rc.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
         // ImGui::EndChild();
 
-        ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.renderOnChange ? 2.f : 10.f);
+        ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.rc.renderOnChange ? 2.f : 10.f);
         ImGui::Text("Effective resolution: %dx%d", int(float(state.requestedFbW) * state.scale), int(float(state.requestedFbH) * state.scale));
-        if (!state.renderOnChange) ui.renderNow = ImGui::Button("Render", ImVec2(120, 40));
+        if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button("Render", ImVec2(120, 40));
         if (state.lastRenderTime != 0.f)
             ImGui::Text(frameInfo().c_str());
         
@@ -248,7 +272,7 @@ void GLWindow::showUI() {
 }
 
 
-void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
+void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -256,21 +280,21 @@ void GLWindow::mainLoop(Image* (*func)(bool renderOnChange, bool renderNow)) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ui.renderNow = false;
+        state.rc.renderNow = false;
         ui.widthApply = false, ui.heightApply = false;
         ui.saveToTGA = false;
 
         showUI();
 
-        if ((ui.renderNow || (state.renderOnChange && (ui.widthApply || ui.heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
+        if ((state.rc.renderNow || (state.rc.renderOnChange && (ui.widthApply || ui.heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
             glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
         }
 
-        if ((ui.renderNow || state.renderOnChange) && state.scale != state.prevScale) {
+        if ((state.rc.renderNow || state.rc.renderOnChange) && state.scale != state.prevScale) {
             reloadScaledResolution();
         }
         
-        Image *img = func(state.renderOnChange, ui.renderNow);
+        Image *img = func(&(state.rc));
         draw(img);
       
         if (ui.saveToTGA && !state.filePath.empty()) {
