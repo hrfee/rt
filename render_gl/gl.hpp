@@ -21,6 +21,8 @@ struct GLWindowState {
     float fovDeg, prevFovDeg;
     RenderConfig rc;
     std::string filePath;
+    std::string mapPath;
+    bool reloadMap;
     struct Mouse {
         bool enabled;
         float sensitivity;

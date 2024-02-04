@@ -176,6 +176,28 @@ bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri) {
     return pointInTriangle(po, ao, bo, co);
 }
 
+void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
+    // FIXME: Include light color, and maybe inverse square law again?
+    float brightness = rc->baseBrightness;
+    // When we call castRay, we just want the distance to the nearest object,
+    // without reflections or lighting.
+    RenderConfig simpleConfig;
+    simpleConfig.lighting = false;
+    simpleConfig.reflections = false;
+    simpleConfig.triangles = rc->triangles;
+    simpleConfig.spheres = rc->spheres;
+    for (PointLight light: pointLights) {
+        Vec3 distance = light.center - p0;
+        RayResult r = castRay(p0, norm(distance), &simpleConfig, 0);
+        if (r.collisions == 0) {
+            brightness += light.brightness;
+        } else {
+            std::printf("light blocked!\n");
+        }
+    }
+    res->color = res->color * std::min(1.f, brightness);
+}
+
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
     // FIXME: Triangles with the same z coords for a,b,c don't work, probably same for x,y.
     RayResult res = {0, 9999.f, 9999.f};
@@ -208,10 +230,12 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
     }
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
     res.p0 = res.p0 + (0.001f * res.normal);
-    if (!(rc->reflections) || res.reflectiveness == 0) {
-        return res;
+    if (rc->reflections && res.reflectiveness != 0) {
+        castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
     }
-    castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
+    if (rc->lighting && res.reflectiveness != 0) {
+        castShadowRays(p0, rc, &res);
+    }
     return res;
 }
 
@@ -252,6 +276,13 @@ void WorldMap::encode(char const* path) {
 }
 
 WorldMap::WorldMap(char const* path) {
+    loadFile(path);
+}
+
+void WorldMap::loadFile(char const* path) {
+    spheres.clear();
+    triangles.clear();
+    pointLights.clear();
     std::ifstream in(path);
     std::string line;
     while (std::getline(in, line)) {

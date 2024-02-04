@@ -47,6 +47,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.h = float(height)*scale;
     state.scale = scale;
     state.prevScale = scale;
+    state.reloadMap = false;
     title = windowTitle;
     int success = glfwInit();
     if (!success) {
@@ -258,8 +259,11 @@ void GLWindow::showUI() {
             ImGui::Text(frameInfo().c_str());
         
         ImGui::Text("Dump render to .tga file");
-        ImGui::InputText("Filepath", &(state.filePath));
+        ImGui::InputText(".tga path", &(state.filePath));
         ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
+        ImGui::Text("Map Loading");
+        ImGui::InputText(".map path", &(state.mapPath));
+        state.reloadMap = ImGui::Button("Reload Map", ImVec2(90, 25));
     }
     ImGui::End();
     ImGui::Begin("camera controls");

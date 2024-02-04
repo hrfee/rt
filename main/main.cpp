@@ -12,7 +12,7 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-
+#define MAP_PATH "maps/3sphere.map"
 // Uncomment to get printouts of frametime & fps. Forces re-rendering every frame.
 // #define FRAMETIME
 
@@ -31,6 +31,11 @@ Image *mainLoop(RenderConfig *rc) {
 #ifndef FRAMETIME
     bool change = rc->renderNow;
 #endif
+    if (window->state.reloadMap) {
+        map->loadFile(window->state.mapPath.c_str());
+        window->state.reloadMap = false;
+        change = true;
+    }
     if (rc->renderOnChange || rc->renderNow) {
         if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
             map->cam->setDimensions(window->state.w, window->state.h);
@@ -108,7 +113,8 @@ int main(int argc, char **argv) {
     }
 
     window = new GLWindow(windowWidth, windowHeight, windowScaleFactor, WINDOW_TITLE);
-    map = new WorldMap("maps/3sphere.map");
+    map = new WorldMap(MAP_PATH);
+    window->state.mapPath = MAP_PATH;
 
     map->cam = new Camera(window->state.w, window->state.h, cameraFOV, {0.f, -0.5f, 0.f});
     window->state.fovDeg = cameraFOV * 180.f / M_PI;
