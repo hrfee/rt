@@ -22,7 +22,7 @@ struct RayResult {
     int collisions;
     float t;
     Vec3 color;
-    float specular;
+    float reflectiveness;
     float emissiveness;
     Vec3 emissionColor;
     Vec3 p0;
@@ -41,8 +41,8 @@ class WorldMap {
         std::vector<Triangle> triangles;
         std::vector<PointLight> pointLights;
         Camera *cam;
-        void appendSphere(Vec3 center, float radius, Vec3 color, float specular); 
-        void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float specular); 
+        void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness); 
+        void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness); 
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);

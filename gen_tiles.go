@@ -19,8 +19,8 @@ func genTile(colors [2]string, p0 Vec, tileSize float64, width, depth int64) {
 			if cy {
 				color = colors[1]
 			}
-			fmt.Printf("triangle a %f %f %f b %f %f %F c %f %f %f color %s specular 0.1\n", x, p0.y, z, x+tileSize, p0.y, z, x+tileSize, p0.y, z+tileSize, color)
-			fmt.Printf("triangle a %f %f %f b %f %f %F c %f %f %f color %s specular 0.1\n", x, p0.y, z, x, p0.y, z+tileSize, x+tileSize, p0.y, z+tileSize, color)
+			fmt.Printf("triangle a %f %f %f b %f %f %F c %f %f %f color %s reflectiveness 0.1\n", x, p0.y, z, x+tileSize, p0.y, z, x+tileSize, p0.y, z+tileSize, color)
+			fmt.Printf("triangle a %f %f %f b %f %f %F c %f %f %f color %s reflectiveness 0.1\n", x, p0.y, z, x, p0.y, z+tileSize, x+tileSize, p0.y, z+tileSize, color)
 			cy = !cy
 		}
 		cx = !cx

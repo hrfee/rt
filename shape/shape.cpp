@@ -10,7 +10,7 @@ namespace {
     const char w_color_hex = '#';
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
-    const char* w_specular = "specular";
+    const char* w_reflectiveness = "reflectiveness";
     // const char* w_emission = "emission";
     const char* w_brightness = "brightness";
     const char* w_a = "a";
@@ -27,8 +27,8 @@ std::string encodeSphere(Sphere *s) {
     fmt << s->radius << " ";
     fmt << w_color << " ";
     fmt << s->color.x << " " << s->color.y << " " << s->color.z << " ";
-    fmt << w_specular << " ";
-    fmt << s->specular << " ";
+    fmt << w_reflectiveness << " ";
+    fmt << s->reflectiveness << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -51,9 +51,9 @@ Sphere decodeSphere(std::string in) {
             s.radius = std::stof(w);
         } else if (w == w_color) {
             s.color = decodeColour(&stream);
-        } else if (w == w_specular) {
+        } else if (w == w_reflectiveness) {
             stream >> w;
-            s.specular = std::stof(w);
+            s.reflectiveness = std::stof(w);
         }
     } while (stream);
     return s;
@@ -105,8 +105,8 @@ std::string encodeTriangle(Triangle *t) {
     fmt << w_c << " ";
     fmt << t->c.x << " " << t->c.y << " " << t->c.z << " ";
     fmt << encodeColour(t->color) << " ";
-    fmt << w_specular << " ";
-    fmt << t->specular << " ";
+    fmt << w_reflectiveness << " ";
+    fmt << t->reflectiveness << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -140,9 +140,9 @@ Triangle decodeTriangle(std::string in) {
             t.c.z = std::stof(w);
         } else if (w == w_color) {
             t.color = decodeColour(&stream);
-        } else if (w == w_specular) {
+        } else if (w == w_reflectiveness) {
             stream >> w;
-            t.specular = std::stof(w);
+            t.reflectiveness = std::stof(w);
         }
     } while (stream);
     return t;
