@@ -7,12 +7,12 @@
 #include <iostream>
 #include <sstream>
 
-void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness) {
-    spheres.emplace_back(Sphere{center, radius, color, reflectiveness});
+void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float specular) {
+    spheres.emplace_back(Sphere{center, radius, color, specular});
 }
 
-void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness) {
-    triangles.emplace_back(Triangle{a, b, c, color, reflectiveness});
+void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float specular) {
+    triangles.emplace_back(Triangle{a, b, c, color, specular});
 }
 
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
@@ -113,7 +113,7 @@ void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResul
     if (bounce.collisions > 0) {
         color = bounce.color;
     }
-    res->color = ((1.f - res->reflectiveness)*res->color + (res->reflectiveness) * color);
+    res->color = ((1.f - res->specular)*res->color + (res->specular) * color);
     if (!(rc->lighting)) {
         return;
     }
@@ -183,7 +183,7 @@ bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri) {
 }
 
 void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
-    // FIXME: Include light color, and maybe inverse square law again?
+    // FIXME: When transparency is added, consider this in obstacles when tracing to light sources
     float brightness = rc->baseBrightness;
     Vec3 lightColor = {1.f, 1.f, 1.f};
     // When we call castRay, we just want the distance to the nearest object,
@@ -195,6 +195,7 @@ void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
     simpleConfig.spheres = rc->spheres;
     for (PointLight light: pointLights) {
         Vec3 distance = light.center - p0;
+        if (dot(res->normal, distance) < 0) continue;
         float tLight = mag(distance);
         Vec3 normDistance = distance / tLight;
         RayResult r = castRay(p0, normDistance, &simpleConfig, 0);
@@ -220,7 +221,7 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
         if (t >= 0 && t < res.t) {
             res.t = t;
             res.color = sphere.color;
-            res.reflectiveness = sphere.reflectiveness;
+            res.specular = sphere.specular;
             Vec3 collisionPoint = p0 + (res.t * delta);
             res.normal = collisionPoint-sphere.center;
             res.p0 = collisionPoint;
@@ -235,17 +236,17 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             res.collisions += 1;
             res.t = t;
             res.color = tri.color;
-            res.reflectiveness = tri.reflectiveness;
+            res.specular = tri.specular;
             res.normal = normal;
             res.p0 = collisionPoint;
         }
     }
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
     res.p0 = res.p0 + (0.001f * res.normal);
-    if (rc->reflections && res.reflectiveness != 0) {
+    if (rc->reflections && res.specular != 0) {
         castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
     }
-    if (rc->lighting && res.reflectiveness != 0) {
+    if (rc->lighting && res.specular != 0) {
         castShadowRays(res.p0, rc, &res);
     }
     return res;
