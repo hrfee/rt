@@ -17,6 +17,12 @@ void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflecti
 
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
     Vec3 baseRowVec = cam->viewportCorner;
+    if (rc->baseBrightness == -1.f) {
+        rc->baseBrightness = baseBrightness;
+    }
+    if (rc->baseBrightness != baseBrightness) {
+        baseBrightness = rc->baseBrightness;
+    }
     for (int y = 0; y < cam->h; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
@@ -179,6 +185,7 @@ bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri) {
 void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
     // FIXME: Include light color, and maybe inverse square law again?
     float brightness = rc->baseBrightness;
+    Vec3 lightColor = {1.f, 1.f, 1.f};
     // When we call castRay, we just want the distance to the nearest object,
     // without reflections or lighting.
     RenderConfig simpleConfig;
@@ -188,14 +195,19 @@ void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
     simpleConfig.spheres = rc->spheres;
     for (PointLight light: pointLights) {
         Vec3 distance = light.center - p0;
-        RayResult r = castRay(p0, norm(distance), &simpleConfig, 0);
-        if (r.collisions == 0) {
-            brightness += light.brightness;
+        float tLight = mag(distance);
+        Vec3 normDistance = distance / tLight;
+        RayResult r = castRay(p0, normDistance, &simpleConfig, 0);
+        bool noHit = r.collisions == 0 || r.t > tLight;
+        if (noHit) {
+            float scaledDistance = tLight / rc->distanceDivisor;
+            brightness += light.brightness / (scaledDistance*scaledDistance);
+            lightColor = lightColor * light.color;
         } else {
-            std::printf("light blocked!\n");
+            // std::printf("light blocked!\n");
         }
     }
-    res->color = res->color * std::min(1.f, brightness);
+    res->color = res->color * (lightColor * std::min(1.f, brightness));
 }
 
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
@@ -234,13 +246,15 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
         castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
     }
     if (rc->lighting && res.reflectiveness != 0) {
-        castShadowRays(p0, rc, &res);
+        castShadowRays(res.p0, rc, &res);
     }
     return res;
 }
 
 namespace {
+    const char* w_map = "map";
     const char* w_dimensions = "dimensions";
+    const char* w_brightness = "brightness";
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
     const char* w_pointLight = "plight";
@@ -259,7 +273,8 @@ void WorldMap::encode(char const* path) {
     {
         // World dimensions
         std::ostringstream fmt;
-        fmt << w_dimensions << " " << w << " " << h << " " << d << std::endl;
+        fmt << w_map << " " << w_dimensions << " " << w << " " << h << " " << d << " ";
+        fmt << w_brightness << " " << baseBrightness << std::endl;
         out << fmt.str();
     }
     // spheres
@@ -289,13 +304,23 @@ void WorldMap::loadFile(char const* path) {
         std::stringstream lstream(line);
         std::string token;
         lstream >> token;
-        if (token == w_dimensions) {
+        if (token == w_map) {
             lstream >> token;
-            w = std::stof(token);
+            if (token == w_dimensions) {
+                lstream >> token;
+                w = std::stof(token);
+                lstream >> token;
+                h = std::stof(token);
+                lstream >> token;
+                d = std::stof(token);
+            }
             lstream >> token;
-            h = std::stof(token);
-            lstream >> token;
-            d = std::stof(token);
+            if (token == w_brightness) {
+                lstream >> token;
+                baseBrightness = std::stof(token);
+            } else {
+                lstream << " " << token;
+            }
         } else if (token == w_sphere) {
             spheres.emplace_back(decodeSphere(line));
         } else if (token == w_triangle) {

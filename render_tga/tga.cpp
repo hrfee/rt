@@ -34,7 +34,7 @@ void encodeDescriptor(TGAHeader *header, int w, int h) {
 
 void writeTGA(Image *img, std::string fname, std::string id) {
     TGAHeader header;
-    header.idLength = id.length(); // FIXME: Put render info in the ID.
+    header.idLength = id.length();
     header.colorMapType = 0;
     header.imageType = 0b00000010; // 2
     encodeDescriptor(&header, img->w, img->h);

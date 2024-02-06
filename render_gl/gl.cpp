@@ -139,7 +139,8 @@ void GLWindow::loadUI() {
     state.rc.renderOnChange = false;
     ui.renderMode = 1;
     state.rc.distanceDivisor = 1.f;
-    state.rc.baseBrightness = 0.f;
+    // Indicate unset, so map can set it for us the first time round.
+    state.rc.baseBrightness = -1.f;
     state.rc.triangles = true;
     state.rc.spheres = true;
 
@@ -264,6 +265,7 @@ void GLWindow::showUI() {
         ImGui::Text("Map Loading");
         ImGui::InputText(".map path", &(state.mapPath));
         state.reloadMap = ImGui::Button("Reload Map", ImVec2(90, 25));
+        if (state.reloadMap) state.rc.baseBrightness = -1.f;
     }
     ImGui::End();
     ImGui::Begin("camera controls");

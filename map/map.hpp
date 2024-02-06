@@ -35,6 +35,7 @@ class WorldMap {
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
+        float baseBrightness;
         void loadFile(char const* path);
         std::vector<Sphere> spheres;
         std::vector<Triangle> triangles;
