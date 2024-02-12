@@ -139,6 +139,7 @@ void GLWindow::loadUI() {
     state.rc.renderOnChange = false;
     ui.renderMode = 1;
     state.rc.distanceDivisor = 1.f;
+    state.rc.globalShininess = -1.f;
     // Indicate unset, so map can set it for us the first time round.
     state.rc.baseBrightness = -1.f;
     state.rc.triangles = true;
@@ -235,6 +236,10 @@ void GLWindow::showUI() {
                 state.rc.lighting = true;
                 state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 1.f, 100.f) ? true : state.rc.renderNow;
                 state.rc.renderNow = ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::Checkbox("Phong specular", &(state.rc.specular)) ? true : state.rc.renderNow;
+                if (state.rc.specular) {
+                    state.rc.renderNow = ImGui::SliderFloat("Global shininess (n)", &(state.rc.globalShininess), 0.f, 100.f) ? true : state.rc.renderNow;
+                }
                 break;
         };
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
@@ -265,7 +270,10 @@ void GLWindow::showUI() {
         ImGui::Text("Map Loading");
         ImGui::InputText(".map path", &(state.mapPath));
         state.reloadMap = ImGui::Button("Reload Map", ImVec2(90, 25));
-        if (state.reloadMap) state.rc.baseBrightness = -1.f;
+        if (state.reloadMap) {
+            state.rc.baseBrightness = -1.f;
+            state.rc.globalShininess = -1.f;
+        }
     }
     ImGui::End();
     ImGui::Begin("camera controls");

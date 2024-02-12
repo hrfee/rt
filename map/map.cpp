@@ -7,12 +7,12 @@
 #include <iostream>
 #include <sstream>
 
-void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness) {
-    spheres.emplace_back(Sphere{center, radius, color, reflectiveness});
+void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular) {
+    spheres.emplace_back(Sphere{center, radius, color, reflectiveness, specular});
 }
 
-void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness) {
-    triangles.emplace_back(Triangle{a, b, c, color, reflectiveness});
+void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular) {
+    triangles.emplace_back(Triangle{a, b, c, color, reflectiveness, specular});
 }
 
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
@@ -22,6 +22,12 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
     }
     if (rc->baseBrightness != baseBrightness) {
         baseBrightness = rc->baseBrightness;
+    }
+    if (rc->globalShininess == -1.f) {
+        rc->globalShininess = globalShininess;
+    }
+    if (rc->globalShininess != globalShininess) {
+        globalShininess = rc->globalShininess;
     }
     for (int y = 0; y < cam->h; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
@@ -182,12 +188,10 @@ bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri) {
     return pointInTriangle(po, ao, bo, co);
 }
 
-void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
-    // FIXME: Include light color, and maybe inverse square law again?
-    float brightness = rc->baseBrightness;
-    Vec3 lightColor = {1.f, 1.f, 1.f};
-    // When we call castRay, we just want the distance to the nearest object,
-    // without reflections or lighting.
+void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res) {
+    // FIXME: Consider transparent obstacles when those are added.
+    Vec3 lightColor = Vec3{1.f, 1.f, 1.f} * rc->baseBrightness;
+    Vec3 specularColor = Vec3{0.f, 0.f, 0.f};
     RenderConfig simpleConfig;
     simpleConfig.lighting = false;
     simpleConfig.reflections = false;
@@ -199,15 +203,35 @@ void WorldMap::castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res) {
         Vec3 normDistance = distance / tLight;
         RayResult r = castRay(p0, normDistance, &simpleConfig, 0);
         bool noHit = r.collisions == 0 || r.t > tLight;
-        if (noHit) {
-            float scaledDistance = tLight / rc->distanceDivisor;
-            brightness += light.brightness / (scaledDistance*scaledDistance);
-            lightColor = lightColor * light.color;
-        } else {
-            // std::printf("light blocked!\n");
-        }
+        if (!noHit) continue;
+        float scaledDistance = tLight / rc->distanceDivisor;
+        float lightBrightness = light.brightness / (scaledDistance*scaledDistance);
+        lightColor = lightColor + (light.color * lightBrightness);
+
+        if (!rc->specular) continue;
+        // PHONG : CGPaP in C p.730 Sect. 16.1.4
+        // \hat{L} = normDistance,
+        // \hat{N} = norm(res->normal),
+        Vec3 normNorm = norm(res->normal);
+        // \hat{V} = norm(viewDelta)
+        // \hat{R} = rNorm;
+        Vec3 rNorm = norm((2.f * normNorm * dot(normNorm, normDistance)) - normDistance);
+        // k_s = res->specular,
+        // O_{s\varlambda} (Specular Colour) = light.specular * light.specularColor,
+        // n (shininess):
+        float n = globalShininess; // FIXME: Add as object parameter!
+        float rDotV = std::fmax(std::pow(dot(rNorm, norm(viewDelta)), n), 0);
+        // std::printf("got rDotV %f\n", rDotV);
+        // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
+        specularColor = specularColor + (res->specular * (light.specular * light.specularColor) * rDotV);
     }
-    res->color = res->color * (lightColor * std::min(1.f, brightness));
+    /*lightColor.x = std::fmin(lightColor.x, 1.f);
+    lightColor.y = std::fmin(lightColor.y, 1.f);
+    lightColor.z = std::fmin(lightColor.z, 1.f);
+    specularColor.x = std::fmin(specularColor.x, 1.f);
+    specularColor.y = std::fmin(specularColor.y, 1.f);
+    specularColor.z = std::fmin(specularColor.z, 1.f);*/
+    res->color = (res->color * lightColor) + specularColor;
 }
 
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
@@ -224,6 +248,7 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             Vec3 collisionPoint = p0 + (res.t * delta);
             res.normal = collisionPoint-sphere.center;
             res.p0 = collisionPoint;
+            res.specular = sphere.specular;
         }
     }
     if (rc->triangles) for (Triangle tri: triangles) {
@@ -238,6 +263,7 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             res.reflectiveness = tri.reflectiveness;
             res.normal = normal;
             res.p0 = collisionPoint;
+            res.specular = tri.specular;
         }
     }
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
@@ -246,8 +272,12 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
         castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
     }
     if (rc->lighting && res.reflectiveness != 0) {
-        castShadowRays(res.p0, rc, &res);
+        castShadowRays(-1.f*delta, res.p0, rc, &res);
     }
+
+    res.color.x = std::fmin(res.color.x, 1.f);
+    res.color.y = std::fmin(res.color.y, 1.f);
+    res.color.z = std::fmin(res.color.z, 1.f);
     return res;
 }
 
@@ -258,6 +288,7 @@ namespace {
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
     const char* w_pointLight = "plight";
+    const char* w_shininess = "shininess";
     const char* w_comment = "//";
 }
 
@@ -268,13 +299,15 @@ void WorldMap::encode(char const* path) {
         return;
     }
     {
-        // FIXME: camera
+        // FIXME: camera maybe?
     }
     {
         // World dimensions
         std::ostringstream fmt;
         fmt << w_map << " " << w_dimensions << " " << w << " " << h << " " << d << " ";
-        fmt << w_brightness << " " << baseBrightness << std::endl;
+        fmt << w_brightness << " " << baseBrightness << " ";
+        fmt << w_shininess << " " << globalShininess << " ";
+        fmt << std::endl;
         out << fmt.str();
     }
     // spheres
@@ -319,6 +352,14 @@ void WorldMap::loadFile(char const* path) {
                 lstream >> token;
                 baseBrightness = std::stof(token);
             } else {
+                lstream << " " << token;
+            }
+            lstream >> token;
+            if (token == w_shininess) {
+                lstream >> token;
+                globalShininess = std::stof(token);
+            } else {
+                globalShininess = 1.f;
                 lstream << " " << token;
             }
         } else if (token == w_sphere) {

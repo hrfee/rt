@@ -13,6 +13,7 @@ struct Sphere {
     float radius; // r
     Vec3 color;
     float reflectiveness; // 0-1
+    float specular; // 1-inf
 };
 
 std::string encodeSphere(Sphere *s);
@@ -23,12 +24,15 @@ struct Triangle {
     Vec3 a, b, c;
     Vec3 color;
     float reflectiveness;
+    float specular; // 1-inf
 };
 
 struct PointLight {
     Vec3 center;
     Vec3 color;
     float brightness;
+    float specular;
+    Vec3 specularColor;
 };
 
 std::string encodePointLight(PointLight *p);

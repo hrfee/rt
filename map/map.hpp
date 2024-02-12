@@ -13,8 +13,10 @@ struct RenderConfig {
     bool renderNow;
     bool lighting;
     bool reflections;
+    bool specular;
     float distanceDivisor;
     float baseBrightness;
+    float globalShininess;
     bool triangles, spheres;
 };
 
@@ -24,6 +26,7 @@ struct RayResult {
     Vec3 color;
     float reflectiveness;
     float emissiveness;
+    float specular;
     Vec3 emissionColor;
     Vec3 p0;
     Vec3 normal;
@@ -35,21 +38,21 @@ class WorldMap {
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
-        float baseBrightness;
+        float baseBrightness, globalShininess;
         void loadFile(char const* path);
         std::vector<Sphere> spheres;
         std::vector<Triangle> triangles;
         std::vector<PointLight> pointLights;
         Camera *cam;
-        void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness); 
-        void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness); 
+        void appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular); 
+        void appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular); 
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);
     private:
         RayResult castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
         void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
-        void castShadowRays(Vec3 p0, RenderConfig *rc, RayResult *res);
+        void castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res);
 };
 
 
