@@ -219,23 +219,16 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         // k_s = res->specular,
         // O_{s\varlambda} (Specular Colour) = light.specular * light.specularColor,
         // n (shininess):
-        float n = globalShininess; // FIXME: Add as object parameter!
+        float n = (res->shininess == -1.f) ? globalShininess : res->shininess;
         float rDotV = std::fmax(std::pow(dot(rNorm, norm(viewDelta)), n), 0);
         // std::printf("got rDotV %f\n", rDotV);
         // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
         specularColor = specularColor + (res->specular * (light.specular * light.specularColor) * rDotV);
     }
-    /*lightColor.x = std::fmin(lightColor.x, 1.f);
-    lightColor.y = std::fmin(lightColor.y, 1.f);
-    lightColor.z = std::fmin(lightColor.z, 1.f);
-    specularColor.x = std::fmin(specularColor.x, 1.f);
-    specularColor.y = std::fmin(specularColor.y, 1.f);
-    specularColor.z = std::fmin(specularColor.z, 1.f);*/
     res->color = (res->color * lightColor) + specularColor;
 }
 
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
-    // FIXME: Triangles with the same z coords for a,b,c don't work, probably same for x,y.
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
     if (rc->spheres) for (Sphere sphere: spheres) {
@@ -245,6 +238,7 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             res.t = t;
             res.color = sphere.color;
             res.reflectiveness = sphere.reflectiveness;
+            res.shininess = sphere.shininess;
             Vec3 collisionPoint = p0 + (res.t * delta);
             res.normal = collisionPoint-sphere.center;
             res.p0 = collisionPoint;
@@ -261,6 +255,7 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
             res.t = t;
             res.color = tri.color;
             res.reflectiveness = tri.reflectiveness;
+            res.shininess = tri.shininess;
             res.normal = normal;
             res.p0 = collisionPoint;
             res.specular = tri.specular;

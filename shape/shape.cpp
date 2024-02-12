@@ -14,6 +14,7 @@ namespace {
     const char* w_specular = "specular";
     // const char* w_emission = "emission";
     const char* w_brightness = "brightness";
+    const char* w_shininess = "shininess";
     const char* w_a = "a";
     const char* w_b = "b";
     const char* w_c = "c";
@@ -31,6 +32,8 @@ std::string encodeSphere(Sphere *s) {
     fmt << s->reflectiveness << " ";
     fmt << w_specular << " ";
     fmt << s->specular << " ";
+    fmt << w_shininess << " ";
+    fmt << s->shininess << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -38,6 +41,7 @@ std::string encodeSphere(Sphere *s) {
 Sphere decodeSphere(std::string in) {
     std::stringstream stream(in);
     Sphere s;
+    s.shininess = -1.f; // -1 Indicates global shininess param takes precedence
     do {
         std::string w;
         stream >> w;
@@ -59,6 +63,9 @@ Sphere decodeSphere(std::string in) {
         } else if (w == w_specular) {
             stream >> w;
             s.specular = std::stof(w);
+        } else if (w == w_shininess) {
+            stream >> w;
+            s.shininess = std::stof(w);
         }
     } while (stream);
     return s;
@@ -128,6 +135,8 @@ std::string encodeTriangle(Triangle *t) {
     fmt << t->reflectiveness << " ";
     fmt << w_specular << " ";
     fmt << t->specular << " ";
+    fmt << w_shininess << " ";
+    fmt << t->shininess << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -135,6 +144,7 @@ std::string encodeTriangle(Triangle *t) {
 Triangle decodeTriangle(std::string in) {
     std::stringstream stream(in);
     Triangle t;
+    t.shininess = -1.f; // -1 Indicates global shininess param takes precedence
     do {
         std::string w;
         stream >> w;
@@ -167,6 +177,9 @@ Triangle decodeTriangle(std::string in) {
         } else if (w == w_specular) {
             stream >> w;
             t.specular = std::stof(w);
+        } else if (w == w_shininess) {
+            stream >> w;
+            t.shininess = std::stof(w);
         }
     } while (stream);
     return t;

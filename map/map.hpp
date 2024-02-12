@@ -27,6 +27,7 @@ struct RayResult {
     float reflectiveness;
     float emissiveness;
     float specular;
+    float shininess;
     Vec3 emissionColor;
     Vec3 p0;
     Vec3 normal;
