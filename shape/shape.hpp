@@ -6,6 +6,17 @@
 #include <iostream>
 #include <sstream>
 
+enum NearestShape { nSphere, nTriangle };
+
+struct Sphere;
+struct Triangle;
+
+struct Shape {
+    Sphere *s;
+    Triangle *t;
+    Shape *next;
+};
+
 struct Sphere {
     // (x-a^2) + (y-b^2) + (z-c^2) = r^2
     // CG:PaP 2nd ed. in C: p. 702
@@ -19,7 +30,7 @@ struct Sphere {
 
 std::string encodeSphere(Sphere *s);
 
-Sphere decodeSphere(std::string in);
+Sphere *decodeSphere(std::string in);
 
 struct Triangle {
     Vec3 a, b, c;
@@ -43,7 +54,7 @@ PointLight decodePointLight(std::string in);
 
 std::string encodeTriangle(Triangle *t);
 
-Triangle decodeTriangle(std::string in);
+Triangle *decodeTriangle(std::string in);
 
 std::string encodeColour(Vec3 c);
 

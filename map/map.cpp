@@ -8,12 +8,54 @@
 #include <sstream>
 #include <filesystem>
 
-void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular) {
-    spheres.emplace_back(Sphere{center, radius, color, reflectiveness, specular});
+void WorldMap::appendShape(Shape *sh) {
+    sh->next = NULL;
+    if (start == NULL) start = sh;
+    if (end != NULL) end->next = sh;
+    end = sh;
 }
 
-void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular) {
-    triangles.emplace_back(Triangle{a, b, c, color, reflectiveness, specular});
+void WorldMap::appendSphere(Sphere *s) {
+    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
+    sh->s = s;
+    sh->t = NULL;
+    appendShape(sh);
+}
+
+void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular, float shininess) {
+    Sphere *s = (Sphere*)malloc(sizeof(Sphere)); // FIXME: Error check!
+    s->center = center;
+    s->radius = radius;
+    s->color = color;
+    s->reflectiveness = reflectiveness;
+    s->specular = specular;
+    s->shininess = shininess;
+    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
+    sh->s = s;
+    sh->t = NULL;
+    appendShape(sh);
+}
+
+void WorldMap::appendTriangle(Triangle *t) {
+    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
+    sh->t = t;
+    sh->s = NULL;
+    appendShape(sh);
+}
+
+void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular, float shininess) {
+    Triangle *t = (Triangle*)malloc(sizeof(Triangle)); // FIXME: Error check!
+    t->a = a;
+    t->b = b;
+    t->c = c;
+    t->color = color;
+    t->reflectiveness = reflectiveness;
+    t->specular = specular;
+    t->shininess = shininess;
+    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
+    sh->t = t;
+    sh->s = NULL;
+    appendShape(sh);
 }
 
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
@@ -235,35 +277,41 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
 RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
-    if (rc->spheres) for (Sphere sphere: spheres) {
-        float t = meetsSphere(p0, delta, sphere);
-        if (t >= 0) res.collisions += 1;
-        if (t >= 0 && t < res.t) {
-            res.t = t;
-            res.color = sphere.color;
-            res.reflectiveness = sphere.reflectiveness;
-            res.shininess = sphere.shininess;
-            Vec3 collisionPoint = p0 + (res.t * delta);
-            res.normal = collisionPoint-sphere.center;
-            res.p0 = collisionPoint;
-            res.specular = sphere.specular;
+    Shape *current = start;
+    while (current != NULL) {
+        if (current->s != NULL && rc->spheres) {
+            Sphere *sphere = current->s;
+            float t = meetsSphere(p0, delta, *sphere);
+            if (t >= 0) res.collisions += 1;
+            if (t >= 0 && t < res.t) {
+                res.t = t;
+                res.color = sphere->color;
+                res.reflectiveness = sphere->reflectiveness;
+                res.shininess = sphere->shininess;
+                Vec3 collisionPoint = p0 + (res.t * delta);
+                res.normal = collisionPoint-sphere->center;
+                res.p0 = collisionPoint;
+                res.specular = sphere->specular;
+            }
+        } else if (current->t != NULL && rc->triangles) {
+            Triangle *tri = current->t;
+            Vec3 normal = norm(getVisibleTriNormal(delta, tri->a, tri->b, tri->c));
+            float t = meetsTrianglePlane(p0, delta, normal, *tri);
+            if (t > 0 && t < res.t) {
+                Vec3 collisionPoint = p0 + (t * delta);
+                if (meetsTriangle(normal, collisionPoint, *tri)) {
+                    res.collisions += 1;
+                    res.t = t;
+                    res.color = tri->color;
+                    res.reflectiveness = tri->reflectiveness;
+                    res.shininess = tri->shininess;
+                    res.normal = normal;
+                    res.p0 = collisionPoint;
+                    res.specular = tri->specular;
+                }
+            }
         }
-    }
-    if (rc->triangles) for (Triangle tri: triangles) {
-        Vec3 normal = norm(getVisibleTriNormal(delta, tri.a, tri.b, tri.c));
-        float t = meetsTrianglePlane(p0, delta, normal, tri);
-        if (t <= 0 || t >= res.t) continue;
-        Vec3 collisionPoint = p0 + (t * delta);
-        if (meetsTriangle(normal, collisionPoint, tri)) {
-            res.collisions += 1;
-            res.t = t;
-            res.color = tri.color;
-            res.reflectiveness = tri.reflectiveness;
-            res.shininess = tri.shininess;
-            res.normal = normal;
-            res.p0 = collisionPoint;
-            res.specular = tri.specular;
-        }
+        current = current->next;
     }
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
     res.p0 = res.p0 + (0.001f * res.normal);
@@ -310,13 +358,11 @@ void WorldMap::encode(char const* path) {
         fmt << std::endl;
         out << fmt.str();
     }
-    // spheres
-    for (Sphere s: spheres) {
-        out << encodeSphere(&s);
-    }
-    // triangles
-    for (Triangle t: triangles) {
-        out << encodeTriangle(&t);
+    Shape *current = start;
+    while (current != NULL) {
+        if (current->s != NULL) out << encodeSphere(current->s);
+        else if (current->t != NULL) out << encodeTriangle(current->t);
+        current = current->next;
     }
 
     out.close();
@@ -324,12 +370,13 @@ void WorldMap::encode(char const* path) {
 }
 
 WorldMap::WorldMap(char const* path) {
+    start = NULL;
+    end = NULL;
     loadFile(path);
 }
 
 void WorldMap::loadFile(char const* path) {
-    spheres.clear();
-    triangles.clear();
+    clearShapes();
     pointLights.clear();
     loadObjFile(path);
 }
@@ -366,10 +413,12 @@ void WorldMap::loadObjFile(const char* path) {
                 globalShininess = 1.f;
                 lstream << " " << token;
             }
-        } else if (token == w_sphere) {
-            spheres.emplace_back(decodeSphere(line));
-        } else if (token == w_triangle) {
-            triangles.emplace_back(decodeTriangle(line));
+        } else if (token == w_sphere || token == w_triangle) {
+            if (token == w_sphere) {
+                appendSphere(decodeSphere(line));
+            } else if (token == w_triangle) {
+                appendTriangle(decodeTriangle(line));
+            }
         } else if (token == w_pointLight) {
             pointLights.emplace_back(decodePointLight(line));
         } else if (token == w_comment) {
@@ -385,6 +434,19 @@ void WorldMap::loadObjFile(const char* path) {
     }
 }
 
+void WorldMap::clearShapes() {
+    if (start == NULL) return;
+    Shape *current = start;
+    while (current != NULL) {
+        if (current->s != NULL) free(current->s);
+        if (current->t != NULL) free(current->t);
+        Shape *next = current->next;
+        free(current);
+        current = next;
+    }
+}
+
 WorldMap::~WorldMap() {
     delete cam;
+    clearShapes();
 }

@@ -38,34 +38,34 @@ std::string encodeSphere(Sphere *s) {
     return fmt.str();
 }
 
-Sphere decodeSphere(std::string in) {
+Sphere *decodeSphere(std::string in) {
     std::stringstream stream(in);
-    Sphere s;
-    s.shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    Sphere *s = (Sphere*)malloc(sizeof(Sphere)); // FIXME: Error check!
+    s->shininess = -1.f; // -1 Indicates global shininess param takes precedence
     do {
         std::string w;
         stream >> w;
         if (w == w_center) {
             stream >> w;
-            s.center.x = std::stof(w);
+            s->center.x = std::stof(w);
             stream >> w;
-            s.center.y = std::stof(w);
+            s->center.y = std::stof(w);
             stream >> w;
-            s.center.z = std::stof(w);
+            s->center.z = std::stof(w);
         } else if (w == w_radius) {
             stream >> w;
-            s.radius = std::stof(w);
+            s->radius = std::stof(w);
         } else if (w == w_color) {
-            s.color = decodeColour(&stream);
+            s->color = decodeColour(&stream);
         } else if (w == w_reflectiveness) {
             stream >> w;
-            s.reflectiveness = std::stof(w);
+            s->reflectiveness = std::stof(w);
         } else if (w == w_specular) {
             stream >> w;
-            s.specular = std::stof(w);
+            s->specular = std::stof(w);
         } else if (w == w_shininess) {
             stream >> w;
-            s.shininess = std::stof(w);
+            s->shininess = std::stof(w);
         }
     } while (stream);
     return s;
@@ -141,45 +141,45 @@ std::string encodeTriangle(Triangle *t) {
     return fmt.str();
 }
 
-Triangle decodeTriangle(std::string in) {
+Triangle *decodeTriangle(std::string in) {
     std::stringstream stream(in);
-    Triangle t;
-    t.shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    Triangle *t = (Triangle*)malloc(sizeof(Triangle));
+    t->shininess = -1.f; // -1 Indicates global shininess param takes precedence
     do {
         std::string w;
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            t.a.x = std::stof(w);
+            t->a.x = std::stof(w);
             stream >> w;
-            t.a.y = std::stof(w);
+            t->a.y = std::stof(w);
             stream >> w;
-            t.a.z = std::stof(w);
+            t->a.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            t.b.x = std::stof(w);
+            t->b.x = std::stof(w);
             stream >> w;
-            t.b.y = std::stof(w);
+            t->b.y = std::stof(w);
             stream >> w;
-            t.b.z = std::stof(w);
+            t->b.z = std::stof(w);
         } else if (w == w_c) {
             stream >> w;
-            t.c.x = std::stof(w);
+            t->c.x = std::stof(w);
             stream >> w;
-            t.c.y = std::stof(w);
+            t->c.y = std::stof(w);
             stream >> w;
-            t.c.z = std::stof(w);
+            t->c.z = std::stof(w);
         } else if (w == w_color) {
-            t.color = decodeColour(&stream);
+            t->color = decodeColour(&stream);
         } else if (w == w_reflectiveness) {
             stream >> w;
-            t.reflectiveness = std::stof(w);
+            t->reflectiveness = std::stof(w);
         } else if (w == w_specular) {
             stream >> w;
-            t.specular = std::stof(w);
+            t->specular = std::stof(w);
         } else if (w == w_shininess) {
             stream >> w;
-            t.shininess = std::stof(w);
+            t->shininess = std::stof(w);
         }
     } while (stream);
     return t;
