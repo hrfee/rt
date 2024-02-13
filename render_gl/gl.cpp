@@ -13,6 +13,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#define MOVE_SPEED 0.1f
+
 void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
     std::ifstream f(fname);
     if (!f) {
@@ -287,6 +289,7 @@ void GLWindow::showUI() {
         ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), -M_PI/2.f, M_PI/2.f);
         // ImGui::EndChild();
         ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
+        state.rc.renderNow = ImGui::InputFloat3("Position", (float*)&(state.rc.manualPosition)) ? true : state.rc.renderNow;
     }
     ImGui::End();
     showKeyboardHelp();
@@ -369,7 +372,7 @@ void showKeyboardHelp() {
     ImGui::Begin("keyboard controls");
     {
         ImGui::Text(R"(
-<M>: Movement mode (use mouse to control camera)
+<M>: Movement mode (use mouse+WASD to control camera)
    - Frames will be rendered with every movement,
      so make sure resolution scale is low enough.
 <ESC>: Exit
@@ -391,6 +394,16 @@ void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int 
         w->state.mouse.enabled = false;
     } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && !w->state.mouse.enabled) {
         glfwSetWindowShouldClose(window, GL_TRUE);
+    }
+    if (!(w->state.mouse.enabled)) return;
+    if (key == GLFW_KEY_W) {
+        w->state.mouse.moveForward = (action == GLFW_PRESS) ? MOVE_SPEED : 0.f;
+    } else if (key == GLFW_KEY_S) {
+        w->state.mouse.moveForward = (action == GLFW_PRESS) ? -1.f*MOVE_SPEED : 0.f;
+    } else if (key == GLFW_KEY_D) {
+        w->state.mouse.moveSideways = (action == GLFW_PRESS) ? 1.f*MOVE_SPEED : 0.f;
+    } else if (key == GLFW_KEY_A) {
+        w->state.mouse.moveSideways = (action == GLFW_PRESS) ? -1.f*MOVE_SPEED : 0.f;
     }
 }
 

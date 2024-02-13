@@ -61,6 +61,16 @@ Image *mainLoop(RenderConfig *rc) {
         change = true;
 #endif
     }
+    if (window->state.mouse.moveForward != 0.f) {
+        map->cam->setPosition(map->cam->position + (window->state.mouse.moveForward * map->cam->viewportNormal));
+        rc->manualPosition = map->cam->position;
+        change = true;
+    }
+    if (window->state.mouse.moveSideways != 0.f) {
+        map->cam->setPosition(map->cam->position + (window->state.mouse.moveSideways * map->cam->viewportParallel));
+        rc->manualPosition = map->cam->position;
+        change = true;
+    }
 #ifndef FRAMETIME
     if (change) {
 #endif

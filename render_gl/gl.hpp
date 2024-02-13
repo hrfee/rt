@@ -28,6 +28,8 @@ struct GLWindowState {
         float sensitivity;
         float prevX, prevY;
         float phi, theta;
+        float moveForward;
+        float moveSideways;
     } mouse;
 };
 

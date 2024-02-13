@@ -50,6 +50,10 @@ void Camera::calculateViewport() {
     Mat3 rotZ = make_z_rotation(theta);
     Mat3 rotY = make_y_rotation(phi);
     
+    // Used for easy camera movement.
+    viewportNormal = rotY * (rotZ * frustumVec);
+    viewportParallel = rotY * (rotZ * Vec3{0.f, 0.f, 1.f});
+
     viewportCorner =  rotY * (rotZ * viewportCorner);
     viewportCol = frustumVec;
     viewportCol.y -= halfViewportHeight;
@@ -120,6 +124,11 @@ void Camera::rotateRad(float thetaRad, float phiRad) {
 
 void Camera::rotate(float thetaDeg, float phiDeg) {
     rotateRad(thetaDeg * M_PI / 180.f, phiDeg * M_PI / 180.f);
+}
+
+void Camera::setPosition(Vec3 pos) {
+    position  = pos;
+    // calculateViewport(); not needed
 }
 
 void Camera::debugPrintCorners() {

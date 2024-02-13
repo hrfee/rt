@@ -30,6 +30,9 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
     if (rc->globalShininess != globalShininess) {
         globalShininess = rc->globalShininess;
     }
+    if (rc->manualPosition != cam->position) {
+        cam->setPosition(rc->manualPosition);
+    }
     for (int y = 0; y < cam->h; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;

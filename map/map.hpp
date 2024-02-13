@@ -18,6 +18,7 @@ struct RenderConfig {
     float baseBrightness;
     float globalShininess;
     bool triangles, spheres;
+    Vec3 manualPosition;
 };
 
 struct RayResult {
