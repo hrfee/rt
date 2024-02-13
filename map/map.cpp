@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <filesystem>
 
 void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular) {
     spheres.emplace_back(Sphere{center, radius, color, reflectiveness, specular});
@@ -284,6 +285,7 @@ namespace {
     const char* w_triangle = "triangle";
     const char* w_pointLight = "plight";
     const char* w_shininess = "shininess";
+    const char* w_include = "include";
     const char* w_comment = "//";
 }
 
@@ -326,6 +328,10 @@ void WorldMap::loadFile(char const* path) {
     spheres.clear();
     triangles.clear();
     pointLights.clear();
+    loadObjFile(path);
+}
+
+void WorldMap::loadObjFile(const char* path) {
     std::ifstream in(path);
     std::string line;
     while (std::getline(in, line)) {
@@ -365,6 +371,13 @@ void WorldMap::loadFile(char const* path) {
             pointLights.emplace_back(decodePointLight(line));
         } else if (token == w_comment) {
             continue;
+        } else if (token == w_include) {
+            lstream >> token;
+            std::filesystem::path base = std::filesystem::path(path).parent_path();
+            
+            std::filesystem::path inc(token);
+            std::filesystem::path eval = base / inc;
+            loadObjFile(eval.c_str());
         }
     }
 }

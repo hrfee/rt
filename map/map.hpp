@@ -41,6 +41,7 @@ class WorldMap {
         float w, h, d;
         float baseBrightness, globalShininess;
         void loadFile(char const* path);
+        void loadObjFile(char const* path);
         std::vector<Sphere> spheres;
         std::vector<Triangle> triangles;
         std::vector<PointLight> pointLights;
