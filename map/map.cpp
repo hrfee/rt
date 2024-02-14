@@ -9,7 +9,7 @@
 #include <filesystem>
 
 Shape *emptyShape() {
-    Shape *sh = (Shape*)alloc(sizeof(Shape)); // FIXME: Error check!
+    Shape *sh = (Shape*)alloc(sizeof(Shape));
     sh->s = NULL;
     sh->t = NULL;
     sh->c = NULL;
@@ -17,8 +17,21 @@ Shape *emptyShape() {
     return sh;
 }
 
+ContainerQuad *emptyContainerQuad() {
+    ContainerQuad *c = (ContainerQuad*)alloc(sizeof(ContainerQuad));
+    c->a = {0, 0 ,0};
+    c->b = {0, 0, 0};
+    c->c = {0, 0, 0};
+    c->d = {0, 0, 0};
+    c->start = NULL;
+    c->end = NULL;
+    return c;
+}
+
 void appendShape(ContainerQuad *c, Shape *sh) {
-    if (c->start == NULL) c->start = sh;
+    if (c->start == NULL) {
+        c->start = sh;
+    }
     if (c->end != NULL) c->end->next = sh;
     c->end = sh;
 }
@@ -42,7 +55,7 @@ void appendContainerQuad(ContainerQuad *cParent, ContainerQuad *c) {
 }
 
 void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular, float shininess) {
-    Sphere *s = (Sphere*)alloc(sizeof(Sphere)); // FIXME: Error check!
+    Sphere *s = (Sphere*)alloc(sizeof(Sphere));
     s->center = center;
     s->radius = radius;
     s->color = color;
@@ -55,7 +68,7 @@ void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float reflect
 }
 
 void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular, float shininess) {
-    Triangle *t = (Triangle*)alloc(sizeof(Triangle)); // FIXME: Error check!
+    Triangle *t = (Triangle*)alloc(sizeof(Triangle));
     t->a = a;
     t->b = b;
     t->c = c;
@@ -474,7 +487,7 @@ int WorldMap::loadObjFile(const char* path) {
                 lstream << " " << token;
             }
         } else if (token == w_container) {
-            c = (ContainerQuad*)alloc(sizeof(ContainerQuad)); // FIXME: Error check!
+            c = emptyContainerQuad();
             allocCounter++;
             for (int i = 0; i < 4; i++) {
                 lstream >> token;
@@ -557,15 +570,18 @@ int clearContainer(ContainerQuad *c) {
     while (current != NULL) {
         if (current->s != NULL) {
             free(current->s);
+            current->s = NULL;
             freeCounter++;
         }
         if (current->t != NULL) {
             free(current->t);
+            current->t = NULL;
             freeCounter++;
         }
         if (current->c != NULL) {
             freeCounter += clearContainer(current->c);
             free(current->c);
+            current->c = NULL;
             freeCounter++;
         }
         Shape *next = current->next;

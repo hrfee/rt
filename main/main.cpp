@@ -12,7 +12,7 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-#define MAP_PATH "maps/checker.map"
+#define MAP_PATH "maps/3sphere.map"
 // Uncomment to get printouts of frametime & fps. Forces re-rendering every frame.
 // #define FRAMETIME
 
