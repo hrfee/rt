@@ -8,43 +8,54 @@
 #include <sstream>
 #include <filesystem>
 
-void WorldMap::appendShape(Shape *sh) {
-    sh->next = NULL;
-    if (start == NULL) start = sh;
-    if (end != NULL) end->next = sh;
-    end = sh;
-}
-
-void WorldMap::appendSphere(Sphere *s) {
-    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
-    sh->s = s;
+Shape *emptyShape() {
+    Shape *sh = (Shape*)alloc(sizeof(Shape)); // FIXME: Error check!
+    sh->s = NULL;
     sh->t = NULL;
-    appendShape(sh);
+    sh->c = NULL;
+    sh->next = NULL;
+    return sh;
 }
 
-void WorldMap::appendSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular, float shininess) {
-    Sphere *s = (Sphere*)malloc(sizeof(Sphere)); // FIXME: Error check!
+void appendShape(ContainerQuad *c, Shape *sh) {
+    if (c->start == NULL) c->start = sh;
+    if (c->end != NULL) c->end->next = sh;
+    c->end = sh;
+}
+
+void appendSphere(ContainerQuad *c, Sphere *s) {
+    Shape *sh = emptyShape();
+    sh->s = s;
+    appendShape(c, sh);
+}
+
+void appendTriangle(ContainerQuad *c, Triangle *t) {
+    Shape *sh = emptyShape();
+    sh->t = t;
+    appendShape(c, sh);
+}
+
+void appendContainerQuad(ContainerQuad *cParent, ContainerQuad *c) {
+    Shape *sh = emptyShape();
+    sh->c = c;
+    appendShape(cParent, sh);
+}
+
+void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular, float shininess) {
+    Sphere *s = (Sphere*)alloc(sizeof(Sphere)); // FIXME: Error check!
     s->center = center;
     s->radius = radius;
     s->color = color;
     s->reflectiveness = reflectiveness;
     s->specular = specular;
     s->shininess = shininess;
-    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
+    Shape *sh = emptyShape();
     sh->s = s;
-    sh->t = NULL;
-    appendShape(sh);
+    appendShape(&o, sh);
 }
 
-void WorldMap::appendTriangle(Triangle *t) {
-    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
-    sh->t = t;
-    sh->s = NULL;
-    appendShape(sh);
-}
-
-void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular, float shininess) {
-    Triangle *t = (Triangle*)malloc(sizeof(Triangle)); // FIXME: Error check!
+void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular, float shininess) {
+    Triangle *t = (Triangle*)alloc(sizeof(Triangle)); // FIXME: Error check!
     t->a = a;
     t->b = b;
     t->c = c;
@@ -52,10 +63,9 @@ void WorldMap::appendTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflecti
     t->reflectiveness = reflectiveness;
     t->specular = specular;
     t->shininess = shininess;
-    Shape *sh = (Shape*)malloc(sizeof(Shape)); // FIXME: Error check!
+    Shape *sh = emptyShape();
     sh->t = t;
-    sh->s = NULL;
-    appendShape(sh);
+    appendShape(&o, sh);
 }
 
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
@@ -79,7 +89,7 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = 0; x < cam->w; x++) {
-            RayResult res = castRay(cam->position, delta, rc);
+            RayResult res = castRay(&o, cam->position, delta, rc);
             if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
@@ -160,7 +170,7 @@ Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
 }
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
-    RayResult bounce = castRay(p0, delta, rc, callCount);
+    RayResult bounce = castRay(&o, p0, delta, rc, callCount);
     Vec3 color = {0.f, 0.f, 0.f};
     if (bounce.collisions > 0) {
         color = bounce.color;
@@ -171,15 +181,15 @@ void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResul
     }
 }
 
-float meetsSphere(Vec3 p0, Vec3 delta, Sphere sphere) {
+float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere) {
     // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
     // substituted values for the camera position (x/y/z_0),
     // pixel vec from camera (delta x/y/z),
     // and normalized distance along pixel vector (t).
-    Vec3 originToSphere = {p0.x - sphere.center.x, p0.y - sphere.center.y, p0.z - sphere.center.z};
+    Vec3 originToSphere = {p0.x - sphere->center.x, p0.y - sphere->center.y, p0.z - sphere->center.z};
     float a = dot(delta, delta);
     float b = 2.f * (delta.x*originToSphere.x + delta.y*originToSphere.y + delta.z*originToSphere.z);
-    float c = dot(originToSphere, originToSphere) - sphere.radius*sphere.radius;
+    float c = dot(originToSphere, originToSphere) - sphere->radius*sphere->radius;
     float discrim = b*b - 4.f*a*c;
     if (discrim < 0) return -1;
     float discrimRoot = std::sqrt(discrim);
@@ -191,14 +201,14 @@ float meetsSphere(Vec3 p0, Vec3 delta, Sphere sphere) {
     return t;
 }
 
-float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle tri) {
+float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle *tri) {
     // dot product of a line on the plane with the normal is zero, hence (p - t.a) \dot norm = 0, where p is a random point (x, y, z)
     // p \dot norm = t.a \dot norm
     // compute the right side, expand the left side and subtract it:
     // (norm.x)x + (norm.y)y + (norm.z)z - (t.a \dot norm) = 0
     // Take values in equation of a plane (CGPaP in C p. 703 eq. 15.18): Ax + By + Cz + D = 0
     // where A = norm.x, B = norm.y, C = norm.z
-    float d = -dot(tri.a, normal);
+    float d = -dot(tri->a, normal);
     // CGPaP in C p.703 eq. 15.21, using dot products to make more readable
     float t = -(dot(normal, p0) + d);
     float denom = dot(normal, delta);
@@ -208,26 +218,26 @@ float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle tri) {
     return t / denom;
 }
 
-bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle tri) {
+bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
     // project orthographically as big as possible
     Vec2 ao, bo, co, po;
     if (normal.x >= normal.y && normal.x >= normal.z) {
         // std::printf("projecting onto x\n");
-        ao = Vec2{tri.a.y, tri.a.z};
-        bo = Vec2{tri.b.y, tri.b.z};
-        co = Vec2{tri.c.y, tri.c.z};
+        ao = Vec2{tri->a.y, tri->a.z};
+        bo = Vec2{tri->b.y, tri->b.z};
+        co = Vec2{tri->c.y, tri->c.z};
         po = Vec2{collisionPoint.y, collisionPoint.z};
     } else if (normal.y >= normal.x && normal.y >= normal.z) {
         // std::printf("projecting onto y\n");
-        ao = Vec2{tri.a.x, tri.a.z};
-        bo = Vec2{tri.b.x, tri.b.z};
-        co = Vec2{tri.c.x, tri.c.z};
+        ao = Vec2{tri->a.x, tri->a.z};
+        bo = Vec2{tri->b.x, tri->b.z};
+        co = Vec2{tri->c.x, tri->c.z};
         po = Vec2{collisionPoint.x, collisionPoint.z};
     } else { 
         // std::printf("projecting onto z\n");
-        ao = Vec2{tri.a.x, tri.a.y};
-        bo = Vec2{tri.b.x, tri.b.y};
-        co = Vec2{tri.c.x, tri.c.y};
+        ao = Vec2{tri->a.x, tri->a.y};
+        bo = Vec2{tri->b.x, tri->b.y};
+        co = Vec2{tri->c.x, tri->c.y};
         po = Vec2{collisionPoint.x, collisionPoint.y};
     }
 
@@ -247,7 +257,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         Vec3 distance = light.center - p0;
         float tLight = mag(distance);
         Vec3 normDistance = distance / tLight;
-        RayResult r = castRay(p0, normDistance, &simpleConfig, 0);
+        RayResult r = castRay(&o, p0, normDistance, &simpleConfig, 0);
         bool noHit = r.collisions == 0 || r.t > tLight;
         if (!noHit) continue;
         float scaledDistance = tLight / rc->distanceDivisor;
@@ -274,14 +284,14 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     res->color = (res->color * lightColor) + specularColor;
 }
 
-RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
+RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
     if (callCount > MAX_BOUNCE) return res;
-    Shape *current = start;
+    Shape *current = c->start;
     while (current != NULL) {
         if (current->s != NULL && rc->spheres) {
             Sphere *sphere = current->s;
-            float t = meetsSphere(p0, delta, *sphere);
+            float t = meetsSphere(p0, delta, sphere);
             if (t >= 0) res.collisions += 1;
             if (t >= 0 && t < res.t) {
                 res.t = t;
@@ -294,12 +304,13 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
                 res.specular = sphere->specular;
             }
         } else if (current->t != NULL && rc->triangles) {
+            // FIXME: Triangles with identical X coords do not render!
             Triangle *tri = current->t;
             Vec3 normal = norm(getVisibleTriNormal(delta, tri->a, tri->b, tri->c));
-            float t = meetsTrianglePlane(p0, delta, normal, *tri);
+            float t = meetsTrianglePlane(p0, delta, normal, tri);
             if (t > 0 && t < res.t) {
                 Vec3 collisionPoint = p0 + (t * delta);
-                if (meetsTriangle(normal, collisionPoint, *tri)) {
+                if (meetsTriangle(normal, collisionPoint, tri)) {
                     res.collisions += 1;
                     res.t = t;
                     res.color = tri->color;
@@ -308,6 +319,45 @@ RayResult WorldMap::castRay(Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount
                     res.normal = normal;
                     res.p0 = collisionPoint;
                     res.specular = tri->specular;
+                }
+            }
+        }
+        if (current->c != NULL) {
+            // Test container collision
+            Triangle tris[2] = {
+                {current->c->a, current->c->b, current->c->c},
+                {current->c->c, current->c->d, current->c->a},
+            };
+            bool collision = !(rc->planeOptimisation);
+            if (!collision) {
+                for (int i = 0; i < 2; i++) {
+                    Vec3 normal = norm(getVisibleTriNormal(delta, tris[i].a, tris[i].b, tris[i].c));
+                    float t = meetsTrianglePlane(p0, delta, normal, &(tris[i]));
+                    if (t < 0 || t >= res.t) continue;
+                    Vec3 collisionPoint = p0 + (t * delta);
+                    if (meetsTriangle(normal, collisionPoint, &(tris[i]))) {
+                        collision = true;
+                        break;
+                    }
+                }
+            }
+            // If collision, cast rays to all objects in the container
+            if (collision) {
+                RenderConfig simpleConfig;
+                simpleConfig.lighting = false;
+                simpleConfig.reflections = false;
+                simpleConfig.triangles = rc->triangles;
+                simpleConfig.spheres = rc->spheres;
+                RayResult r = castRay(current->c, p0, delta, &simpleConfig, 0);
+                res.collisions += r.collisions;
+                if (r.t > 0 && r.t < res.t) {
+                    res.t = r.t;
+                    res.color = r.color;
+                    res.reflectiveness = r.reflectiveness;
+                    res.shininess = r.shininess;
+                    res.normal = r.normal;
+                    res.p0 = r.p0;
+                    res.specular = r.specular;
                 }
             }
         }
@@ -338,6 +388,13 @@ namespace {
     const char* w_shininess = "shininess";
     const char* w_include = "include";
     const char* w_comment = "//";
+    const char* w_container = "container";
+    const char* w_a = "a";
+    const char* w_b = "b";
+    const char* w_c = "c";
+    const char* w_d = "d";
+    const char* w_open = "{";
+    const char* w_close = "}";
 }
 
 void WorldMap::encode(char const* path) {
@@ -358,7 +415,7 @@ void WorldMap::encode(char const* path) {
         fmt << std::endl;
         out << fmt.str();
     }
-    Shape *current = start;
+    Shape *current = o.start;
     while (current != NULL) {
         if (current->s != NULL) out << encodeSphere(current->s);
         else if (current->t != NULL) out << encodeTriangle(current->t);
@@ -370,20 +427,23 @@ void WorldMap::encode(char const* path) {
 }
 
 WorldMap::WorldMap(char const* path) {
-    start = NULL;
-    end = NULL;
+    o.start = NULL;
+    o.end = NULL;
     loadFile(path);
 }
 
 void WorldMap::loadFile(char const* path) {
-    clearShapes();
+    // FIXME: Reloading the map causes a SIGSEGV, due to accessing a free'd pointer maybe?
+    std::printf("Frees: %d\n", clearContainer(&o));
     pointLights.clear();
-    loadObjFile(path);
+    std::printf("Allocations: %d\n", loadObjFile(path));
 }
 
-void WorldMap::loadObjFile(const char* path) {
+int WorldMap::loadObjFile(const char* path) {
     std::ifstream in(path);
     std::string line;
+    ContainerQuad *c = NULL;
+    int allocCounter = 0;
     while (std::getline(in, line)) {
         std::stringstream lstream(line);
         std::string token;
@@ -413,11 +473,65 @@ void WorldMap::loadObjFile(const char* path) {
                 globalShininess = 1.f;
                 lstream << " " << token;
             }
+        } else if (token == w_container) {
+            c = (ContainerQuad*)alloc(sizeof(ContainerQuad)); // FIXME: Error check!
+            allocCounter++;
+            for (int i = 0; i < 4; i++) {
+                lstream >> token;
+                if (token == w_a) {
+                    lstream >> token;
+                    c->a.x = std::stof(token);
+                    lstream >> token;
+                    c->a.y = std::stof(token);
+                    lstream >> token;
+                    c->a.z = std::stof(token);
+                } else if (token == w_b) {
+                    lstream >> token;
+                    c->b.x = std::stof(token);
+                    lstream >> token;
+                    c->b.y = std::stof(token);
+                    lstream >> token;
+                    c->b.z = std::stof(token);
+                } else if (token == w_c) {
+                    lstream >> token;
+                    c->c.x = std::stof(token);
+                    lstream >> token;
+                    c->c.y = std::stof(token);
+                    lstream >> token;
+                    c->c.z = std::stof(token);
+                } else if (token == w_d) {
+                    lstream >> token;
+                    c->d.x = std::stof(token);
+                    lstream >> token;
+                    c->d.y = std::stof(token);
+                    lstream >> token;
+                    c->d.z = std::stof(token);
+                }
+            }
+            lstream >> token;
+            if (token == w_open) {
+            } else {
+                throw std::runtime_error("Didn't find open brace");
+            }
+        } else if (token == w_close && c != NULL) {
+            appendContainerQuad(&o, c);
+            allocCounter++;
+            c = NULL;
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
-                appendSphere(decodeSphere(line));
+                if (c == NULL) {
+                    appendSphere(&o, decodeSphere(line));
+                } else {
+                    appendSphere(c, decodeSphere(line));
+                }
+                allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
-                appendTriangle(decodeTriangle(line));
+                if (c == NULL) {
+                    appendTriangle(&o, decodeTriangle(line));
+                } else {
+                    appendTriangle(c, decodeTriangle(line));
+                }
+                allocCounter += 2; // One for triangle, one for shape container
             }
         } else if (token == w_pointLight) {
             pointLights.emplace_back(decodePointLight(line));
@@ -432,21 +546,37 @@ void WorldMap::loadObjFile(const char* path) {
             loadObjFile(eval.c_str());
         }
     }
+    return allocCounter;
 }
 
-void WorldMap::clearShapes() {
-    if (start == NULL) return;
-    Shape *current = start;
+int clearContainer(ContainerQuad *c) {
+    Shape *current = c->start;
+    c->start = NULL;
+    c->end = NULL;
+    int freeCounter = 0;
     while (current != NULL) {
-        if (current->s != NULL) free(current->s);
-        if (current->t != NULL) free(current->t);
+        if (current->s != NULL) {
+            free(current->s);
+            freeCounter++;
+        }
+        if (current->t != NULL) {
+            free(current->t);
+            freeCounter++;
+        }
+        if (current->c != NULL) {
+            freeCounter += clearContainer(current->c);
+            free(current->c);
+            freeCounter++;
+        }
         Shape *next = current->next;
         free(current);
+        freeCounter++;
         current = next;
     }
+    return freeCounter;
 }
 
 WorldMap::~WorldMap() {
     delete cam;
-    clearShapes();
+    clearContainer(&o);
 }

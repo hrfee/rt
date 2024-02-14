@@ -146,6 +146,7 @@ void GLWindow::loadUI() {
     state.rc.baseBrightness = -1.f;
     state.rc.triangles = true;
     state.rc.spheres = true;
+    state.rc.planeOptimisation = true;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -246,6 +247,7 @@ void GLWindow::showUI() {
         };
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
     }
     ImGui::End();
     ImGui::Begin("output controls");
@@ -271,7 +273,7 @@ void GLWindow::showUI() {
         ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
         ImGui::Text("Map Loading");
         ImGui::InputText(".map path", &(state.mapPath));
-        state.reloadMap = ImGui::Button("Reload Map", ImVec2(90, 25));
+        state.reloadMap = ImGui::Button("Reload Map (50/50 SEGV)", ImVec2(90, 25));
         if (state.reloadMap) {
             state.rc.baseBrightness = -1.f;
             state.rc.globalShininess = -1.f;

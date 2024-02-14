@@ -6,15 +6,26 @@
 #include <iostream>
 #include <sstream>
 
-enum NearestShape { nSphere, nTriangle };
-
 struct Sphere;
 struct Triangle;
+struct ContainerQuad;
 
 struct Shape {
     Sphere *s;
     Triangle *t;
+    ContainerQuad *c;
     Shape *next;
+};
+
+// Very simple optimization. Defined in .map file as:
+// container a <vec3> b <vec3> c <vec3> d <vec3> {
+// <shapes>
+// }
+// Note: abcd must be arranged clockwise!
+struct ContainerQuad {
+    Vec3 a, b, c, d;
+    Shape *start;
+    Shape *end;
 };
 
 struct Sphere {
@@ -59,5 +70,7 @@ Triangle *decodeTriangle(std::string in);
 std::string encodeColour(Vec3 c);
 
 Vec3 decodeColour(std::stringstream *in);
+
+void *alloc(size_t n);
 
 #endif

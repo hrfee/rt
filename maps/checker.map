@@ -8,7 +8,7 @@ triangle a 5.2 0 -0.2 b 2 -0.8 -1.4 c 5 1 1 color #2094ab reflectiveness 0.5 spe
 
 triangle a 50 -5 5.4 b -5 -5 5.5 c -5 15 5.3 color #ffffff reflectiveness 0.1
 
-include floor.obj
+include floor-opt.obj
 
-plight center 0 10 0 color #ffffff brightness 50
-plight center 5 2 1 color #ffffff brightness 1.0
+plight center 0 10 0 color #ffffff brightness 50 specular 0.2 color #ffffff
+plight center 5 2 1 color #ffffff brightness 1.0 specular 0.2 color #ffffff

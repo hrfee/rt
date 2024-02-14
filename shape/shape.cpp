@@ -20,6 +20,14 @@ namespace {
     const char* w_c = "c";
 }
 
+void *alloc(size_t n) {
+    void *ptr = malloc(n);
+    if (ptr == NULL) {
+        std::printf("Failed allocation!\n");
+    }
+    return ptr;
+}
+
 std::string encodeSphere(Sphere *s) {
     std::ostringstream fmt;
     fmt << "sphere ";
@@ -40,7 +48,7 @@ std::string encodeSphere(Sphere *s) {
 
 Sphere *decodeSphere(std::string in) {
     std::stringstream stream(in);
-    Sphere *s = (Sphere*)malloc(sizeof(Sphere)); // FIXME: Error check!
+    Sphere *s = (Sphere*)alloc(sizeof(Sphere)); // FIXME: Error check!
     s->shininess = -1.f; // -1 Indicates global shininess param takes precedence
     do {
         std::string w;
@@ -143,7 +151,7 @@ std::string encodeTriangle(Triangle *t) {
 
 Triangle *decodeTriangle(std::string in) {
     std::stringstream stream(in);
-    Triangle *t = (Triangle*)malloc(sizeof(Triangle));
+    Triangle *t = (Triangle*)alloc(sizeof(Triangle));
     t->shininess = -1.f; // -1 Indicates global shininess param takes precedence
     do {
         std::string w;

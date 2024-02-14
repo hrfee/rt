@@ -11,21 +11,24 @@ type Vec struct {
 }
 
 func genTile(colors [2]string, p0 Vec, tileSize float64, width, depth int64) {
+	maxX := p0.x + float64(width)*tileSize
+	maxZ := p0.z + float64(depth)*tileSize
+	fmt.Printf("container a %f %f %f b %f %f %f c %f %f %f d %f %f %f {\n", p0.x, p0.y, p0.z, maxX, p0.y, p0.z, maxX, p0.y, maxZ, p0.x, p0.y, maxZ)
 	cx := false
-	for x := p0.x; x < (p0.x + float64(width)*tileSize); x += tileSize {
+	for x := p0.x; x < maxX; x += tileSize {
 		cy := cx
-		for z := p0.z; z < (p0.z + float64(depth)*tileSize); z += tileSize {
+		for z := p0.z; z < maxZ; z += tileSize {
 			color := colors[0]
 			if cy {
 				color = colors[1]
 			}
-			fmt.Printf("triangle a %f %f %f b %f %f %F c %f %f %f color %s reflectiveness 0.1\n", x, p0.y, z, x+tileSize, p0.y, z, x+tileSize, p0.y, z+tileSize, color)
-			fmt.Printf("triangle a %f %f %f b %f %f %F c %f %f %f color %s reflectiveness 0.1\n", x, p0.y, z, x, p0.y, z+tileSize, x+tileSize, p0.y, z+tileSize, color)
+			fmt.Printf("\ttriangle a %f %f %f b %f %f %f c %f %f %f color %s reflectiveness 0.1\n", x, p0.y, z, x+tileSize, p0.y, z, x+tileSize, p0.y, z+tileSize, color)
+			fmt.Printf("\ttriangle a %f %f %f b %f %f %f c %f %f %f color %s reflectiveness 0.1\n", x, p0.y, z, x, p0.y, z+tileSize, x+tileSize, p0.y, z+tileSize, color)
 			cy = !cy
 		}
 		cx = !cx
 	}
-
+	fmt.Printf("}\n")
 }
 
 func main() {
