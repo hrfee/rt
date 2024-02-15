@@ -14,6 +14,10 @@ struct Shape {
     Sphere *s;
     Triangle *t;
     ContainerQuad *c;
+    Vec3 color;
+    float reflectiveness; // 0-1
+    float specular; // 1-inf
+    float shininess;
     Shape *next;
 };
 
@@ -33,22 +37,10 @@ struct Sphere {
     // CG:PaP 2nd ed. in C: p. 702
     Vec3 center; // a, b, c
     float radius; // r
-    Vec3 color;
-    float reflectiveness; // 0-1
-    float specular; // 1-inf
-    float shininess;
 };
-
-std::string encodeSphere(Sphere *s);
-
-Sphere *decodeSphere(std::string in);
 
 struct Triangle {
     Vec3 a, b, c;
-    Vec3 color;
-    float reflectiveness;
-    float specular; // 1-inf
-    float shininess;
 };
 
 struct PointLight {
@@ -63,14 +55,18 @@ std::string encodePointLight(PointLight *p);
 
 PointLight decodePointLight(std::string in);
 
-std::string encodeTriangle(Triangle *t);
+std::string encodeSphere(Shape *sh);
 
-Triangle *decodeTriangle(std::string in);
+Shape *decodeSphere(std::string in);
+
+std::string encodeTriangle(Shape *sh);
+
+Shape *decodeTriangle(std::string in);
 
 std::string encodeColour(Vec3 c);
 
 Vec3 decodeColour(std::stringstream *in);
 
-void *alloc(size_t n);
+Shape *emptyShape();
 
 #endif

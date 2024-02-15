@@ -1,7 +1,9 @@
 #include "shape.hpp"
+#include "../util/util.hpp"
 
 #include <iostream>
 #include <sstream>
+#include <cstring>
 
 namespace {
     const char* w_center = "center";
@@ -20,63 +22,84 @@ namespace {
     const char* w_c = "c";
 }
 
-void *alloc(size_t n) {
-    void *ptr = malloc(n);
-    if (ptr == NULL) {
-        std::printf("Failed allocation!\n");
-    }
-    return ptr;
+Shape *emptyShape() {
+    Shape *sh = (Shape*)alloc(sizeof(Shape));
+    /*sh->s = NULL;
+    sh->t = NULL;
+    sh->c = NULL;
+    sh->next = NULL;*/
+    std::memset(sh, 0, sizeof(Shape));
+    sh->shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    return sh;
 }
 
-std::string encodeSphere(Sphere *s) {
+std::string encodeShape(Shape *sh) {
     std::ostringstream fmt;
-    fmt << "sphere ";
-    fmt << w_center << " ";
-    fmt << s->center.x << " " << s->center.y << " " << s->center.z << " ";
-    fmt << w_radius << " ";
-    fmt << s->radius << " ";
-    fmt << encodeColour(s->color) << " ";
+    fmt << encodeColour(sh->color) << " ";
     fmt << w_reflectiveness << " ";
-    fmt << s->reflectiveness << " ";
+    fmt << sh->reflectiveness << " ";
     fmt << w_specular << " ";
-    fmt << s->specular << " ";
+    fmt << sh->specular << " ";
     fmt << w_shininess << " ";
-    fmt << s->shininess << " ";
+    fmt << sh->shininess << " ";
     fmt << std::endl;
     return fmt.str();
 }
 
-Sphere *decodeSphere(std::string in) {
+Shape *decodeShape(std::string in) {
     std::stringstream stream(in);
-    Sphere *s = (Sphere*)alloc(sizeof(Sphere)); // FIXME: Error check!
-    s->shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    Shape *sh = emptyShape();
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_color) {
+            sh->color = decodeColour(&stream);
+        } else if (w == w_reflectiveness) {
+            stream >> w;
+            sh->reflectiveness = std::stof(w);
+        } else if (w == w_specular) {
+            stream >> w;
+            sh->specular = std::stof(w);
+        } else if (w == w_shininess) {
+            stream >> w;
+            sh->shininess = std::stof(w);
+        }
+    } while (stream);
+    return sh;
+}
+
+std::string encodeSphere(Shape *sh) {
+    std::ostringstream fmt;
+    fmt << "sphere ";
+    fmt << w_center << " ";
+    fmt << sh->s->center.x << " " << sh->s->center.y << " " << sh->s->center.z << " ";
+    fmt << w_radius << " ";
+    fmt << sh->s->radius << " ";
+    fmt << encodeShape(sh) << " ";
+    fmt << std::endl;
+    return fmt.str();
+}
+
+Shape *decodeSphere(std::string in) {
+    std::stringstream stream(in);
+    Shape *sh = decodeShape(in);
+    sh->s = (Sphere*)alloc(sizeof(Sphere));
     do {
         std::string w;
         stream >> w;
         if (w == w_center) {
             stream >> w;
-            s->center.x = std::stof(w);
+            sh->s->center.x = std::stof(w);
             stream >> w;
-            s->center.y = std::stof(w);
+            sh->s->center.y = std::stof(w);
             stream >> w;
-            s->center.z = std::stof(w);
+            sh->s->center.z = std::stof(w);
         } else if (w == w_radius) {
             stream >> w;
-            s->radius = std::stof(w);
-        } else if (w == w_color) {
-            s->color = decodeColour(&stream);
-        } else if (w == w_reflectiveness) {
-            stream >> w;
-            s->reflectiveness = std::stof(w);
-        } else if (w == w_specular) {
-            stream >> w;
-            s->specular = std::stof(w);
-        } else if (w == w_shininess) {
-            stream >> w;
-            s->shininess = std::stof(w);
+            sh->s->radius = std::stof(w);
         }
     } while (stream);
-    return s;
+    return sh;
 }
 
 std::string encodePointLight(PointLight *p) {
@@ -129,68 +152,51 @@ PointLight decodePointLight(std::string in) {
     return p;
 }
 
-std::string encodeTriangle(Triangle *t) {
+std::string encodeTriangle(Shape *sh) {
     std::ostringstream fmt;
     fmt << "triangle ";
     fmt << w_a << " ";
-    fmt << t->a.x << " " << t->a.y << " " << t->a.z << " ";
+    fmt << sh->t->a.x << " " << sh->t->a.y << " " << sh->t->a.z << " ";
     fmt << w_b << " ";
-    fmt << t->b.x << " " << t->b.y << " " << t->b.z << " ";
+    fmt << sh->t->b.x << " " << sh->t->b.y << " " << sh->t->b.z << " ";
     fmt << w_c << " ";
-    fmt << t->c.x << " " << t->c.y << " " << t->c.z << " ";
-    fmt << encodeColour(t->color) << " ";
-    fmt << w_reflectiveness << " ";
-    fmt << t->reflectiveness << " ";
-    fmt << w_specular << " ";
-    fmt << t->specular << " ";
-    fmt << w_shininess << " ";
-    fmt << t->shininess << " ";
+    fmt << sh->t->c.x << " " << sh->t->c.y << " " << sh->t->c.z << " ";
+    fmt << encodeShape(sh) << " ";
     fmt << std::endl;
     return fmt.str();
 }
 
-Triangle *decodeTriangle(std::string in) {
+Shape *decodeTriangle(std::string in) {
     std::stringstream stream(in);
-    Triangle *t = (Triangle*)alloc(sizeof(Triangle));
-    t->shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    Shape *sh = decodeShape(in);
+    sh->t = (Triangle*)alloc(sizeof(Triangle));
     do {
         std::string w;
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            t->a.x = std::stof(w);
+            sh->t->a.x = std::stof(w);
             stream >> w;
-            t->a.y = std::stof(w);
+            sh->t->a.y = std::stof(w);
             stream >> w;
-            t->a.z = std::stof(w);
+            sh->t->a.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            t->b.x = std::stof(w);
+            sh->t->b.x = std::stof(w);
             stream >> w;
-            t->b.y = std::stof(w);
+            sh->t->b.y = std::stof(w);
             stream >> w;
-            t->b.z = std::stof(w);
+            sh->t->b.z = std::stof(w);
         } else if (w == w_c) {
             stream >> w;
-            t->c.x = std::stof(w);
+            sh->t->c.x = std::stof(w);
             stream >> w;
-            t->c.y = std::stof(w);
+            sh->t->c.y = std::stof(w);
             stream >> w;
-            t->c.z = std::stof(w);
-        } else if (w == w_color) {
-            t->color = decodeColour(&stream);
-        } else if (w == w_reflectiveness) {
-            stream >> w;
-            t->reflectiveness = std::stof(w);
-        } else if (w == w_specular) {
-            stream >> w;
-            t->specular = std::stof(w);
-        } else if (w == w_shininess) {
-            stream >> w;
-            t->shininess = std::stof(w);
+            sh->t->c.z = std::stof(w);
         }
     } while (stream);
-    return t;
+    return sh;
 }
 
 std::string encodeColour(Vec3 c) {

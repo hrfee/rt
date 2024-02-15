@@ -1,21 +1,13 @@
 #include "map.hpp"
 
 #include "../vec/mat.hpp"
+#include "../util/util.hpp"
 #include <cmath>
 #include <fstream>
 #include <string>
 #include <iostream>
 #include <sstream>
 #include <filesystem>
-
-Shape *emptyShape() {
-    Shape *sh = (Shape*)alloc(sizeof(Shape));
-    sh->s = NULL;
-    sh->t = NULL;
-    sh->c = NULL;
-    sh->next = NULL;
-    return sh;
-}
 
 ContainerQuad *emptyContainerQuad() {
     ContainerQuad *c = (ContainerQuad*)alloc(sizeof(ContainerQuad));
@@ -36,18 +28,6 @@ void appendShape(ContainerQuad *c, Shape *sh) {
     c->end = sh;
 }
 
-void appendSphere(ContainerQuad *c, Sphere *s) {
-    Shape *sh = emptyShape();
-    sh->s = s;
-    appendShape(c, sh);
-}
-
-void appendTriangle(ContainerQuad *c, Triangle *t) {
-    Shape *sh = emptyShape();
-    sh->t = t;
-    appendShape(c, sh);
-}
-
 void appendContainerQuad(ContainerQuad *cParent, ContainerQuad *c) {
     Shape *sh = emptyShape();
     sh->c = c;
@@ -55,29 +35,27 @@ void appendContainerQuad(ContainerQuad *cParent, ContainerQuad *c) {
 }
 
 void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular, float shininess) {
-    Sphere *s = (Sphere*)alloc(sizeof(Sphere));
-    s->center = center;
-    s->radius = radius;
-    s->color = color;
-    s->reflectiveness = reflectiveness;
-    s->specular = specular;
-    s->shininess = shininess;
     Shape *sh = emptyShape();
-    sh->s = s;
+    sh->s = (Sphere*)alloc(sizeof(Sphere));
+    sh->s->center = center;
+    sh->s->radius = radius;
+    sh->color = color;
+    sh->reflectiveness = reflectiveness;
+    sh->specular = specular;
+    sh->shininess = shininess;
     appendShape(&o, sh);
 }
 
 void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular, float shininess) {
-    Triangle *t = (Triangle*)alloc(sizeof(Triangle));
-    t->a = a;
-    t->b = b;
-    t->c = c;
-    t->color = color;
-    t->reflectiveness = reflectiveness;
-    t->specular = specular;
-    t->shininess = shininess;
     Shape *sh = emptyShape();
-    sh->t = t;
+    sh->t = (Triangle*)alloc(sizeof(Triangle));
+    sh->t->a = a;
+    sh->t->b = b;
+    sh->t->c = c;
+    sh->color = color;
+    sh->reflectiveness = reflectiveness;
+    sh->specular = specular;
+    sh->shininess = shininess;
     appendShape(&o, sh);
 }
 
@@ -308,13 +286,13 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
             if (t >= 0) res.collisions += 1;
             if (t >= 0 && t < res.t) {
                 res.t = t;
-                res.color = sphere->color;
-                res.reflectiveness = sphere->reflectiveness;
-                res.shininess = sphere->shininess;
+                res.color = current->color;
+                res.reflectiveness = current->reflectiveness;
+                res.shininess = current->shininess;
                 Vec3 collisionPoint = p0 + (res.t * delta);
                 res.normal = collisionPoint-sphere->center;
                 res.p0 = collisionPoint;
-                res.specular = sphere->specular;
+                res.specular = current->specular;
             }
         } else if (current->t != NULL && rc->triangles) {
             // FIXME: Triangles with identical X coords do not render!
@@ -326,12 +304,12 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
                 if (meetsTriangle(normal, collisionPoint, tri)) {
                     res.collisions += 1;
                     res.t = t;
-                    res.color = tri->color;
-                    res.reflectiveness = tri->reflectiveness;
-                    res.shininess = tri->shininess;
+                    res.color = current->color;
+                    res.reflectiveness = current->reflectiveness;
+                    res.shininess = current->shininess;
                     res.normal = normal;
                     res.p0 = collisionPoint;
-                    res.specular = tri->specular;
+                    res.specular = current->specular;
                 }
             }
         }
@@ -430,8 +408,8 @@ void WorldMap::encode(char const* path) {
     }
     Shape *current = o.start;
     while (current != NULL) {
-        if (current->s != NULL) out << encodeSphere(current->s);
-        else if (current->t != NULL) out << encodeTriangle(current->t);
+        if (current->s != NULL) out << encodeSphere(current);
+        else if (current->t != NULL) out << encodeTriangle(current);
         current = current->next;
     }
 
@@ -533,16 +511,16 @@ int WorldMap::loadObjFile(const char* path) {
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
                 if (c == NULL) {
-                    appendSphere(&o, decodeSphere(line));
+                    appendShape(&o, decodeSphere(line));
                 } else {
-                    appendSphere(c, decodeSphere(line));
+                    appendShape(c, decodeSphere(line));
                 }
                 allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
                 if (c == NULL) {
-                    appendTriangle(&o, decodeTriangle(line));
+                    appendShape(&o, decodeTriangle(line));
                 } else {
-                    appendTriangle(c, decodeTriangle(line));
+                    appendShape(c, decodeTriangle(line));
                 }
                 allocCounter += 2; // One for triangle, one for shape container
             }

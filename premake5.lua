@@ -20,6 +20,7 @@ project "main"
     links "map"
     links "shape"
     links "img"
+    links "util"
     links "glfw"
     links "render_tga"
     links "render_gl"
@@ -27,15 +28,23 @@ project "main"
     filter { "system:linux" }
         buildoptions { "-lglfw -lrt -lm -ldl -lwayland-client -lm -pthread -lrt -lffi" }
 
+project "util"
+    kind "StaticLib"
+    location "util"
+    links "util"
+    files { "util/**.cpp", "util/**.hpp" }
+
 project "map"
     kind "StaticLib"
     location "map"
     links "shape"
+    links "util"
     files { "map/**.cpp", "map/**.hpp" }
 
 project "shape"
     kind "StaticLib"
     location "shape"
+    links "util"
     files { "shape/**.cpp", "shape/**.hpp" }
 
 project "vec"
