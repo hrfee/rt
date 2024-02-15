@@ -1,7 +1,7 @@
-#include "../map/map.hpp"
-#include "../img/img.hpp"
-#include "../render_gl/gl.hpp"
-#include "../cam/cam.hpp"
+#include "map.hpp"
+#include "img.hpp"
+#include "gl.hpp"
+#include "cam.hpp"
 #include <math.h>
 #include <cstdio>
 #include <getopt.h>

@@ -1,7 +1,7 @@
 #ifndef CAM
 #define CAM
 
-#include "../vec/vec.hpp"
+#include "vec.hpp"
 
 class Camera {
     public:

@@ -1,7 +1,7 @@
 #ifndef SHAPE
 #define SHAPE
 
-#include "../vec/vec.hpp"
+#include "vec.hpp"
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -15,6 +15,7 @@ struct Shape {
     Triangle *t;
     ContainerQuad *c;
     Vec3 color;
+    float opacity;
     float reflectiveness; // 0-1
     float specular; // 1-inf
     float shininess;

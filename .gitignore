@@ -4,6 +4,7 @@
 *.so
 *.a
 *.lib
+build/
 bin/
 Makefile
 **/Makefile

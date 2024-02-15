@@ -2,7 +2,7 @@
 #define RENDER_TGA
 
 #include <string>
-#include "../img/img.hpp"
+#include "img.hpp"
 
 void writeTGA(Image *img, std::string fname, std::string id);
 #endif

@@ -2,7 +2,7 @@
 #define IMG
 
 #include <cstdlib>
-#include "../vec/vec.hpp"
+#include "vec.hpp"
 
 // Images start from bottom-left.
 struct Image {

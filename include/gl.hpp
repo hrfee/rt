@@ -4,8 +4,8 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "imgui.h"
-#include "../img/img.hpp"
-#include "../map/map.hpp"
+#include "img.hpp"
+#include "map.hpp"
 #include <string>
 
 struct GLWindowState {

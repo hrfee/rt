@@ -7,8 +7,7 @@
 #include <sstream>
 #include <cmath>
 
-#include "../render_tga/tga.hpp"
-#include "imgui.h"
+#include "tga.hpp"
 #include "imgui_stdlib.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"

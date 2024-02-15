@@ -1,5 +1,5 @@
 #include "shape.hpp"
-#include "../util/util.hpp"
+#include "util.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -12,6 +12,7 @@ namespace {
     const char w_color_hex = '#';
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
+    const char* w_opacity = "opacity";
     const char* w_reflectiveness = "reflectiveness";
     const char* w_specular = "specular";
     // const char* w_emission = "emission";
@@ -30,12 +31,15 @@ Shape *emptyShape() {
     sh->next = NULL;*/
     std::memset(sh, 0, sizeof(Shape));
     sh->shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    sh->opacity = 1.f;
     return sh;
 }
 
 std::string encodeShape(Shape *sh) {
     std::ostringstream fmt;
     fmt << encodeColour(sh->color) << " ";
+    fmt << w_opacity << " ";
+    fmt << sh->opacity << " ";
     fmt << w_reflectiveness << " ";
     fmt << sh->reflectiveness << " ";
     fmt << w_specular << " ";
@@ -54,6 +58,9 @@ Shape *decodeShape(std::string in) {
         stream >> w;
         if (w == w_color) {
             sh->color = decodeColour(&stream);
+        } else if (w == w_opacity) {
+            stream >> w;
+            sh->opacity = std::stof(w);
         } else if (w == w_reflectiveness) {
             stream >> w;
             sh->reflectiveness = std::stof(w);

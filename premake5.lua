@@ -17,10 +17,12 @@ project "main"
     targetdir "bin/${cfg.buildcfg}"
     location "main"
     files { "main/**.hpp", "main/**.cpp", "render_tga/**.cpp" }
-    links "map"
-    links "shape"
-    links "img"
     links "util"
+    links "shape"
+    links "vec"
+    links "ray"
+    links "map"
+    links "img"
     links "glfw"
     links "render_tga"
     links "render_gl"
@@ -31,15 +33,7 @@ project "main"
 project "util"
     kind "StaticLib"
     location "util"
-    links "util"
     files { "util/**.cpp", "util/**.hpp" }
-
-project "map"
-    kind "StaticLib"
-    location "map"
-    links "shape"
-    links "util"
-    files { "map/**.cpp", "map/**.hpp" }
 
 project "shape"
     kind "StaticLib"
@@ -51,6 +45,21 @@ project "vec"
     kind "StaticLib"
     location "vec"
     files { "vec/**.cpp", "vec/**.hpp" }
+
+project "ray"
+    kind "StaticLib"
+    location "ray"
+    links "shape"
+    links "vec"
+    files { "ray/**.cpp", "ray/**.hpp" }
+
+project "map"
+    kind "StaticLib"
+    location "map"
+    links "util"
+    links "shape"
+    links "ray"
+    files { "map/**.cpp", "map/**.hpp", "util/**.cpp", "util/**.hpp" }
 
 project "img"
     kind "StaticLib"

@@ -1,5 +1,5 @@
 #include "cam.hpp"
-#include "../vec/mat.hpp"
+#include "mat.hpp"
 
 #include <vector>
 #include <cmath>

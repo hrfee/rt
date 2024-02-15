@@ -4,9 +4,9 @@
 #define MAX_BOUNCE 1000
 
 #include <vector>
-#include "../shape/shape.hpp"
-#include "../cam/cam.hpp"
-#include "../img/img.hpp"
+#include "shape.hpp"
+#include "cam.hpp"
+#include "img.hpp"
 
 struct RenderConfig {
     bool renderOnChange;
@@ -47,8 +47,8 @@ class WorldMap {
         std::vector<PointLight> pointLights;
         ContainerQuad o;
         Camera *cam;
-        void createSphere(Vec3 center, float radius, Vec3 color, float reflectiveness, float specular, float shininess = -1.f);
-        void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float reflectiveness, float specular, float shininess = -1.f); 
+        void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f);
+        void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f); 
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);

@@ -4,7 +4,7 @@
 #include <string>
 #include <cstdint>
 #include <fstream>
-#include "../img/img.hpp"
+#include "img.hpp"
 
 struct BMPHeader {
     char bmpSignature[2] = {'B', 'M'};
