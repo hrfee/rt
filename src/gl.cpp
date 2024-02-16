@@ -143,6 +143,7 @@ void GLWindow::loadUI() {
     state.rc.globalShininess = -1.f;
     // Indicate unset, so map can set it for us the first time round.
     state.rc.baseBrightness = -1.f;
+    state.rc.maxBounce = 100;
     state.rc.triangles = true;
     state.rc.spheres = true;
     state.rc.planeOptimisation = true;
@@ -247,6 +248,7 @@ void GLWindow::showUI() {
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10) ? true : state.rc.renderNow;
     }
     ImGui::End();
     ImGui::Begin("output controls");

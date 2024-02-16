@@ -147,7 +147,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
 
 RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
     RayResult res = {0, 9999.f, 9999.f};
-    if (callCount > MAX_BOUNCE) return res;
+    if (callCount > rc->maxBounce) return res;
     Shape *current = c->start;
     while (current != NULL) {
         if (current->s != NULL && rc->spheres) {
@@ -157,10 +157,11 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
             if (t >= 0 && t < res.t) {
                 res.t = t;
                 res.color = current->color;
+                res.opacity = current->opacity;
                 res.reflectiveness = current->reflectiveness;
                 res.shininess = current->shininess;
                 Vec3 collisionPoint = p0 + (res.t * delta);
-                res.normal = collisionPoint-sphere->center;
+                res.normal = norm(collisionPoint-sphere->center);
                 res.p0 = collisionPoint;
                 res.specular = current->specular;
             }
@@ -175,6 +176,7 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
                     res.collisions += 1;
                     res.t = t;
                     res.color = current->color;
+                    res.opacity = current->opacity;
                     res.reflectiveness = current->reflectiveness;
                     res.shininess = current->shininess;
                     res.normal = normal;
@@ -214,6 +216,7 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
                 if (r.t > 0 && r.t < res.t) {
                     res.t = r.t;
                     res.color = r.color;
+                    res.opacity = current->opacity;
                     res.reflectiveness = r.reflectiveness;
                     res.shininess = r.shininess;
                     res.normal = r.normal;
@@ -227,7 +230,8 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
     res.p0 = res.p0 + (0.001f * res.normal);
     if (rc->reflections && res.reflectiveness != 0) {
-        castReflectionRay(res.p0, res.normal, rc, &res, callCount+1);
+        Vec3 reflection = res.p0 - 2.f*dot(res.p0, res.normal)*res.normal;
+        castReflectionRay(res.p0, reflection, rc, &res, callCount+1);
     }
     if (rc->lighting && res.reflectiveness != 0) {
         castShadowRays(-1.f*delta, res.p0, rc, &res);

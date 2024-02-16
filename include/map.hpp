@@ -1,8 +1,6 @@
 #ifndef MAP
 #define MAP
 
-#define MAX_BOUNCE 1000
-
 #include <vector>
 #include "shape.hpp"
 #include "cam.hpp"
@@ -14,6 +12,7 @@ struct RenderConfig {
     bool lighting;
     bool reflections;
     bool specular;
+    int maxBounce;
     float distanceDivisor;
     float baseBrightness;
     float globalShininess;
@@ -26,6 +25,7 @@ struct RayResult {
     int collisions;
     float t;
     Vec3 color;
+    float opacity;
     float reflectiveness;
     float emissiveness;
     float specular;
