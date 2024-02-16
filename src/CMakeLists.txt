@@ -1,5 +1,7 @@
 file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${rt_SOURCE_DIR}/include/*.hpp")
 
+add_compile_options(-O3)
+
 add_library(util STATIC util.cpp ${HEADER_LIST})
 set_target_properties(util PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(util PUBLIC ../include)
@@ -17,17 +19,13 @@ target_include_directories(vec PUBLIC ../include)
 add_library(ray STATIC ray.cpp ${HEADER_LIST})
 set_target_properties(ray PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(ray PUBLIC ../include)
-target_link_libraries(ray PUBLIC shape)
-target_link_libraries(ray PUBLIC vec)
+target_link_libraries(ray PUBLIC shape vec)
 
 add_library(map STATIC map.cpp ${HEADER_LIST})
 set_target_properties(map PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(map PUBLIC ../include)
-target_link_libraries(map PUBLIC shape)
-target_link_libraries(map PUBLIC cam)
-target_link_libraries(map PUBLIC img)
-target_link_libraries(map PRIVATE util)
-target_link_libraries(map PRIVATE ray)
+target_link_libraries(map PUBLIC shape cam img)
+target_link_libraries(map PRIVATE util ray)
 
 add_library(img STATIC img.cpp ${HEADER_LIST})
 set_target_properties(img PROPERTIES LINKER_LANGUAGE CXX)
@@ -52,12 +50,8 @@ target_link_libraries(cam PUBLIC vec)
 add_library(render_gl STATIC gl.cpp ${HEADER_LIST})
 set_target_properties(render_gl PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(render_gl PUBLIC ../include "../third_party/imgui/" "../third_party/imgui/misc/cpp/" "../third_party/imgui/backends/" "../third_party/glad/include/")
-target_link_libraries(render_gl PUBLIC img)
-target_link_libraries(render_gl PUBLIC map)
-target_link_libraries(render_gl PRIVATE render_tga)
-target_link_libraries(render_gl PRIVATE glfw)
-target_link_libraries(render_gl PRIVATE glad)
-target_link_libraries(render_gl PRIVATE imgui)
+target_link_libraries(render_gl PUBLIC img map)
+target_link_libraries(render_gl PRIVATE render_tga glfw glad imgui)
 
 source_group(
     TREE "${PROJECT_SOURCE_DIR}/include"
