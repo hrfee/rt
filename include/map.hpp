@@ -13,6 +13,7 @@ struct RenderConfig {
     bool reflections;
     bool specular;
     int maxBounce;
+    float refractiveIndex;
     float distanceDivisor;
     float baseBrightness;
     float globalShininess;
@@ -23,8 +24,13 @@ struct RenderConfig {
 
 struct RayResult {
     int collisions;
+    int potentialCollisions;
     float t;
+    float t1;
     Vec3 color;
+    Vec3 reflectionColor;
+    Vec3 specularColor;
+    Vec3 refractColor;
     float opacity;
     float reflectiveness;
     float emissiveness;
@@ -33,6 +39,8 @@ struct RayResult {
     Vec3 emissionColor;
     Vec3 p0;
     Vec3 normal;
+    Vec3 norm;
+    Shape *obj;
 };
 
 class WorldMap {
@@ -46,9 +54,11 @@ class WorldMap {
         int loadObjFile(char const* path);
         std::vector<PointLight> pointLights;
         ContainerQuad o;
+        ContainerQuad debug;
         Camera *cam;
         void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f);
         void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f); 
+        void createDebugVector(Vec3 p0, Vec3 delta, Vec3 color = {1.f, 0.f, 0.f});
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);

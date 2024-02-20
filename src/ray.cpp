@@ -73,7 +73,7 @@ Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
     return norms[1];
 }
 
-float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere) {
+float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere, float *t1) {
     // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
     // substituted values for the camera position (x/y/z_0),
     // pixel vec from camera (delta x/y/z),
@@ -87,8 +87,16 @@ float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere) {
     float discrimRoot = std::sqrt(discrim);
     float t = (-b - discrimRoot) / (2.f*a);
     if (discrim > 0 && t < 0) {
-        float t1 = (-b + discrimRoot) / (2.f*a);
-        if (t < 0) t = t1;
+        float t_1 = (-b + discrimRoot) / (2.f*a);
+        float t_ = 0.f;
+        if (t < 0 || (t > t_1 && t_1 > 0)) {
+            t_ = t;
+            t = t_1;
+            t_1 = t_;
+        }
+        if (t1 != NULL) {
+            *t1 = t_1;
+        }
     }
     return t;
 }
@@ -134,4 +142,29 @@ bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
     }
 
     return pointInTriangle(po, ao, bo, co);
+}
+
+Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir) {
+    // Based on CGPaP in C p.757-758 Sect. 16.5.2 "Calculating the refraction vector":
+    // \vec{I} = a_,
+    // \vec{T} = out,
+    // \vec{N} = normal_,
+    
+    // CGPaP describes \vec{I} in forwards ray tracing terms, so we invert ours.
+    Vec3 a_ = -1.f * norm(a);
+    Vec3 normal_ = norm(normal); 
+    *tir = false;
+    float indexRatio = ra / rb;
+    float cosIncident = dot(normal_, a_);
+    // When the square root below (cosOut) is imaginary, TIR occurs.
+    // Hence when sinIncidentSquared is greater than 1, TIR occurs.
+    float sinIncidentSquared = (indexRatio * indexRatio) * (1.f - (cosIncident*cosIncident));
+    if (sinIncidentSquared > 1.f) {
+        *tir = true;
+        return {0.f, 0.f, 0.f};
+    }
+    float cosOut = std::sqrt(1.f - sinIncidentSquared);
+
+    Vec3 out = (((indexRatio * cosIncident) - cosOut) * normal_) - (indexRatio * a_);
+    return out;
 }

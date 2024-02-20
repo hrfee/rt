@@ -9,6 +9,9 @@
 #include <sstream>
 #include <filesystem>
 
+#define RI_AIR 1.f
+#define RI_GLASS 1.52f
+
 ContainerQuad *emptyContainerQuad() {
     ContainerQuad *c = (ContainerQuad*)alloc(sizeof(ContainerQuad));
     c->a = {0, 0 ,0};
@@ -61,6 +64,23 @@ void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity,
     appendShape(&o, sh);
 }
 
+void WorldMap::createDebugVector(Vec3 p0, Vec3 delta, Vec3 color) {
+    Vec3 p1 = p0 + delta;
+    Shape *sh = emptyShape();
+    sh->t = (Triangle*)alloc(sizeof(Triangle));
+    sh->t->a = p0;
+    sh->t->a.y -= 0.5f;
+    sh->t->b = p0;
+    sh->t->b.y += 0.5f;
+    sh->t->c = p1;
+    sh->color = color;
+    sh->opacity = 1.f;
+    sh->reflectiveness = 0.f;
+    sh->specular = 0.f;
+    sh->shininess = 5.f;
+    appendShape(&debug, sh);
+}
+
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
     Vec3 baseRowVec = cam->viewportCorner;
     if (rc->baseBrightness == -1.f) {
@@ -86,11 +106,16 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
             if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
+            res = castRay(&debug, cam->position, delta, rc);
+            if (res.collisions > 0) {
+                writePixel(img, x, y, res.color);
+            }
             
             delta = delta + cam->viewportCol; 
         }
         baseRowVec = baseRowVec + cam->viewportRow;
     }
+    clearContainer(&debug);
 }
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
@@ -99,10 +124,7 @@ void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResul
     if (bounce.collisions > 0) {
         color = bounce.color;
     }
-    res->color = ((1.f - res->reflectiveness)*res->color + (res->reflectiveness) * color);
-    if (!(rc->lighting)) {
-        return;
-    }
+    res->reflectionColor = color;
 }
 
 void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res) {
@@ -142,46 +164,62 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
         specularColor = specularColor + (res->specular * (light.specular * light.specularColor) * rDotV);
     }
-    res->color = (res->color * lightColor) + specularColor;
+    res->specularColor = specularColor;
+    res->color = (res->color * lightColor);
 }
 
 RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
-    RayResult res = {0, 9999.f, 9999.f};
+    RayResult res = {0, 0, 9999.f, 9999.f};
     if (callCount > rc->maxBounce) return res;
     Shape *current = c->start;
     while (current != NULL) {
         if (current->s != NULL && rc->spheres) {
             Sphere *sphere = current->s;
-            float t = meetsSphere(p0, delta, sphere);
-            if (t >= 0) res.collisions += 1;
+            float t1 = -1.f;
+            float t = meetsSphere(p0, delta, sphere, &t1);
+            if (t >= 0) {
+                res.collisions += 1;
+                res.potentialCollisions += 1;
+            }
             if (t >= 0 && t < res.t) {
+                res.obj = current;
                 res.t = t;
+                res.t1 = t1;
                 res.color = current->color;
                 res.opacity = current->opacity;
                 res.reflectiveness = current->reflectiveness;
                 res.shininess = current->shininess;
                 Vec3 collisionPoint = p0 + (res.t * delta);
-                res.normal = norm(collisionPoint-sphere->center);
+                res.normal = collisionPoint-sphere->center;
+                res.norm = norm(res.normal);
                 res.p0 = collisionPoint;
                 res.specular = current->specular;
             }
         } else if (current->t != NULL && rc->triangles) {
             // FIXME: Triangles with identical X coords do not render!
             Triangle *tri = current->t;
-            Vec3 normal = norm(getVisibleTriNormal(delta, tri->a, tri->b, tri->c));
-            float t = meetsTrianglePlane(p0, delta, normal, tri);
-            if (t > 0 && t < res.t) {
-                Vec3 collisionPoint = p0 + (t * delta);
-                if (meetsTriangle(normal, collisionPoint, tri)) {
-                    res.collisions += 1;
-                    res.t = t;
-                    res.color = current->color;
-                    res.opacity = current->opacity;
-                    res.reflectiveness = current->reflectiveness;
-                    res.shininess = current->shininess;
-                    res.normal = normal;
-                    res.p0 = collisionPoint;
-                    res.specular = current->specular;
+            Vec3 normal = getVisibleTriNormal(delta, tri->a, tri->b, tri->c);
+            Vec3 normnorm = norm(normal);
+            float t = meetsTrianglePlane(p0, delta, normnorm, tri);
+            if (t > 0) {
+                res.potentialCollisions += 1;
+                if (t < res.t) {
+                    Vec3 collisionPoint = p0 + (t * delta);
+                    if (meetsTriangle(normnorm, collisionPoint, tri)) {
+                        res.collisions += 1;
+                        res.obj = current;
+                        res.t = t;
+                        res.color = current->color;
+                        res.opacity = current->opacity;
+                        res.reflectiveness = current->reflectiveness;
+                        res.shininess = current->shininess;
+                        res.normal = normal;
+                        res.norm = normnorm;
+                        res.p0 = collisionPoint;
+                        res.specular = current->specular;
+                    } else {
+                        res.potentialCollisions -= 1;
+                    }
                 }
             }
         }
@@ -213,13 +251,16 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
                 simpleConfig.spheres = rc->spheres;
                 RayResult r = castRay(current->c, p0, delta, &simpleConfig, 0);
                 res.collisions += r.collisions;
+                res.potentialCollisions += r.potentialCollisions;
                 if (r.t > 0 && r.t < res.t) {
+                    res.obj = r.obj;
                     res.t = r.t;
                     res.color = r.color;
                     res.opacity = current->opacity;
                     res.reflectiveness = r.reflectiveness;
                     res.shininess = r.shininess;
                     res.normal = r.normal;
+                    res.norm = r.norm;
                     res.p0 = r.p0;
                     res.specular = r.specular;
                 }
@@ -228,14 +269,57 @@ RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig 
         current = current->next;
     }
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-    res.p0 = res.p0 + (0.001f * res.normal);
+    Vec3 p0PlusABit = res.p0 + (0.001f * res.normal);
     if (rc->reflections && res.reflectiveness != 0) {
-        Vec3 reflection = res.p0 - 2.f*dot(res.p0, res.normal)*res.normal;
-        castReflectionRay(res.p0, reflection, rc, &res, callCount+1);
+        // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
+        Vec3 reflection = delta - 2.f*dot(delta, res.norm) * res.norm;
+        castReflectionRay(p0PlusABit, reflection, rc, &res, callCount+1);
+        res.color = ((1.f - res.reflectiveness)*res.color);
     }
+
     if (rc->lighting && res.reflectiveness != 0) {
-        castShadowRays(-1.f*delta, res.p0, rc, &res);
+        castShadowRays(-1.f*delta, p0PlusABit, rc, &res);
     }
+
+    if (res.opacity != 1.f) {
+        // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
+        if (res.collisions >= 1 && res.potentialCollisions > 1) {
+            Vec3 p0Transparent = res.p0 - (0.001f * res.normal);
+            if (res.obj->t != NULL) {
+                RayResult r = castRay(&o, p0Transparent, delta, rc, callCount+1);
+                res.refractColor = r.color;
+            } else if (res.obj->s != NULL) {
+                // 1. Bounce into the sphere.
+                bool tir = false;
+                Vec3 refract = Refract(RI_AIR, rc->refractiveIndex, delta, res.normal, &tir);
+
+                if (tir) {
+                    // Don't do anything, the sphere should be reflective so it'll look fine.
+                    // std::printf("TIR!\n");
+                    // res.color = {0.f, 1.f, 0.f};
+                } else {
+                    // 2. Bounce around the glass until we can escape.
+                    tir = true;
+                    Vec3 pb = res.p0;
+                    while (tir) {
+                        pb = pb + (0.001f * refract);
+                        float t = meetsSphere(pb, refract, res.obj->s, NULL);
+                        pb = pb + (t * refract);
+                        // Since we're inside the sphere, invert the normal to point inwards
+                        Vec3 normal = -1.f*(pb - res.obj->s->center);
+                        refract = Refract(rc->refractiveIndex, RI_AIR, refract, normal, &tir);
+                    }
+                    pb = pb + (0.001f * refract);
+                    RayResult r = castRay(&o, pb, refract, rc, callCount+1);
+                    res.refractColor = r.color;
+                }
+            }
+        } else {
+            res.refractColor = {0.f, 0.f, 0.f};
+        }
+    }
+   
+    res.color = (res.opacity * res.color) + ((1.f - res.opacity) * res.refractColor) + (res.reflectiveness * res.reflectionColor) + res.specularColor;
 
     res.color.x = std::fmin(res.color.x, 1.f);
     res.color.y = std::fmin(res.color.y, 1.f);

@@ -2,6 +2,7 @@
 #include "img.hpp"
 #include "gl.hpp"
 #include "cam.hpp"
+#include "ray.hpp"
 #include <math.h>
 #include <cstdio>
 #include <getopt.h>
