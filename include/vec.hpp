@@ -39,12 +39,22 @@ struct Vec3 {
 
 constexpr
 Vec3 operator+(Vec3 a, Vec3 b) noexcept {
-    return Vec3{ a.x+b.x, a.y+b.y, a.z+b.z };
+    return Vec3{a.x+b.x, a.y+b.y, a.z+b.z};
 }
 
 constexpr
 Vec3 operator-(Vec3 a, Vec3 b) noexcept {
-    return Vec3{ a.x-b.x, a.y-b.y, a.z-b.z };
+    return Vec3{a.x-b.x, a.y-b.y, a.z-b.z};
+}
+
+constexpr
+Vec3 operator-(Vec3 a, float b) noexcept {
+    return Vec3{a.x-b, a.y-b, a.z-b};
+}
+
+constexpr
+Vec3 operator+(Vec3 a, float b) noexcept {
+    return Vec3{a.x+b, a.y+b, a.z+b};
 }
 
 constexpr
@@ -96,6 +106,20 @@ float mag(Vec3 a) noexcept {
 constexpr
 Vec3 norm(Vec3 a) noexcept {
     return a/mag(a);
+}
+
+constexpr
+void maxPerComponent(Vec3 *a, Vec3 b) noexcept {
+    a->x = std::fmax(a->x, b.x);
+    a->y = std::fmax(a->y, b.y);
+    a->z = std::fmax(a->z, b.z);
+}
+
+constexpr
+void minPerComponent(Vec3 *a, Vec3 b) noexcept {
+    a->x = std::fmin(a->x, b.x);
+    a->y = std::fmin(a->y, b.y);
+    a->z = std::fmin(a->z, b.z);
 }
 
 struct Vec3ui {

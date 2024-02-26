@@ -2,35 +2,47 @@
 #define SHAPE
 
 #include "vec.hpp"
+#include <vector>
 #include <string>
 #include <iostream>
 #include <sstream>
 
 struct Sphere;
 struct Triangle;
-struct ContainerQuad;
+struct Container;
 
 struct Shape {
     Sphere *s;
     Triangle *t;
-    ContainerQuad *c;
+    Container *c;
     Vec3 color;
     float opacity;
     float reflectiveness; // 0-1
     float specular; // 1-inf
     float shininess;
-    Shape *next;
 };
 
-// Very simple optimization. Defined in .map file as:
+struct Bound {
+    Vec3 min, max; // Bounding box
+    Shape *s;
+    Bound *next;
+};
+
+// When plane is true, acts as a very simple optimization.
+// Defined in .map file as:
 // container a <vec3> b <vec3> c <vec3> d <vec3> {
 // <shapes>
 // }
 // Note: abcd must be arranged clockwise!
-struct ContainerQuad {
+// When plane is false, acts as an Axis-Aligned Bounding Box (AABB),
+// Where a and b are the corners.
+struct Container {
     Vec3 a, b, c, d;
-    Shape *start;
-    Shape *end;
+    Bound *start;
+    Bound *end;
+    bool plane;
+    int splitAxis;
+    int size;
 };
 
 struct Sphere {
@@ -38,6 +50,7 @@ struct Sphere {
     // CG:PaP 2nd ed. in C: p. 702
     Vec3 center; // a, b, c
     float radius; // r
+    float thickness; // fraction of radius. 0 == hollow, 1 == filled.
 };
 
 struct Triangle {
@@ -69,5 +82,21 @@ std::string encodeColour(Vec3 c);
 Vec3 decodeColour(std::stringstream *in);
 
 Shape *emptyShape();
+
+Bound *emptyBound();
+
+Container *emptyContainer(bool plane = false);
+
+void appendToContainer(Container *c, Bound *bo);
+
+void appendToContainer(Container *c, Bound bo);
+
+void appendToContainer(Container *c, Shape *sh);
+
+void appendToContainer(Container *cParent, Container *c);
+
+Bound *boundByIndex(Container *c, int i);
+
+int clearContainer(Container *c, bool clearChildShapes = true);
 
 #endif

@@ -168,3 +168,45 @@ Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir) {
     Vec3 out = (((indexRatio * cosIncident) - cosOut) * normal_) - (indexRatio * a_);
     return out;
 }
+
+/*bool meetsAABB(Vec3 p0, Vec3 delta, Container *container) {
+
+    if (delta.y < 0.f) return true;
+    Vec3 tMin = (container->a - p0);
+    tMin = {tMin.x / delta.x, tMin.y / delta.y, tMin.z / delta.z};
+    Vec3 tMax = (container->b - p0);
+    tMax = {tMax.x / delta.x, tMax.y / delta.y, tMax.z / delta.z};
+    if (mag(tMin) > mag(tMax)) {
+        Vec3 tm = tMin;
+        tMin = tMax;
+        tMax = tm;
+    }
+    // tMin/tMax now correlate to the nearest and farthest planes of the box
+    float near = std::max(std::max(tMin.x, tMin.y), tMin.z);
+    float far = std::min(std::min(tMax.x, tMax.y), tMax.z);
+    return near <= far;
+}*/
+
+bool meetsAABB(Vec3 p0, Vec3 delta, Container *container) {
+    float p[3] = {p0.x, p0.y, p0.z};
+    float d[3] = {delta.x, delta.y, delta.z};
+    float min[3] = {container->a.x, container->a.y, container->a.z};
+    float max[3] = {container->b.x, container->b.y, container->b.z};
+    float tmin = -9999.f;
+    float tmax = 9999.f;
+    for (int i = 0; i < 3;  i++) {
+        float t0 = (min[i] - p[i]) / d[i];
+        float t1 = (max[i] - p[i]) / d[i];
+        if (d[i] < 0.f) {
+            float t_ = t0;
+            t0 = t1;
+            t1 = t_;
+        }
+
+        tmin = t0 > tmin ? t0 : tmin;
+        tmax = t1 < tmax ? t1 : tmax;
+
+        if (tmax <= tmin) return false;
+    }
+    return true;
+}

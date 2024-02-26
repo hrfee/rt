@@ -9,6 +9,7 @@
 struct RenderConfig {
     bool renderOnChange;
     bool renderNow;
+    bool collisionsOnly;
     bool lighting;
     bool reflections;
     bool specular;
@@ -31,12 +32,6 @@ struct RayResult {
     Vec3 reflectionColor;
     Vec3 specularColor;
     Vec3 refractColor;
-    float opacity;
-    float reflectiveness;
-    float emissiveness;
-    float specular;
-    float shininess;
-    Vec3 emissionColor;
     Vec3 p0;
     Vec3 normal;
     Vec3 norm;
@@ -45,38 +40,43 @@ struct RayResult {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth) { o.start = NULL; o.end = NULL; };
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0) { obj = &unoptimizedObj; };
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
         float baseBrightness, globalShininess;
         void loadFile(char const* path);
         int loadObjFile(char const* path);
+        void optimizeMap(int level = 1);
+        int optimizeLevel;
         std::vector<PointLight> pointLights;
-        ContainerQuad o;
-        ContainerQuad debug;
+        Container unoptimizedObj;
+        Container *obj;
+        Container *flatObj;
+        Container *optimizedObj;
         Camera *cam;
-        void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f);
+        void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f, float thickness = -1.f);
         void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f); 
         void createDebugVector(Vec3 p0, Vec3 delta, Vec3 color = {1.f, 0.f, 0.f});
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
         void castRays(Image *img, RenderConfig *rc);
         void encode(char const* path);
     private:
-        RayResult castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
+        RayResult castRay(Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
+        void ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
         void castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res);
+        void castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount = 0);
 };
 
-int clearContainer(ContainerQuad *c);
+int clearContainer(Container *c);
+void flattenRootContainer(Container *dst, Container *src);
 
 float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere);
 float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle *tri);
 bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri);
 bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c);
 
-void appendShape(ContainerQuad *c, Shape *sh);
-void appendContainerQuad(ContainerQuad *cParent, ContainerQuad *c);
-void appendSphere(ContainerQuad *c, Sphere *s);
-void appendTriangle(ContainerQuad *c, Triangle *t);
+void appendSphere(Container *c, Sphere *s);
+void appendTriangle(Container *c, Triangle *t);
 #endif

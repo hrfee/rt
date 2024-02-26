@@ -23,6 +23,8 @@ struct GLWindowState {
     std::string filePath;
     std::string mapPath;
     bool reloadMap;
+    bool useOptimizedMap;
+    int kdLevel;
     struct Mouse {
         bool enabled;
         float sensitivity;

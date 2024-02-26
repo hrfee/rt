@@ -8,6 +8,7 @@
 namespace {
     const char* w_center = "center";
     const char* w_radius = "radius";
+    const char* w_thickness = "thickness";
     const char* w_color = "color";
     const char w_color_hex = '#';
     const char* w_color_rgb_start = "rgb(";
@@ -82,6 +83,8 @@ std::string encodeSphere(Shape *sh) {
     fmt << sh->s->center.x << " " << sh->s->center.y << " " << sh->s->center.z << " ";
     fmt << w_radius << " ";
     fmt << sh->s->radius << " ";
+    fmt << w_thickness << " ";
+    fmt << sh->s->thickness << " ";
     fmt << encodeShape(sh) << " ";
     fmt << std::endl;
     return fmt.str();
@@ -91,6 +94,7 @@ Shape *decodeSphere(std::string in) {
     std::stringstream stream(in);
     Shape *sh = decodeShape(in);
     sh->s = (Sphere*)alloc(sizeof(Sphere));
+    sh->s->thickness = 1.f;
     do {
         std::string w;
         stream >> w;
@@ -104,6 +108,9 @@ Shape *decodeSphere(std::string in) {
         } else if (w == w_radius) {
             stream >> w;
             sh->s->radius = std::stof(w);
+        } else if (w == w_thickness) {
+            stream >> w;
+            sh->s->thickness = std::stof(w);
         }
     } while (stream);
     return sh;
@@ -272,3 +279,99 @@ Vec3 decodeColour(std::stringstream *stream) {
     }
     return c;
 }
+
+Bound *emptyBound() {
+    Bound *bo = (Bound*)malloc(sizeof(Bound));
+    std::memset(bo, 0, sizeof(Bound));
+    return bo;
+}
+
+Container *emptyContainer(bool plane) {
+    Container *c = (Container*)malloc(sizeof(Container));
+    c->a = {0, 0, 0};
+    c->b = {0, 0, 0};
+    c->c = {0, 0, 0};
+    c->d = {0, 0, 0};
+    c->plane = plane;
+    c->start = NULL;
+    c->end = NULL;
+    c->size = 0;
+    c->splitAxis = -1;
+    return c;
+}
+
+void appendToContainer(Container *c, Bound *bo) {
+    if (c->start == NULL) c->start = bo;
+    if (c->end != NULL) c->end->next = bo;
+    c->end = bo;
+    c->size++;
+}
+
+void appendToContainer(Container *c, Bound bo) {
+    Bound *bptr = emptyBound();
+    std::memcpy(bptr, &bo, sizeof(Bound));
+    appendToContainer(c, bptr);
+}
+
+void appendToContainer(Container *c, Shape *sh) {
+    auto bo = emptyBound();
+    bo->s = sh;
+    appendToContainer(c, bo);
+}
+
+void appendToContainer(Container *cParent, Container *c) {
+    auto bo = emptyBound();
+    bo->s = emptyShape();
+    bo->s->c = c;
+    appendToContainer(c, bo);
+}
+
+Bound *boundByIndex(Container *c, int i) {
+    int idx = 0;
+    Bound *bo = c->start;
+    while (bo != c->end->next) {
+        if (idx == i) return bo;
+        idx++;
+        bo = bo->next;
+    }
+    return NULL;
+}
+
+int clearContainer(Container *c, bool clearChildShapes) {
+    if (c == NULL) return 0;
+    int freeCounter = 0;
+    Bound *bo = c->start;
+    Bound *end = NULL;
+    if (c->end != NULL) end = c->end->next;
+    while (bo != end) {
+        if (clearChildShapes) {
+            Shape *current = bo->s;
+            if (current->s != NULL) {
+                free(current->s);
+                current->s = NULL;
+                freeCounter++;
+            }
+            if (current->t != NULL) {
+                free(current->t);
+                current->t = NULL;
+                freeCounter++;
+            }
+            if (current->c != NULL) {
+                freeCounter += clearContainer(current->c);
+                free(current->c);
+                current->c = NULL;
+                freeCounter++;
+            }
+            free(current);
+            freeCounter++;
+        }
+        Bound *next = bo->next;
+        free(bo);
+        bo = next;
+    }
+    c->size = 0;
+    c->start = NULL;
+    c->end = NULL;
+    return freeCounter;
+}
+

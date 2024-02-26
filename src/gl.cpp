@@ -148,6 +148,8 @@ void GLWindow::loadUI() {
     state.rc.triangles = true;
     state.rc.spheres = true;
     state.rc.planeOptimisation = true;
+    state.useOptimizedMap = false;
+    state.kdLevel = 1;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -249,6 +251,10 @@ void GLWindow::showUI() {
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::Checkbox("Use KD optimised map", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
+        if (state.useOptimizedMap) {
+            state.rc.renderNow = ImGui::SliderInt("KD divide level", &(state.kdLevel), 1, 100);
+        }
         state.rc.renderNow = ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f) ? true : state.rc.renderNow;
     }

@@ -21,11 +21,17 @@ set_target_properties(ray PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(ray PUBLIC ../include)
 target_link_libraries(ray PUBLIC shape vec)
 
+add_library(kd STATIC kd.cpp ${HEADER_LIST})
+set_target_properties(kd PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(kd PUBLIC ../include)
+target_link_libraries(kd PUBLIC shape)
+target_link_libraries(kd PRIVATE vec)
+
 add_library(map STATIC map.cpp ${HEADER_LIST})
 set_target_properties(map PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(map PUBLIC ../include)
 target_link_libraries(map PUBLIC shape cam img)
-target_link_libraries(map PRIVATE util ray)
+target_link_libraries(map PRIVATE util ray kd)
 
 add_library(img STATIC img.cpp ${HEADER_LIST})
 set_target_properties(img PROPERTIES LINKER_LANGUAGE CXX)

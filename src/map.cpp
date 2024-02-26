@@ -2,9 +2,11 @@
 
 #include "util.hpp"
 #include "ray.hpp"
+#include "kd.hpp"
 #include <cmath>
 #include <fstream>
 #include <string>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <filesystem>
@@ -12,42 +14,18 @@
 #define RI_AIR 1.f
 #define RI_GLASS 1.52f
 
-ContainerQuad *emptyContainerQuad() {
-    ContainerQuad *c = (ContainerQuad*)alloc(sizeof(ContainerQuad));
-    c->a = {0, 0 ,0};
-    c->b = {0, 0, 0};
-    c->c = {0, 0, 0};
-    c->d = {0, 0, 0};
-    c->start = NULL;
-    c->end = NULL;
-    return c;
-}
-
-void appendShape(ContainerQuad *c, Shape *sh) {
-    if (c->start == NULL) {
-        c->start = sh;
-    }
-    if (c->end != NULL) c->end->next = sh;
-    c->end = sh;
-}
-
-void appendContainerQuad(ContainerQuad *cParent, ContainerQuad *c) {
-    Shape *sh = emptyShape();
-    sh->c = c;
-    appendShape(cParent, sh);
-}
-
-void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity, float reflectiveness, float specular, float shininess) {
+void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity, float reflectiveness, float specular, float shininess, float thickness) {
     Shape *sh = emptyShape();
     sh->s = (Sphere*)alloc(sizeof(Sphere));
     sh->s->center = center;
     sh->s->radius = radius;
+    sh->s->thickness = thickness;
     sh->color = color;
     sh->opacity = opacity;
     sh->reflectiveness = reflectiveness;
     sh->specular = specular;
     sh->shininess = shininess;
-    appendShape(&o, sh);
+    appendToContainer(&unoptimizedObj, sh);
 }
 
 void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity, float reflectiveness, float specular, float shininess) {
@@ -61,24 +39,7 @@ void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity,
     sh->reflectiveness = reflectiveness;
     sh->specular = specular;
     sh->shininess = shininess;
-    appendShape(&o, sh);
-}
-
-void WorldMap::createDebugVector(Vec3 p0, Vec3 delta, Vec3 color) {
-    Vec3 p1 = p0 + delta;
-    Shape *sh = emptyShape();
-    sh->t = (Triangle*)alloc(sizeof(Triangle));
-    sh->t->a = p0;
-    sh->t->a.y -= 0.5f;
-    sh->t->b = p0;
-    sh->t->b.y += 0.5f;
-    sh->t->c = p1;
-    sh->color = color;
-    sh->opacity = 1.f;
-    sh->reflectiveness = 0.f;
-    sh->specular = 0.f;
-    sh->shininess = 5.f;
-    appendShape(&debug, sh);
+    appendToContainer(&unoptimizedObj, sh);
 }
 
 void WorldMap::castRays(Image *img, RenderConfig *rc) {
@@ -102,11 +63,7 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = 0; x < cam->w; x++) {
-            RayResult res = castRay(&o, cam->position, delta, rc);
-            if (res.collisions > 0) {
-                writePixel(img, x, y, res.color);
-            }
-            res = castRay(&debug, cam->position, delta, rc);
+            RayResult res = castRay(obj, cam->position, delta, rc);
             if (res.collisions > 0) {
                 writePixel(img, x, y, res.color);
             }
@@ -115,11 +72,10 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
         }
         baseRowVec = baseRowVec + cam->viewportRow;
     }
-    clearContainer(&debug);
 }
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
-    RayResult bounce = castRay(&o, p0, delta, rc, callCount);
+    RayResult bounce = castRay(obj, p0, delta, rc, callCount);
     Vec3 color = {0.f, 0.f, 0.f};
     if (bounce.collisions > 0) {
         color = bounce.color;
@@ -128,19 +84,19 @@ void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResul
 }
 
 void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res) {
-    // FIXME: Consider transparent obstacles when those are added.
     Vec3 lightColor = Vec3{1.f, 1.f, 1.f} * rc->baseBrightness;
     Vec3 specularColor = Vec3{0.f, 0.f, 0.f};
     RenderConfig simpleConfig;
-    simpleConfig.lighting = false;
-    simpleConfig.reflections = false;
+    simpleConfig.collisionsOnly = true;
     simpleConfig.triangles = rc->triangles;
     simpleConfig.spheres = rc->spheres;
+    simpleConfig.maxBounce = rc->maxBounce;
     for (PointLight light: pointLights) {
         Vec3 distance = light.center - p0;
         float tLight = mag(distance);
         Vec3 normDistance = distance / tLight;
-        RayResult r = castRay(&o, p0, normDistance, &simpleConfig, 0);
+        RayResult r = {0, 0, 9999.f, 9999.f};
+        ray(&r, obj, p0, normDistance, &simpleConfig);
         bool noHit = r.collisions == 0 || r.t > tLight;
         if (!noHit) continue;
         float scaledDistance = tLight / rc->distanceDivisor;
@@ -158,168 +114,213 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         // k_s = res->specular,
         // O_{s\varlambda} (Specular Colour) = light.specular * light.specularColor,
         // n (shininess):
-        float n = (res->shininess == -1.f) ? globalShininess : res->shininess;
+        float n = (res->obj->shininess == -1.f) ? globalShininess : res->obj->shininess;
         float rDotV = std::fmax(std::pow(dot(rNorm, norm(viewDelta)), n), 0);
         // std::printf("got rDotV %f\n", rDotV);
         // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
-        specularColor = specularColor + (res->specular * (light.specular * light.specularColor) * rDotV);
+        specularColor = specularColor + (res->obj->specular * (light.specular * light.specularColor) * rDotV);
     }
     res->specularColor = specularColor;
     res->color = (res->color * lightColor);
 }
 
-RayResult WorldMap::castRay(ContainerQuad *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
-    RayResult res = {0, 0, 9999.f, 9999.f};
-    if (callCount > rc->maxBounce) return res;
-    Shape *current = c->start;
-    while (current != NULL) {
-        if (current->s != NULL && rc->spheres) {
-            Sphere *sphere = current->s;
-            float t1 = -1.f;
-            float t = meetsSphere(p0, delta, sphere, &t1);
-            if (t >= 0) {
-                res.collisions += 1;
-                res.potentialCollisions += 1;
+void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
+    float ri = rc->refractiveIndex;
+    float thickness = res->obj->s->thickness;
+    Vec3 center = res->obj->s->center;
+    if (thickness == 0.f) {
+        // Behave like a filled sphere of air.
+        ri = RI_AIR;
+        thickness = 1.f;
+    }
+    // FIXME: Make thickness value look right!
+    // 1. Bounce into the sphere.
+    bool tir = false;
+    Vec3 refract = Refract(RI_AIR, ri, delta, res->normal, &tir);
+
+    if (tir) {
+        // Don't do anything, the sphere should be reflective so it'll look fine.
+        // std::printf("TIR!\n");
+        // res.color = {0.f, 1.f, 0.f};
+    } else {
+        // 2. Bounce around the glass until we can escape.
+        if (thickness == 1.f) {
+            tir = true;
+            Vec3 pb = res->p0;
+            while (tir) {
+                pb = pb + (0.001f * refract);
+                float t = meetsSphere(pb, refract, res->obj->s, NULL);
+                pb = pb + (t * refract);
+                // Since we're inside the sphere, invert the normal to point inwards
+                Vec3 normal = -1.f*(pb - center);
+                refract = Refract(ri, RI_AIR, refract, normal, &tir);
             }
-            if (t >= 0 && t < res.t) {
-                res.obj = current;
-                res.t = t;
-                res.t1 = t1;
-                res.color = current->color;
-                res.opacity = current->opacity;
-                res.reflectiveness = current->reflectiveness;
-                res.shininess = current->shininess;
-                Vec3 collisionPoint = p0 + (res.t * delta);
-                res.normal = collisionPoint-sphere->center;
-                res.norm = norm(res.normal);
-                res.p0 = collisionPoint;
-                res.specular = current->specular;
+            pb = pb + (0.001f * refract);
+            RayResult r = castRay(obj, pb, refract, rc, callCount+1);
+            res->refractColor = r.color;
+        } else {
+            // For hollow spheres, use an inner, smaller sphere with radius based on the thickness.
+            Sphere innerSphere = {center, res->obj->s->radius*(1.f - res->obj->s->thickness)};
+            tir = true;
+            Vec3 pb = res->p0;
+            bool hitInternalSphere = true;
+            while (tir) {
+                float t = meetsSphere(pb, refract, &innerSphere, NULL);
+                if (t < 0) {
+                    hitInternalSphere = false;
+                    break;
+                }
+                pb = pb + (t * refract);
+                // Since we're inside the sphere, invert the normal to point inwards
+                Vec3 normal = -1.f*(pb - center);
+                refract = Refract(ri, RI_AIR, refract, normal, &tir);
+            }
+            if (hitInternalSphere) {
+                tir = true;
+                pb = pb + (0.001f * refract);
+                while (tir) {
+                    float t = meetsSphere(pb, refract, &innerSphere, NULL);
+                    pb = pb + (t * refract);
+                    Vec3 normal = -1.f*(pb - center);
+                    refract  = Refract(RI_AIR, ri, refract, normal, &tir);
+                }
+            }
+            tir = true;
+            pb = pb + (0.001f * refract);
+            while (tir) {
+                float t = meetsSphere(pb, refract, res->obj->s, NULL);
+                pb = pb + (t * refract);
+                Vec3 normal = -1.f*(pb - center);
+                refract  = Refract(ri, RI_AIR, refract, normal, &tir);
+            }
+            pb = pb + (0.001f * refract);
+            RayResult r = castRay(obj, pb, refract, rc, callCount+1);
+            // std::printf("col: %d\n", r.collisions);
+            if (r.collisions > 0 && r.obj->s == res->obj->s) std::printf("self!\n");
+            res->refractColor = r.color;
+        }
+    }
+}
+
+void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
+    Bound *bo = c->start;
+    while (bo != c->end->next) {
+        Shape *current = bo->s;
+        if (current->s != NULL && rc->spheres) {
+            float t = meetsSphere(p0, delta, current->s, NULL);
+            if (t >= 0) {
+                res->collisions++;
+                res->potentialCollisions++;
+                if (t < res->t) {
+                    res->obj = current;
+                    res->t = t;
+                    res->p0 = p0 + (res->t * delta);
+                    res->normal = res->p0 - current->s->center;
+                    res->norm = norm(res->normal);
+                }
             }
         } else if (current->t != NULL && rc->triangles) {
-            // FIXME: Triangles with identical X coords do not render!
-            Triangle *tri = current->t;
-            Vec3 normal = getVisibleTriNormal(delta, tri->a, tri->b, tri->c);
-            Vec3 normnorm = norm(normal);
-            float t = meetsTrianglePlane(p0, delta, normnorm, tri);
-            if (t > 0) {
-                res.potentialCollisions += 1;
-                if (t < res.t) {
-                    Vec3 collisionPoint = p0 + (t * delta);
-                    if (meetsTriangle(normnorm, collisionPoint, tri)) {
-                        res.collisions += 1;
-                        res.obj = current;
-                        res.t = t;
-                        res.color = current->color;
-                        res.opacity = current->opacity;
-                        res.reflectiveness = current->reflectiveness;
-                        res.shininess = current->shininess;
-                        res.normal = normal;
-                        res.norm = normnorm;
-                        res.p0 = collisionPoint;
-                        res.specular = current->specular;
+            Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
+            Vec3 nNormal = norm(normal);
+            float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
+            if (t >= 0) {
+                res->potentialCollisions++;
+                if (t < res->t) {
+                    Vec3 cPoint = p0 + (t * delta);
+                    if (meetsTriangle(nNormal, cPoint, current->t)) {
+                        res->collisions++;
+                        res->obj = current;
+                        res->t = t;
+                        res->p0 = cPoint;
+                        res->normal = normal;
+                        res->norm = nNormal;
                     } else {
-                        res.potentialCollisions -= 1;
+                        res->potentialCollisions--;
                     }
                 }
             }
-        }
-        if (current->c != NULL) {
-            // Test container collision
-            Triangle tris[2] = {
-                {current->c->a, current->c->b, current->c->c},
-                {current->c->c, current->c->d, current->c->a},
-            };
-            bool collision = !(rc->planeOptimisation);
-            if (!collision) {
-                for (int i = 0; i < 2; i++) {
-                    Vec3 normal = norm(getVisibleTriNormal(delta, tris[i].a, tris[i].b, tris[i].c));
-                    float t = meetsTrianglePlane(p0, delta, normal, &(tris[i]));
-                    if (t < 0 || t >= res.t) continue;
-                    Vec3 collisionPoint = p0 + (t * delta);
-                    if (meetsTriangle(normal, collisionPoint, &(tris[i]))) {
-                        collision = true;
-                        break;
+        } else if (current->c != NULL) {
+            bool collision = false;
+            if (current->c->plane) {
+                // Test container collision
+                Triangle tris[2] = {
+                    {current->c->a, current->c->b, current->c->c},
+                    {current->c->c, current->c->d, current->c->a},
+                };
+                collision = !(rc->planeOptimisation);
+                if (!collision) {
+                    for (int i = 0; i < 2; i++) {
+                        Vec3 normal = norm(getVisibleTriNormal(delta, tris[i].a, tris[i].b, tris[i].c));
+                        float t = meetsTrianglePlane(p0, delta, normal, &(tris[i]));
+                        if (t < 0 || t >= res->t) continue;
+                        Vec3 collisionPoint = p0 + (t * delta);
+                        if (meetsTriangle(normal, collisionPoint, &(tris[i]))) {
+                            collision = true;
+                            break;
+                        }
                     }
                 }
+            } else {
+                collision = meetsAABB(p0, delta, current->c);
+                // collision = true;
             }
-            // If collision, cast rays to all objects in the container
+            // If collision, cast ray to objects within the container
             if (collision) {
-                RenderConfig simpleConfig;
-                simpleConfig.lighting = false;
-                simpleConfig.reflections = false;
-                simpleConfig.triangles = rc->triangles;
-                simpleConfig.spheres = rc->spheres;
-                RayResult r = castRay(current->c, p0, delta, &simpleConfig, 0);
-                res.collisions += r.collisions;
-                res.potentialCollisions += r.potentialCollisions;
-                if (r.t > 0 && r.t < res.t) {
-                    res.obj = r.obj;
-                    res.t = r.t;
-                    res.color = r.color;
-                    res.opacity = current->opacity;
-                    res.reflectiveness = r.reflectiveness;
-                    res.shininess = r.shininess;
-                    res.normal = r.normal;
-                    res.norm = r.norm;
-                    res.p0 = r.p0;
-                    res.specular = r.specular;
-                }
+                ray(res, current->c, p0, delta, rc);
             }
         }
-        current = current->next;
+        bo = bo->next;
     }
+}
+
+RayResult WorldMap::castRay(Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
+    // FIXME: Axis-aligned tris (i.e. floor.obj or kd cubes) render on one side only!
+    RayResult res = {0, 0, 9999.f, 9999.f};
+    if (callCount > rc->maxBounce) {
+        // std::printf("Terminating!\n");
+        return res;
+    }
+
+    // Collision Detection
+    ray(&res, c, p0, delta, rc);
+
+    if (res.obj == NULL) return res;
+
+    // Shading
+    res.color = res.obj->color;
+
+    // std::printf("looped over %d objects\n", size);
+    if (rc->collisionsOnly) return res;
+    
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
     Vec3 p0PlusABit = res.p0 + (0.001f * res.normal);
-    if (rc->reflections && res.reflectiveness != 0) {
+    if (rc->reflections && res.obj->reflectiveness != 0) {
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
         Vec3 reflection = delta - 2.f*dot(delta, res.norm) * res.norm;
         castReflectionRay(p0PlusABit, reflection, rc, &res, callCount+1);
-        res.color = ((1.f - res.reflectiveness)*res.color);
+        res.color = ((1.f - res.obj->reflectiveness)*res.color);
     }
 
-    if (rc->lighting && res.reflectiveness != 0) {
+    if (rc->lighting && res.obj->reflectiveness != 0) {
         castShadowRays(-1.f*delta, p0PlusABit, rc, &res);
     }
 
-    if (res.opacity != 1.f) {
+    if (res.obj->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
         if (res.collisions >= 1 && res.potentialCollisions > 1) {
             Vec3 p0Transparent = res.p0 - (0.001f * res.normal);
             if (res.obj->t != NULL) {
-                RayResult r = castRay(&o, p0Transparent, delta, rc, callCount+1);
+                RayResult r = castRay(obj, p0Transparent, delta, rc, callCount+1);
                 res.refractColor = r.color;
             } else if (res.obj->s != NULL) {
-                // 1. Bounce into the sphere.
-                bool tir = false;
-                Vec3 refract = Refract(RI_AIR, rc->refractiveIndex, delta, res.normal, &tir);
-
-                if (tir) {
-                    // Don't do anything, the sphere should be reflective so it'll look fine.
-                    // std::printf("TIR!\n");
-                    // res.color = {0.f, 1.f, 0.f};
-                } else {
-                    // 2. Bounce around the glass until we can escape.
-                    tir = true;
-                    Vec3 pb = res.p0;
-                    while (tir) {
-                        pb = pb + (0.001f * refract);
-                        float t = meetsSphere(pb, refract, res.obj->s, NULL);
-                        pb = pb + (t * refract);
-                        // Since we're inside the sphere, invert the normal to point inwards
-                        Vec3 normal = -1.f*(pb - res.obj->s->center);
-                        refract = Refract(rc->refractiveIndex, RI_AIR, refract, normal, &tir);
-                    }
-                    pb = pb + (0.001f * refract);
-                    RayResult r = castRay(&o, pb, refract, rc, callCount+1);
-                    res.refractColor = r.color;
-                }
+                castThroughSphere(delta, rc, &res, callCount);
             }
         } else {
             res.refractColor = {0.f, 0.f, 0.f};
         }
     }
    
-    res.color = (res.opacity * res.color) + ((1.f - res.opacity) * res.refractColor) + (res.reflectiveness * res.reflectionColor) + res.specularColor;
+    res.color = (res.obj->opacity * res.color) + ((1.f - res.obj->opacity) * res.refractColor) + (res.obj->reflectiveness * res.reflectionColor) + res.specularColor;
 
     res.color.x = std::fmin(res.color.x, 1.f);
     res.color.y = std::fmin(res.color.y, 1.f);
@@ -364,11 +365,12 @@ void WorldMap::encode(char const* path) {
         fmt << std::endl;
         out << fmt.str();
     }
-    Shape *current = o.start;
-    while (current != NULL) {
+    Bound *bo = unoptimizedObj.start;
+    while (bo != unoptimizedObj.end) {
+        Shape *current = bo->s;
         if (current->s != NULL) out << encodeSphere(current);
         else if (current->t != NULL) out << encodeTriangle(current);
-        current = current->next;
+        bo = bo->next;
     }
 
     out.close();
@@ -376,22 +378,41 @@ void WorldMap::encode(char const* path) {
 }
 
 WorldMap::WorldMap(char const* path) {
-    o.start = NULL;
-    o.end = NULL;
+    obj = &unoptimizedObj;
+    clearContainer(&unoptimizedObj, true);
+    clearContainer(flatObj, true);
+    optimizedObj = NULL;
     loadFile(path);
 }
 
+void WorldMap::optimizeMap(int level) {
+    clearContainer(optimizedObj, false);
+    free(optimizedObj);
+    optimizedObj = NULL;
+    if (flatObj == NULL) {
+        flatObj = emptyContainer();
+        flattenRootContainer(flatObj, &unoptimizedObj);
+    }
+    optimizedObj = splitKD(flatObj, level);
+    optimizeLevel = level;
+}
+
 void WorldMap::loadFile(char const* path) {
-    // FIXME: Reloading the map causes a SIGSEGV, due to accessing a free'd pointer maybe?
-    std::printf("Frees: %d\n", clearContainer(&o));
+    std::printf("Frees: %d\n", clearContainer(&unoptimizedObj, true));
     pointLights.clear();
+    clearContainer(optimizedObj, false);
+    free(optimizedObj);
+    optimizedObj = NULL;
+    clearContainer(flatObj, true);
+    flatObj = NULL;
+    obj = &unoptimizedObj;
     std::printf("Allocations: %d\n", loadObjFile(path));
 }
 
 int WorldMap::loadObjFile(const char* path) {
     std::ifstream in(path);
     std::string line;
-    ContainerQuad *c = NULL;
+    Container *c = NULL;
     int allocCounter = 0;
     while (std::getline(in, line)) {
         std::stringstream lstream(line);
@@ -423,7 +444,7 @@ int WorldMap::loadObjFile(const char* path) {
                 lstream << " " << token;
             }
         } else if (token == w_container) {
-            c = emptyContainerQuad();
+            c = emptyContainer(true);
             allocCounter++;
             for (int i = 0; i < 4; i++) {
                 lstream >> token;
@@ -463,22 +484,22 @@ int WorldMap::loadObjFile(const char* path) {
                 throw std::runtime_error("Didn't find open brace");
             }
         } else if (token == w_close && c != NULL) {
-            appendContainerQuad(&o, c);
+            appendToContainer(&unoptimizedObj, c);
             allocCounter++;
             c = NULL;
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
                 if (c == NULL) {
-                    appendShape(&o, decodeSphere(line));
+                    appendToContainer(&unoptimizedObj, decodeSphere(line));
                 } else {
-                    appendShape(c, decodeSphere(line));
+                    appendToContainer(c, decodeSphere(line));
                 }
                 allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
                 if (c == NULL) {
-                    appendShape(&o, decodeTriangle(line));
+                    appendToContainer(&unoptimizedObj, decodeTriangle(line));
                 } else {
-                    appendShape(c, decodeTriangle(line));
+                    appendToContainer(c, decodeTriangle(line));
                 }
                 allocCounter += 2; // One for triangle, one for shape container
             }
@@ -498,37 +519,48 @@ int WorldMap::loadObjFile(const char* path) {
     return allocCounter;
 }
 
-int clearContainer(ContainerQuad *c) {
-    Shape *current = c->start;
-    c->start = NULL;
-    c->end = NULL;
-    int freeCounter = 0;
-    while (current != NULL) {
-        if (current->s != NULL) {
-            free(current->s);
-            current->s = NULL;
-            freeCounter++;
-        }
-        if (current->t != NULL) {
-            free(current->t);
-            current->t = NULL;
-            freeCounter++;
-        }
+void flattenRootContainer(Container *dst, Container *src) {
+    if (src == NULL) return;
+    Bound *bo = src->start;
+    while (bo != src->end->next) {
+        Shape *current = bo->s;
         if (current->c != NULL) {
-            freeCounter += clearContainer(current->c);
-            free(current->c);
-            current->c = NULL;
-            freeCounter++;
+            flattenRootContainer(dst, current->c);
+        } else {
+            Bound *b = emptyBound();
+            b->s = emptyShape();
+            std::memcpy(b->s, current, sizeof(Shape));
+            if (current->s != NULL) {
+                b->min = current->s->center - current->s->radius;
+                b->max = current->s->center + current->s->radius;
+                Sphere *s = (Sphere*)alloc(sizeof(Sphere));
+                std::memcpy(s, current->s, sizeof(Sphere));
+                b->s->s = s;
+            }
+            if (current->t != NULL) {
+                b->min = {9999, 9999, 9999};
+                b->max = {-9999, -9999, -9999};
+                minPerComponent(&(b->min), current->t->a);
+                maxPerComponent(&(b->max), current->t->a);
+                minPerComponent(&(b->min), current->t->b);
+                maxPerComponent(&(b->max), current->t->b);
+                minPerComponent(&(b->min), current->t->c);
+                maxPerComponent(&(b->max), current->t->c);
+                Triangle *t = (Triangle*)alloc(sizeof(Triangle));
+                std::memcpy(t, current->t, sizeof(Triangle));
+                b->s->t = t;
+            }
+            appendToContainer(dst, b);
         }
-        Shape *next = current->next;
-        free(current);
-        freeCounter++;
-        current = next;
+        bo = bo->next;
     }
-    return freeCounter;
 }
 
 WorldMap::~WorldMap() {
     delete cam;
-    clearContainer(&o);
+    clearContainer(&unoptimizedObj, true);
+    // clearContainer(optimizedObj);
+    free(optimizedObj);
+    obj = NULL;
+    optimizedObj = NULL;
 }

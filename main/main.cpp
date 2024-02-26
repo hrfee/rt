@@ -2,7 +2,6 @@
 #include "img.hpp"
 #include "gl.hpp"
 #include "cam.hpp"
-#include "ray.hpp"
 #include <math.h>
 #include <cstdio>
 #include <getopt.h>
@@ -13,7 +12,7 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-#define MAP_PATH "maps/3sphere.map"
+#define MAP_PATH "maps/checker.map"
 // Uncomment to get printouts of frametime & fps. Forces re-rendering every frame.
 // #define FRAMETIME
 
@@ -35,8 +34,19 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.reloadMap) {
         map->loadFile(window->state.mapPath.c_str());
         window->state.reloadMap = false;
+        window->state.useOptimizedMap = false;
         change = true;
     }
+
+    if (window->state.useOptimizedMap) {
+        if (map->optimizedObj == NULL || (window->state.kdLevel != map->optimizeLevel && change)) {
+            map->optimizeMap(window->state.kdLevel);
+        }
+        map->obj = map->optimizedObj;
+    } else {
+        map->obj = &(map->unoptimizedObj);
+    }
+
     if (rc->renderOnChange || rc->renderNow) {
         if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
             map->cam->setDimensions(window->state.w, window->state.h);
@@ -126,6 +136,8 @@ int main(int argc, char **argv) {
     window = new GLWindow(windowWidth, windowHeight, windowScaleFactor, WINDOW_TITLE);
     map = new WorldMap(MAP_PATH);
     window->state.mapPath = MAP_PATH;
+
+    // map->o = splitKD(&(map->o), 10);
 
     map->cam = new Camera(window->state.w, window->state.h, cameraFOV, {0.f, -0.5f, 0.f});
     window->state.fovDeg = cameraFOV * 180.f / M_PI;
