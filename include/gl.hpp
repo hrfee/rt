@@ -24,6 +24,8 @@ struct GLWindowState {
     std::string mapPath;
     bool reloadMap;
     bool useOptimizedMap;
+    bool renderOptimizedHierarchy;
+    Container *optimizedMap;
     int kdLevel;
     struct Mouse {
         bool enabled;
@@ -60,6 +62,7 @@ class GLWindow {
         GLWindowUI ui;
         void loadUI();
         void showUI();
+        void renderTree(Container *c, int tabIndex = 0);
 };
 
 void resizeWindowCallback(GLFWwindow *, int, int);

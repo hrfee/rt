@@ -41,6 +41,7 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.useOptimizedMap) {
         if (map->optimizedObj == NULL || (window->state.kdLevel != map->optimizeLevel && change)) {
             map->optimizeMap(window->state.kdLevel);
+            window->state.optimizedMap = map->optimizedObj;
         }
         map->obj = map->optimizedObj;
     } else {

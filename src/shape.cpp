@@ -344,8 +344,8 @@ int clearContainer(Container *c, bool clearChildShapes) {
     Bound *end = NULL;
     if (c->end != NULL) end = c->end->next;
     while (bo != end) {
-        if (clearChildShapes) {
-            Shape *current = bo->s;
+        Shape *current = bo->s;
+        if (clearChildShapes || current->debug) {
             if (current->s != NULL) {
                 free(current->s);
                 current->s = NULL;

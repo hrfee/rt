@@ -20,6 +20,7 @@ struct Shape {
     float reflectiveness; // 0-1
     float specular; // 1-inf
     float shininess;
+    bool debug; // Whether to be hidden in normal output or not.
 };
 
 struct Bound {

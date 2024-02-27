@@ -95,7 +95,13 @@ void determineBounds(Container *o, Vec3 *min, Vec3 *max) {
     }
 }
 
-Container* splitKD(Container *o, int splitLimit, int splitCount, int lastAxis) {
+namespace {
+    // Line generated with distincColors.py
+    Vec3 distinctColors[16] = {{0.545, 0.271, 0.075}, {0.098, 0.098, 0.439}, {0.000, 0.502, 0.000}, {0.741, 0.718, 0.420}, {0.690, 0.188, 0.376}, {1.000, 0.000, 0.000}, {1.000, 0.647, 0.000}, {1.000, 1.000, 0.000}, {0.486, 0.988, 0.000}, {0.000, 0.980, 0.604}, {0.000, 1.000, 1.000}, {0.000, 0.000, 1.000}, {1.000, 0.000, 1.000}, {0.392, 0.584, 0.929}, {0.933, 0.510, 0.933}, {0.902, 0.902, 0.980}};
+
+}
+
+Container* splitKD(Container *o, int splitLimit, int splitCount, int lastAxis, int colorIndex) {
     if (splitCount >= splitLimit) return NULL;
     Container *kd = emptyContainer();
     kd->a = {9999, 9999, 9999};
@@ -204,8 +210,7 @@ Container* splitKD(Container *o, int splitLimit, int splitCount, int lastAxis) {
     }
 
     Shape *sections[2] = {emptyShape(), emptyShape()};
-
-    std::srand(std::time(NULL)); // Uncomment when using debug spheres/cube
+   
     for (int i = 0; i < 2;  i++) {
         Container *c = containers[i];
         if (c->size == 1) {
@@ -213,12 +218,12 @@ Container* splitKD(Container *o, int splitLimit, int splitCount, int lastAxis) {
             free(c);
 
         } else if (c->size != 0) {
-            Container *splitAgain = splitKD(c, splitLimit, splitCount+1, bestAxis);
+            Container *splitAgain = splitKD(c, splitLimit, splitCount+1, bestAxis, colorIndex);
+            colorIndex += (splitLimit - splitCount)*2;
             if (splitAgain != NULL) {
                 free(c);
-                sections[i]->c = splitAgain;
+                c = splitAgain;
             } else {
-                sections[i]->c = c;
                 c->a = kd->a;
                 c->b = kd->b;
                 c->splitAxis = bestAxis;
@@ -229,36 +234,26 @@ Container* splitKD(Container *o, int splitLimit, int splitCount, int lastAxis) {
                 if (bestAxis == 0) boundary->x = spl[bestAxis];
                 else if (bestAxis == 1) boundary->y = spl[bestAxis];
                 else if (bestAxis == 2) boundary->z = spl[bestAxis];
-
-                std::printf("split%d: (%f %f %f), (%f %f %f)\n", i, c->a.x, c->a.y, c->a.z, c->b.x, c->b.y, c->b.z); 
-                // DEBUG SPHERES
-                // containerSphereCorners(c);
-                containerCube(c);
             }
+            // DEBUG SPHERES
+            // containerSphereCorners(c);
+            containerCube(c, distinctColors[colorIndex]);
+            colorIndex++;
+            
+            sections[i]->c = c;
             Bound bo;
             bo.s = sections[i];
             appendToContainer(kd, bo);
-            // if (sections[i]->c->end == NULL) std::printf("got null with size %d!\n", splitGroups[i][bestIndex].size());
         }
     }
 
-    /* if (bestIndex == 0) std::printf("best was x\n");
-    else if (bestIndex == 1) std::printf("best was y\n");
-    else std::printf("best was z\n");
-    // Pick a point in the list, range is from from 0 - array[point+1]
-    std::printf("group 1 (%f - %f):\n", kda[bestIndex], spl[bestIndex]);
-    printShapes(splitGroups[0][bestIndex]);
-    std::printf("group 2 (%f - %f):\n", spl[bestIndex], kdb[bestIndex]);
-    printShapes(splitGroups[1][bestIndex]);
-
-    std::printf("-----VS-----\n");*/
-
-    if (splitCount == 0) {
+    // Uncomment to render hierarchy in detail in console.
+    /* if (splitCount == 0) {
         // std::printf("------INITIAL------\n");
         // printShapes(o);
         std::printf("------HIERARCHY (%d leaves)------\n", o->size);
         printShapes(kd);
-    }
+    } */
     return kd;
 }
 
@@ -295,12 +290,12 @@ void printShapes(Container *c, int tabIndex) {
     }
 }
 
-void containerCube(Container *c) {
-    Vec3 color = {0.f, 0.f, 0.f};
+void containerCube(Container *c, Vec3 color) {
+    /* Vec3 color = {0.f, 0.f, 0.f};
     color.x = 0.5f + (float(std::rand() % 500) / 500.f);
     color.y = 0.5f + (float(std::rand() % 500) / 500.f);
-    color.z = 0.5f + (float(std::rand() % 500) / 500.f);
-    float width = 0.4f;
+    color.z = 0.5f + (float(std::rand() % 500) / 500.f); */
+    float width = 0.2f;
     float pts[2][3] = {{c->a.x, c->a.y, c->a.z}, {c->b.x, c->b.y, c->b.z}};
     Vec3 vtx[8];
     int idx = 0;
@@ -348,10 +343,12 @@ void containerCube(Container *c) {
             t1->b = Vec3{corners[3][0], corners[3][1], corners[3][2]};
             t1->c = Vec3{corners[0][0], corners[0][1], corners[0][2]};
             Shape *sh0 = emptyShape();
+            sh0->debug = true;
             sh0->t = t0;
             sh0->color = color;
             appendToContainer(c, sh0);
             Shape *sh1 = emptyShape();
+            sh1->debug = true;
             sh1->color = color;
             sh1->t = t1;
             appendToContainer(c, sh1);
@@ -359,11 +356,11 @@ void containerCube(Container *c) {
     }
 }
 
-void containerSphereCorners(Container *c) {
-    Vec3 color = {0.f, 0.f, 0.f};
+void containerSphereCorners(Container *c, Vec3 color) {
+    /* Vec3 color = {0.f, 0.f, 0.f};
     color.x = 0.5f + (float(std::rand() % 500) / 500.f);
     color.y = 0.5f + (float(std::rand() % 500) / 500.f);
-    color.z = 0.5f + (float(std::rand() % 500) / 500.f);
+    color.z = 0.5f + (float(std::rand() % 500) / 500.f); */
     std::vector<Shape*> debugShapes;
     for (int j = 0; j < 2; j++) {
         Bound bo;

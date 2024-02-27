@@ -206,6 +206,10 @@ void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConf
     Bound *bo = c->start;
     while (bo != c->end->next) {
         Shape *current = bo->s;
+        if (current->debug && !(rc->showDebugObjects)) {
+            bo = bo->next;
+            continue;
+        }
         if (current->s != NULL && rc->spheres) {
             float t = meetsSphere(p0, delta, current->s, NULL);
             if (t >= 0) {

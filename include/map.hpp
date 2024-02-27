@@ -21,6 +21,7 @@ struct RenderConfig {
     bool triangles, spheres;
     Vec3 manualPosition;
     bool planeOptimisation;
+    bool showDebugObjects;
 };
 
 struct RayResult {

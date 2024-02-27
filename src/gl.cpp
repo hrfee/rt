@@ -149,7 +149,9 @@ void GLWindow::loadUI() {
     state.rc.spheres = true;
     state.rc.planeOptimisation = true;
     state.useOptimizedMap = false;
+    state.rc.showDebugObjects = false;
     state.kdLevel = 1;
+    state.renderOptimizedHierarchy = false;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -251,10 +253,19 @@ void GLWindow::showUI() {
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
+        
         state.rc.renderNow = ImGui::Checkbox("Use KD optimised map", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
         if (state.useOptimizedMap) {
             state.rc.renderNow = ImGui::SliderInt("KD divide level", &(state.kdLevel), 1, 100);
+            state.rc.renderNow = ImGui::Checkbox("Draw cube around sections", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
+            ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
+            if (state.renderOptimizedHierarchy) {
+                renderTree(state.optimizedMap);
+            }
+        } else {
+            state.renderOptimizedHierarchy = false;
         }
+
         state.rc.renderNow = ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f) ? true : state.rc.renderNow;
     }
@@ -425,3 +436,59 @@ GLWindow::~GLWindow() {
     glfwDestroyWindow(window);
     glfwTerminate();
 }
+
+void GLWindow::renderTree(Container *c, int tabIndex) {
+    ImVec4 containerColor(1.f, 1.f, 1.f, 1.f);
+    if (tabIndex == 0) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, 1.f));
+        ImGui::Text("root(%d, (%.3f, %.3f %.3f), (%.3f, %.3f, %.3f));\n",
+                c->size,
+                c->a.x, c->a.y, c->a.z,
+                c->b.x, c->b.y, c->b.z
+        );
+        ImGui::PopStyleColor();
+    } else {
+        auto prefix = std::string(tabIndex*2, ' ');
+        Bound *bo = c->start;
+
+        while (bo != c->end->next) {
+            Shape *current = bo->s;
+            if (current->t != NULL && current->debug) {
+                containerColor = ImVec4(current->color.x, current->color.y, current->color.z, 1.f);
+                break;
+            }
+            bo = bo->next;
+        }
+        char splitAxis = 'x';
+        if (c->splitAxis == 1) splitAxis = 'y';
+        else if (c->splitAxis == 2) splitAxis = 'z';
+        ImGui::PushStyleColor(ImGuiCol_Text, containerColor);
+        ImGui::Text("%s node(%d%c, (%.3f, %.3f %.3f), (%.3f, %.3f, %.3f));\n",
+                prefix.c_str(), c->size, splitAxis,
+                c->a.x, c->a.y, c->a.z,
+                c->b.x, c->b.y, c->b.z
+        );
+        ImGui::PopStyleColor();
+    }
+    Bound *bo = c->start;
+
+    int children = 0;
+    while (bo != c->end->next) {
+        Shape *current = bo->s;
+        if (current->c != NULL) {
+            renderTree(current->c, tabIndex+1);
+        } else if (!(current->debug)) {
+            children++;
+        }
+        bo = bo->next;
+    }
+    auto prefix2 = std::string((tabIndex+1)*2, ' ');
+    if (children != 0) {
+        ImGui::PushStyleColor(ImGuiCol_Text, containerColor);
+        ImGui::Text("%s%d leaves;\n",
+                prefix2.c_str(), children
+        );
+        ImGui::PopStyleColor();
+    }
+}
+
