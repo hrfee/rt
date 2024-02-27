@@ -315,7 +315,6 @@ void containerCube(Container *c) {
     // Worked out by hand
     int edges[12][2] = {{0, 1}, {0, 2}, {2, 3}, {1, 3}, {4, 6}, {4, 5}, {7, 5}, {7, 6}, {0, 4}, {1, 5}, {2, 6}, {7, 3}};
     for (int i = 0; i < 12; i++) {
-     // FIXME Draw line!
         Vec3 ab[2] = {vtx[edges[i][0]], vtx[edges[i][1]]};
         Vec3 d = ab[1] - ab[0];
         int notAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;

@@ -102,9 +102,10 @@ int main(int argc, char **argv) {
     int windowHeight = INIT_H;
     float windowScaleFactor = INIT_SCALE_FACTOR;
     float cameraFOV = float(INIT_FOV)*M_PI / 180.f;
+    std::string mapPath = MAP_PATH;
 
     int flag;
-    while ((flag = getopt(argc, argv, "hW:H:s:f:")) != -1) {
+    while ((flag = getopt(argc, argv, "hW:H:s:f:m:")) != -1) {
         switch (flag) {
             case 'W': {
                 windowWidth = std::stoi(std::string(optarg));
@@ -118,8 +119,11 @@ int main(int argc, char **argv) {
             case 'f': {
                 cameraFOV = float(std::stoi(std::string(optarg))) * M_PI / 180.f;
             }; break;
+            case 'm': {
+                mapPath = std::string(optarg);
+            }; break;
             case 'h': {
-                std::fprintf(stderr, "%s\n%s -W <window width> -H <window height> -s <render scale factor> -f <fov (degrees)>\n", WINDOW_TITLE, argv[0]);
+                std::fprintf(stderr, "%s\n%s -W <window width> -H <window height> -s <render scale factor> -f <fov (degrees)> -m <map path>\n", WINDOW_TITLE, argv[0]);
                 return 0;
             }; break;
             case '?': {
@@ -134,8 +138,8 @@ int main(int argc, char **argv) {
     }
 
     window = new GLWindow(windowWidth, windowHeight, windowScaleFactor, WINDOW_TITLE);
-    map = new WorldMap(MAP_PATH);
-    window->state.mapPath = MAP_PATH;
+    map = new WorldMap(mapPath.c_str());
+    window->state.mapPath = mapPath.c_str();
 
     // map->o = splitKD(&(map->o), 10);
 

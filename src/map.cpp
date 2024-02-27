@@ -274,7 +274,6 @@ void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConf
 }
 
 RayResult WorldMap::castRay(Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
-    // FIXME: Axis-aligned tris (i.e. floor.obj or kd cubes) render on one side only!
     RayResult res = {0, 0, 9999.f, 9999.f};
     if (callCount > rc->maxBounce) {
         // std::printf("Terminating!\n");

@@ -119,15 +119,17 @@ float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle *tri) {
 }
 
 bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
+    // Sign doesn't matter here as our triangles aren't single-faced.
+    Vec3 absNormal = {std::abs(normal.x), std::abs(normal.y), std::abs(normal.z)};
     // project orthographically as big as possible
     Vec2 ao, bo, co, po;
-    if (normal.x >= normal.y && normal.x >= normal.z) {
+    if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
         // std::printf("projecting onto x\n");
         ao = Vec2{tri->a.y, tri->a.z};
         bo = Vec2{tri->b.y, tri->b.z};
         co = Vec2{tri->c.y, tri->c.z};
         po = Vec2{collisionPoint.y, collisionPoint.z};
-    } else if (normal.y >= normal.x && normal.y >= normal.z) {
+    } else if (absNormal.y >= absNormal.x && absNormal.y >= absNormal.z) {
         // std::printf("projecting onto y\n");
         ao = Vec2{tri->a.x, tri->a.z};
         bo = Vec2{tri->b.x, tri->b.z};
