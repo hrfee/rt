@@ -147,7 +147,7 @@ void GLWindow::loadUI() {
     state.maxThreadCount = -1;
 
     state.rc.refractiveIndex = 1.52f;
-    state.rc.maxBounce = 100;
+    state.rc.maxBounce = 15;
     state.rc.triangles = true;
     state.rc.spheres = true;
     state.rc.planeOptimisation = true;
