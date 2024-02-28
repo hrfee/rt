@@ -2,7 +2,7 @@
 
 #include "util.hpp"
 #include "ray.hpp"
-#include "kd.hpp"
+#include "hierarchy.hpp"
 #include <cmath>
 #include <fstream>
 #include <string>
@@ -91,6 +91,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     simpleConfig.triangles = rc->triangles;
     simpleConfig.spheres = rc->spheres;
     simpleConfig.maxBounce = rc->maxBounce;
+    simpleConfig.showDebugObjects = rc->showDebugObjects;
     for (PointLight light: pointLights) {
         Vec3 distance = light.center - p0;
         float tLight = mag(distance);
@@ -388,7 +389,8 @@ WorldMap::WorldMap(char const* path) {
     loadFile(path);
 }
 
-void WorldMap::optimizeMap(int level) {
+// splitterIndex: 0 = splitEqually, 1 = SAH
+void WorldMap::optimizeMap(int level, int splitterIndex) {
     clearContainer(optimizedObj, false);
     free(optimizedObj);
     optimizedObj = NULL;
@@ -396,7 +398,14 @@ void WorldMap::optimizeMap(int level) {
         flatObj = emptyContainer();
         flattenRootContainer(flatObj, &unoptimizedObj);
     }
-    optimizedObj = splitKD(flatObj, level);
+    switch (splitterIndex) {
+        case 0:
+            optimizedObj = splitBVH(flatObj, splitEqually, level);
+            break;
+        case 1:
+            optimizedObj = splitBVH(flatObj, splitSAH, level);
+            break;
+    }
     optimizeLevel = level;
 }
 

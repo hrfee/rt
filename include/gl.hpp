@@ -26,7 +26,8 @@ struct GLWindowState {
     bool useOptimizedMap;
     bool renderOptimizedHierarchy;
     Container *optimizedMap;
-    int kdLevel;
+    int hierarchySplitterIndex;
+    int hierarchyDepth;
     struct Mouse {
         bool enabled;
         float sensitivity;

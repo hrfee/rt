@@ -140,9 +140,10 @@ void GLWindow::loadUI() {
     state.rc.renderOnChange = false;
     ui.renderMode = 1;
     state.rc.distanceDivisor = 1.f;
-    state.rc.globalShininess = -1.f;
     // Indicate unset, so map can set it for us the first time round.
     state.rc.baseBrightness = -1.f;
+    state.rc.globalShininess = -1.f;
+
     state.rc.refractiveIndex = 1.52f;
     state.rc.maxBounce = 100;
     state.rc.triangles = true;
@@ -150,7 +151,8 @@ void GLWindow::loadUI() {
     state.rc.planeOptimisation = true;
     state.useOptimizedMap = false;
     state.rc.showDebugObjects = false;
-    state.kdLevel = 1;
+    state.hierarchyDepth = 1;
+    state.hierarchySplitterIndex = 1; // SAH
     state.renderOptimizedHierarchy = false;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -224,6 +226,7 @@ std::string GLWindow::frameInfo() {
 
 namespace {
     const char *modes[] = {"Raycasting", "Raycasting w/ Reflections", "Basic Lighting"};
+    const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)"};
 }
 
 void GLWindow::showUI() {
@@ -254,14 +257,15 @@ void GLWindow::showUI() {
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
         
-        state.rc.renderNow = ImGui::Checkbox("Use KD optimised map", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::Checkbox("Use/Generate BVH hierarchy", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
         if (state.useOptimizedMap) {
-            state.rc.renderNow = ImGui::SliderInt("KD divide level", &(state.kdLevel), 1, 100);
-            state.rc.renderNow = ImGui::Checkbox("Draw cube around sections", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
+            state.rc.renderNow = ImGui::SliderInt("Hierarchy depth", &(state.hierarchyDepth), 1, 100);
+            state.rc.renderNow = ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
             ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
             if (state.renderOptimizedHierarchy) {
                 renderTree(state.optimizedMap);
             }
+            state.rc.renderNow = ImGui::Combo("BVH Splitter", &(state.hierarchySplitterIndex), splitters, IM_ARRAYSIZE(splitters));
         } else {
             state.renderOptimizedHierarchy = false;
         }

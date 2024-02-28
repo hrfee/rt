@@ -39,8 +39,10 @@ Image *mainLoop(RenderConfig *rc) {
     }
 
     if (window->state.useOptimizedMap) {
-        if (map->optimizedObj == NULL || (window->state.kdLevel != map->optimizeLevel && change)) {
-            map->optimizeMap(window->state.kdLevel);
+
+        if (map->optimizedObj == NULL || (window->state.hierarchyDepth != map->optimizeLevel && change) || window->state.hierarchySplitterIndex != map->splitterIndex) {
+            map->splitterIndex = window->state.hierarchySplitterIndex;
+            map->optimizeMap(window->state.hierarchyDepth, map->splitterIndex);
             window->state.optimizedMap = map->optimizedObj;
         }
         map->obj = map->optimizedObj;

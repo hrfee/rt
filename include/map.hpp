@@ -5,6 +5,7 @@
 #include "shape.hpp"
 #include "cam.hpp"
 #include "img.hpp"
+#include "hierarchy.hpp"
 
 struct RenderConfig {
     bool renderOnChange;
@@ -41,15 +42,16 @@ struct RayResult {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0) { obj = &unoptimizedObj; };
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0), splitterIndex(-1) { obj = &unoptimizedObj; };
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
         float baseBrightness, globalShininess;
         void loadFile(char const* path);
         int loadObjFile(char const* path);
-        void optimizeMap(int level = 1);
+        void optimizeMap(int level = 1, int splitterIndex = 1);
         int optimizeLevel;
+        int splitterIndex;
         std::vector<PointLight> pointLights;
         Container unoptimizedObj;
         Container *obj;
