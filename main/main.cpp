@@ -86,14 +86,26 @@ Image *mainLoop(RenderConfig *rc) {
         rc->manualPosition = map->cam->position;
         change = true;
     }
+
+    if (window->state.maxThreadCount == -1) {
+        window->state.maxThreadCount = std::thread::hardware_concurrency();
+    }
+    if (window->state.threadCount == -1) {
+        window->state.threadCount = std::thread::hardware_concurrency();
+    }
+
 #ifndef FRAMETIME
     if (change && !map->currentlyRendering) {
 #endif
         clearImage(img);
         // map->castRays(img, rc, glfwGetTime);
         window->state.currentlyRendering = true;
-        std::thread cast(&WorldMap::castRays, map, img, rc, glfwGetTime);
-        cast.detach(); // Keep running when this loop finishes and cast goes out of scope
+        if (window->state.mouse.enabled) {
+            map->castRays(img, rc, glfwGetTime, window->state.threadCount);
+        } else {
+            std::thread cast(&WorldMap::castRays, map, img, rc, glfwGetTime, window->state.threadCount);
+            cast.detach(); // Keep running when this loop finishes and cast goes out of scope
+        }
         /*cast.join();
         window->state.lastRenderTime = map->lastRenderTime;
         window->state.lastRenderW = window->state.w;

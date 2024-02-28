@@ -64,10 +64,11 @@ class WorldMap {
         void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f); 
         void createDebugVector(Vec3 p0, Vec3 delta, Vec3 color = {1.f, 0.f, 0.f});
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
-        double castRays(Image *img, RenderConfig *rc, double (*getTime)(void));
+        double castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads = -1);
         void encode(char const* path);
     private:
-        RayResult castRay(Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
+        void castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
+        void castSubRays(Image *img, RenderConfig *rc, int w0, int w1);
         void ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
         void castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res);

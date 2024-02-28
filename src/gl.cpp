@@ -143,6 +143,8 @@ void GLWindow::loadUI() {
     // Indicate unset, so map can set it for us the first time round.
     state.rc.baseBrightness = -1.f;
     state.rc.globalShininess = -1.f;
+    state.threadCount = -1;
+    state.maxThreadCount = -1;
 
     state.rc.refractiveIndex = 1.52f;
     state.rc.maxBounce = 100;
@@ -260,6 +262,7 @@ void GLWindow::showUI() {
         };
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount);
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
         
         state.rc.renderNow = ImGui::Checkbox("Use/Generate BVH hierarchy", &(state.useOptimizedMap)) ? true : state.rc.renderNow;

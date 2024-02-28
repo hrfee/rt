@@ -28,6 +28,8 @@ struct GLWindowState {
     Container *optimizedMap;
     int hierarchySplitterIndex;
     int hierarchyDepth;
+    int threadCount;
+    int maxThreadCount;
     struct Mouse {
         bool enabled;
         float sensitivity;

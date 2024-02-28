@@ -10,6 +10,8 @@
 #include <iostream>
 #include <sstream>
 #include <filesystem>
+#include <functional>
+#include <thread>
 
 #define RI_AIR 1.f
 #define RI_GLASS 1.52f
@@ -42,10 +44,10 @@ void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity,
     appendToContainer(&unoptimizedObj, sh);
 }
 
-double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void)) {
+double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads) {
+    if (nthreads == -1) nthreads = std::thread::hardware_concurrency();
     lastRenderTime = getTime();
     currentlyRendering = true;
-    Vec3 baseRowVec = cam->viewportCorner;
     if (rc->baseBrightness == -1.f) {
         rc->baseBrightness = baseBrightness;
     }
@@ -61,26 +63,63 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void))
     if (rc->manualPosition != cam->position) {
         cam->setPosition(rc->manualPosition);
     }
+    int sectionWidth = cam->w / nthreads;
+    std::thread *threadptrs = new std::thread[nthreads];
+    for (int i = 0; i < nthreads; i++) {
+        int w = sectionWidth;
+        int w0 = i*w;
+        if (i == nthreads-1) {
+            w += (cam->w % nthreads);
+        }
+        int w1 = w0 + w;
+        threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1);
+    }
+    for (int i = 0; i < nthreads; i++) {
+        threadptrs[i].join();
+    }
+    /* RayResult *res = (RayResult*)malloc(sizeof(RayResult)*nthreads);
     for (int y = 0; y < cam->h; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
-        for (int x = 0; x < cam->w; x++) {
-            RayResult res = castRay(obj, cam->position, delta, rc);
-            if (res.collisions > 0) {
-                writePixel(img, x, y, res.color);
+        int remainingPixels = cam->w;
+        int x = 0;
+        while (remainingPixels > 0) {
+            int threads = std::min(remainingPixels, nthreads);
+            int groupX = x;
+            for (int i = 0; i < threads; i++) {
+                threadptrs[i] = std::thread(&WorldMap::castRay, this, res+i, obj, cam->position, delta, rc, 0);
+                delta = delta + cam->viewportCol;
+                remainingPixels--;
+                x++;
             }
-            
-            delta = delta + cam->viewportCol; 
+            for (int i = 0; i < threads; i++) {
+                threadptrs[i].join();
+                if (res[i].collisions > 0) {
+                    writePixel(img, groupX+i, y, res[i].color);
+                }
+            }
         }
+        // for (int x = 0; x < cam->w; x++) {
+        //     RayResult r;
+        //     castRay(&r, obj, cam->position, delta, rc);
+        //     if (r.collisions > 0) {
+        //         writePixel(img, x, y, r.color);
+        //     }
+        //     
+        //     delta = delta + cam->viewportCol; 
+        // }
         baseRowVec = baseRowVec + cam->viewportRow;
-    }
+    } */
     currentlyRendering = false;
     lastRenderTime = getTime() - lastRenderTime;
+    delete[] threadptrs;
+    // free(res);
     return lastRenderTime;
 }
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
-    RayResult bounce = castRay(obj, p0, delta, rc, callCount);
+    RayResult bounce;
+    castRay(&bounce, obj, p0, delta, rc, callCount);
     Vec3 color = {0.f, 0.f, 0.f};
     if (bounce.collisions > 0) {
         color = bounce.color;
@@ -162,7 +201,8 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
                 refract = Refract(ri, RI_AIR, refract, normal, &tir);
             }
             pb = pb + (0.001f * refract);
-            RayResult r = castRay(obj, pb, refract, rc, callCount+1);
+            RayResult r;
+            castRay(&r, obj, pb, refract, rc, callCount+1);
             res->refractColor = r.color;
         } else {
             // For hollow spheres, use an inner, smaller sphere with radius based on the thickness.
@@ -200,7 +240,8 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
                 refract  = Refract(ri, RI_AIR, refract, normal, &tir);
             }
             pb = pb + (0.001f * refract);
-            RayResult r = castRay(obj, pb, refract, rc, callCount+1);
+            RayResult r;
+            castRay(&r, obj, pb, refract, rc, callCount+1);
             // std::printf("col: %d\n", r.collisions);
             if (r.collisions > 0 && r.obj->s == res->obj->s) std::printf("self!\n");
             res->refractColor = r.color;
@@ -283,58 +324,79 @@ void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConf
     }
 }
 
-RayResult WorldMap::castRay(Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
-    RayResult res = {0, 0, 9999.f, 9999.f};
+void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount) {
+    std::memset(res, 0, sizeof(RayResult));
+    res->t = 9999.f;
+    res->t1 = 9999.f;
     if (callCount > rc->maxBounce) {
         // std::printf("Terminating!\n");
-        return res;
+        return;
     }
 
     // Collision Detection
-    ray(&res, c, p0, delta, rc);
+    ray(res, c, p0, delta, rc);
 
-    if (res.obj == NULL) return res;
+    if (res->obj == NULL) return;
 
     // Shading
-    res.color = res.obj->color;
+    res->color = res->obj->color;
 
     // std::printf("looped over %d objects\n", size);
-    if (rc->collisionsOnly) return res;
+    if (rc->collisionsOnly) return;
     
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-    Vec3 p0PlusABit = res.p0 + (0.001f * res.normal);
-    if (rc->reflections && res.obj->reflectiveness != 0) {
+    Vec3 p0PlusABit = res->p0 + (0.001f * res->normal);
+    if (rc->reflections && res->obj->reflectiveness != 0) {
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
-        Vec3 reflection = delta - 2.f*dot(delta, res.norm) * res.norm;
-        castReflectionRay(p0PlusABit, reflection, rc, &res, callCount+1);
-        res.color = ((1.f - res.obj->reflectiveness)*res.color);
+        Vec3 reflection = delta - 2.f*dot(delta, res->norm) * res->norm;
+        castReflectionRay(p0PlusABit, reflection, rc, res, callCount+1);
+        res->color = ((1.f - res->obj->reflectiveness)*res->color);
     }
 
-    if (rc->lighting && res.obj->reflectiveness != 0) {
-        castShadowRays(-1.f*delta, p0PlusABit, rc, &res);
+    if (rc->lighting && res->obj->reflectiveness != 0) {
+        castShadowRays(-1.f*delta, p0PlusABit, rc, res);
     }
 
-    if (res.obj->opacity != 1.f) {
+    if (res->obj->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
-        if (res.collisions >= 1 && res.potentialCollisions > 1) {
-            Vec3 p0Transparent = res.p0 - (0.001f * res.normal);
-            if (res.obj->t != NULL) {
-                RayResult r = castRay(obj, p0Transparent, delta, rc, callCount+1);
-                res.refractColor = r.color;
-            } else if (res.obj->s != NULL) {
-                castThroughSphere(delta, rc, &res, callCount);
+        if (res->collisions >= 1 && res->potentialCollisions > 1) {
+            Vec3 p0Transparent = res->p0 - (0.001f * res->normal);
+            if (res->obj->t != NULL) {
+                RayResult r;
+                castRay(&r, obj, p0Transparent, delta, rc, callCount+1);
+                res->refractColor = r.color;
+            } else if (res->obj->s != NULL) {
+                castThroughSphere(delta, rc, res, callCount);
             }
         } else {
-            res.refractColor = {0.f, 0.f, 0.f};
+            res->refractColor = {0.f, 0.f, 0.f};
         }
     }
    
-    res.color = (res.obj->opacity * res.color) + ((1.f - res.obj->opacity) * res.refractColor) + (res.obj->reflectiveness * res.reflectionColor) + res.specularColor;
+    res->color = (res->obj->opacity * res->color) + ((1.f - res->obj->opacity) * res->refractColor) + (res->obj->reflectiveness * res->reflectionColor) + res->specularColor;
 
-    res.color.x = std::fmin(res.color.x, 1.f);
-    res.color.y = std::fmin(res.color.y, 1.f);
-    res.color.z = std::fmin(res.color.z, 1.f);
-    return res;
+    res->color.x = std::fmin(res->color.x, 1.f);
+    res->color.y = std::fmin(res->color.y, 1.f);
+    res->color.z = std::fmin(res->color.z, 1.f);
+}
+
+void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1) {
+    RayResult res;
+    Vec3 startCol = w0 * cam->viewportCol;
+    Vec3 baseRowVec = cam->viewportCorner + startCol;
+    for (int y = 0; y < cam->h; y++) {
+        // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
+        Vec3 delta = baseRowVec;
+        for (int x = w0; x < w1; x++) {
+            castRay(&res, obj, cam->position, delta, rc);
+            if (res.collisions > 0) {
+                writePixel(img, x, y, res.color);
+            }
+            
+            delta = delta + cam->viewportCol; 
+        }
+        baseRowVec = baseRowVec + cam->viewportRow;
+    }
 }
 
 namespace {

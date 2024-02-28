@@ -1,2 +1,3 @@
 include 3sphere.map
 include floor.obj
+include wall.obj
