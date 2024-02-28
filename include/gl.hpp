@@ -36,6 +36,7 @@ struct GLWindowState {
         float moveForward;
         float moveSideways;
     } mouse;
+    bool currentlyRendering;
 };
 
 struct GLWindowUI {

@@ -210,7 +210,12 @@ void GLWindow::draw(Image *img) {
 std::string GLWindow::frameInfo() {
     std::ostringstream out;
     out.precision(5);
-    out << "Frame took " << int(state.lastRenderTime*1000.f) << "ms ";
+    if (state.currentlyRendering) {
+        out << "Time elapsed: ";
+    } else {
+        out << "Frame took ";
+    }
+    out << int(state.lastRenderTime*1000.f) << "ms ";
     out << "(";
     if (state.lastRenderTime > 1.f) {
         out << state.lastRenderTime << "s, ";

@@ -162,12 +162,15 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
             if (i == 0) spl[i] = split.x;
             else if (i == 1) spl[i] = split.y;
             else if (i == 2) spl[i] = split.z;
-            float sa = 0.f, sa0 = 0.f, sa1 = 0.f;
+            float sa = 0.f;
+            // index 0 = spheres, 1 = triangles
+            float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
             // int h = 0;
-            int h0 = 0, h1 = 0;
+            int h0[2] = {0, 0}, h1[2] = {0, 0};
             Bound *bo = o->start;
             while (bo != o->end->next) {
                 float s = shapeSA(bo->s);
+                int shapeIndex = (bo->s->t != NULL) ? 1 : 0;
                 sa += s;
                 // h++;
                 float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
@@ -176,21 +179,21 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
                     ((bmin[i] >= min[i]) || (bmax[i] >= min[i])) &&
                     ((bmin[i] <= spl[i]) || (bmax[i] <= spl[i]))
                    ) {
-                    sa0 += s;
-                    h0++;
+                    sa0[shapeIndex] += s;
+                    h0[shapeIndex]++;
                 }
                 if (
                     ((bmin[i] >= spl[i]) || (bmax[i] >= spl[i])) &&
                     ((bmin[i] <= max[i]) || (bmax[i] <= max[i]))
                    ) {
-                    sa1 += s;
-                    h1++;
+                    sa1[shapeIndex] += s;
+                    h1[shapeIndex]++;
                 }
                 bo = bo->next;
             }
             
             // FIXME: Adapt to use sphere and triangle costs!
-            float cost = cTraverse + cTri * (h0*(sa0/sa) + h1*(sa1/sa));
+            float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]/sa) + h1[0]*(sa1[0]/sa))) + (cTri * (h0[1]*(sa0[1]/sa) + h1[1]*(sa1[1]/sa)));
 
             if (cost < bestCosts[i]) {
                 bestIndices[i] = splitIndex;

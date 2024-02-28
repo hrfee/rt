@@ -42,7 +42,9 @@ void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity,
     appendToContainer(&unoptimizedObj, sh);
 }
 
-void WorldMap::castRays(Image *img, RenderConfig *rc) {
+double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void)) {
+    lastRenderTime = getTime();
+    currentlyRendering = true;
     Vec3 baseRowVec = cam->viewportCorner;
     if (rc->baseBrightness == -1.f) {
         rc->baseBrightness = baseBrightness;
@@ -72,6 +74,9 @@ void WorldMap::castRays(Image *img, RenderConfig *rc) {
         }
         baseRowVec = baseRowVec + cam->viewportRow;
     }
+    currentlyRendering = false;
+    lastRenderTime = getTime() - lastRenderTime;
+    return lastRenderTime;
 }
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
@@ -391,6 +396,7 @@ WorldMap::WorldMap(char const* path) {
 
 // splitterIndex: 0 = splitEqually, 1 = SAH
 void WorldMap::optimizeMap(int level, int splitterIndex) {
+    std::printf("Optimizing map with splitter %d, depth %d\n", splitterIndex, level);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
     optimizedObj = NULL;

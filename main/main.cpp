@@ -5,6 +5,7 @@
 #include <math.h>
 #include <cstdio>
 #include <getopt.h>
+#include <thread>
 
 #define INIT_W 1280 
 #define INIT_H 720
@@ -86,16 +87,27 @@ Image *mainLoop(RenderConfig *rc) {
         change = true;
     }
 #ifndef FRAMETIME
-    if (change) {
+    if (change && !map->currentlyRendering) {
 #endif
         clearImage(img);
-        window->state.lastRenderTime = glfwGetTime();
-        map->castRays(img, rc);
-        window->state.lastRenderTime = glfwGetTime() - window->state.lastRenderTime;
+        // map->castRays(img, rc, glfwGetTime);
+        window->state.currentlyRendering = true;
+        std::thread cast(&WorldMap::castRays, map, img, rc, glfwGetTime);
+        cast.detach(); // Keep running when this loop finishes and cast goes out of scope
+        /*cast.join();
+        window->state.lastRenderTime = map->lastRenderTime;
+        window->state.lastRenderW = window->state.w;
+        window->state.lastRenderH = window->state.h;*/
+#ifndef FRAMETIME
+    } else if (!map->currentlyRendering) {
+        window->state.currentlyRendering = false;
+        window->state.lastRenderTime = map->lastRenderTime;
         window->state.lastRenderW = window->state.w;
         window->state.lastRenderH = window->state.h;
-#ifndef FRAMETIME
+    } else {
+        window->state.lastRenderTime = glfwGetTime() - map->lastRenderTime;
     }
+
 #endif
     return img;
 }
