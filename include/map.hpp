@@ -5,6 +5,7 @@
 #include "shape.hpp"
 #include "cam.hpp"
 #include "img.hpp"
+#include "mat.hpp"
 #include "hierarchy.hpp"
 
 struct RenderConfig {
@@ -48,7 +49,7 @@ class WorldMap {
         float w, h, d;
         float baseBrightness, globalShininess;
         void loadFile(char const* path);
-        int loadObjFile(char const* path);
+        int loadObjFile(char const* path, Mat4 transform = mat44Identity);
         void optimizeMap(int level = 1, int splitterIndex = 1);
         int optimizeLevel;
         int splitterIndex;

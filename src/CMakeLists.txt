@@ -30,7 +30,7 @@ target_link_libraries(hierarchy PRIVATE vec)
 add_library(map STATIC map.cpp ${HEADER_LIST})
 set_target_properties(map PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(map PUBLIC ../include)
-target_link_libraries(map PUBLIC shape cam img hierarchy)
+target_link_libraries(map PUBLIC shape cam img hierarchy vec)
 target_link_libraries(map PRIVATE util ray)
 
 add_library(img STATIC img.cpp ${HEADER_LIST})

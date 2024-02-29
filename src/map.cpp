@@ -2,6 +2,7 @@
 
 #include "util.hpp"
 #include "ray.hpp"
+#include "mat.hpp"
 #include "hierarchy.hpp"
 #include <cmath>
 #include <fstream>
@@ -408,6 +409,9 @@ namespace {
     const char* w_pointLight = "plight";
     const char* w_shininess = "shininess";
     const char* w_include = "include";
+    const char* w_translate = "translate";
+    const char* w_rotate = "rotate";
+    const char* w_scale = "scale";
     const char* w_comment = "//";
     const char* w_container = "container";
     const char* w_a = "a";
@@ -489,7 +493,7 @@ void WorldMap::loadFile(char const* path) {
     std::printf("Allocations: %d\n", loadObjFile(path));
 }
 
-int WorldMap::loadObjFile(const char* path) {
+int WorldMap::loadObjFile(const char* path, Mat4 transform) {
     std::ifstream in(path);
     std::string line;
     Container *c = NULL;
@@ -558,6 +562,10 @@ int WorldMap::loadObjFile(const char* path) {
                     c->d.z = std::stof(token);
                 }
             }
+            c->a = c->a * transform;
+            c->b = c->b * transform;
+            c->c = c->c * transform;
+            c->a = c->d * transform;
             lstream >> token;
             if (token == w_open) {
             } else {
@@ -569,31 +577,69 @@ int WorldMap::loadObjFile(const char* path) {
             c = NULL;
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
+                Shape *sphere = decodeSphere(line);
+                sphere->s->center = sphere->s->center * transform;
                 if (c == NULL) {
-                    appendToContainer(&unoptimizedObj, decodeSphere(line));
+                    appendToContainer(&unoptimizedObj, sphere);
                 } else {
-                    appendToContainer(c, decodeSphere(line));
+                    appendToContainer(c, sphere);
                 }
                 allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
+                Shape *triangle = decodeTriangle(line);
+                // std::printf("before %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);
+                triangle->t->a = triangle->t->a * transform;
+                // std::printf("after %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);
+                triangle->t->b = triangle->t->b * transform;
+                triangle->t->c = triangle->t->c * transform;
                 if (c == NULL) {
-                    appendToContainer(&unoptimizedObj, decodeTriangle(line));
+                    appendToContainer(&unoptimizedObj, triangle);
                 } else {
-                    appendToContainer(c, decodeTriangle(line));
+                    appendToContainer(c, triangle);
                 }
                 allocCounter += 2; // One for triangle, one for shape container
             }
         } else if (token == w_pointLight) {
-            pointLights.emplace_back(decodePointLight(line));
+            PointLight pl = decodePointLight(line);
+            pl.center = pl.center * transform;
+            pointLights.emplace_back(pl);
         } else if (token == w_comment) {
             continue;
         } else if (token == w_include) {
             lstream >> token;
             std::filesystem::path base = std::filesystem::path(path).parent_path();
-            
+           
             std::filesystem::path inc(token);
             std::filesystem::path eval = base / inc;
-            loadObjFile(eval.c_str());
+
+            Mat4 trans = mat44Identity;
+            for (int j = 0; j < 3; j++) {
+                lstream >> token;
+                if (token == w_translate) {
+                    Vec3 transl = {0.f, 0.f, 0.f};
+                    lstream >> token;
+                    transl.x = std::stof(token);
+                    lstream >> token;
+                    transl.y = std::stof(token);
+                    lstream >> token;
+                    transl.z = std::stof(token);
+                    trans = trans * translateMat(transl);
+                } else if (token == w_rotate) {
+                    lstream >> token;
+                    trans = trans * rotateX(std::stof(token));
+                    lstream >> token;
+                    trans = trans * rotateY(std::stof(token));
+                    lstream >> token;
+                    trans = trans * rotateZ(std::stof(token));
+                } else if (token == w_scale) {
+                    lstream >> token;
+                    trans = trans * scale(std::stof(token));
+                } else {
+                    lstream << " " << token;
+                    break;
+                }
+            }
+            loadObjFile(eval.c_str(), trans);
         }
     }
     return allocCounter;
