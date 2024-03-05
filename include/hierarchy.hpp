@@ -19,4 +19,7 @@ float shapeSA(Shape *sh);
 void containerCube(Container *c, Vec3 color);
 void containerSphereCorners(Container *c, Vec3 color);
 
+Container* splitVoxels(Container *o, int subdivision);
+void getVoxelIndex(Container *c, int subdivision, Vec3 p, Vec3 delta, int *x, int *y, int *z, float *t);
+
 #endif

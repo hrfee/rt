@@ -71,6 +71,8 @@ class WorldMap {
         void castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
         void castSubRays(Image *img, RenderConfig *rc, int w0, int w1);
         void ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
+        void traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
+        void voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
         void castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res);
         void castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount = 0);

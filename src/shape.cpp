@@ -293,6 +293,7 @@ Container *emptyContainer(bool plane) {
     c->c = {0, 0, 0};
     c->d = {0, 0, 0};
     c->plane = plane;
+    c->voxelSubdiv = 0;
     c->start = NULL;
     c->end = NULL;
     c->size = 0;
@@ -343,6 +344,8 @@ int clearContainer(Container *c, bool clearChildShapes) {
     Bound *bo = c->start;
     Bound *end = NULL;
     if (c->end != NULL) end = c->end->next;
+    int boundCounter = 0;
+    int boundLimit = c->voxelSubdiv*c->voxelSubdiv*c->voxelSubdiv;
     while (bo != end) {
         Shape *current = bo->s;
         if (clearChildShapes || current->debug) {
@@ -366,8 +369,18 @@ int clearContainer(Container *c, bool clearChildShapes) {
             freeCounter++;
         }
         Bound *next = bo->next;
-        free(bo);
+        if (c->voxelSubdiv != 0) {
+            next = bo + 1;
+            boundCounter++;
+            if (boundCounter >= boundLimit) next = NULL;
+        } else {
+            free(bo);
+        }
         bo = next;
+    }
+    // Voxel containers have their "start" set to a voxelSubdiv^3 size array.
+    if (c->voxelSubdiv != 0) {
+        free(c->start);
     }
     c->size = 0;
     c->start = NULL;

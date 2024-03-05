@@ -250,7 +250,117 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
     }
 }
 
-void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
+void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
+    delta = norm(delta);
+    int origin[3];
+    int subdivision = optimizeLevel;
+    Vec3 dims = {c->b.x-c->a.x, c->b.y-c->a.y, c->b.z-c->a.z};
+    Vec3 vox = dims / subdivision;
+    float t = 0;
+    getVoxelIndex(c, subdivision, p0, delta, &origin[0], &origin[1], &origin[2], &t);
+    if (origin[0] < 0 || origin[1] < 0 || origin[2] < 0 || origin[0] > subdivision || origin[1] > subdivision || origin[2] > subdivision) return;
+    // res->collisions = 1;
+    // res->color = {(o[0]/subdivision), (o[1]/subdivision), (o[2]/subdivision)};
+    // FIXME: Check if anythings in this bound, if not, "increment" to next (see paper)
+    int step[3] = {
+        delta.x > 0 ? 1 : -1,
+        delta.y > 0 ? 1 : -1,
+        delta.z > 0 ? 1 : -1
+    };
+    float deltaA[3] = {delta.x, delta.y, delta.z};
+    float tMax[3] = {t, t, t};
+    
+    Bound *o = c->start + origin[0] + subdivision * (origin[1] + subdivision * origin[2]);
+
+    float oMin[3] = {o->min.x, o->min.y, o->min.z};
+    float oMax[3] = {o->max.x, o->max.y, o->max.z};
+
+    float pos[3] = {p0.x + (t*delta.x), p0.y + (t*delta.y), p0.z + (t*delta.z)};
+    for (int i = 0; i < 3; i++) {
+        float boundary = (step[i] == 1) ? oMax[i] : oMin[i];
+        tMax[i] += (boundary - pos[i]) / deltaA[i];
+    }
+
+    float tDelta[3] = {vox.x / delta.x, vox.y / delta.y, vox.z / delta.z};
+
+    while (o != NULL) {
+        // std::printf("skipped to %d, %d, %d\n", origin[0], origin[1], origin[2]);
+        // std::printf("ptr %p\n", o);
+        /* Shape *sh = o->s;
+        Bound *bo = sh->c->start;
+        Bound *end = NULL;
+        if (sh->c->end != NULL) end = sh->c->end->next;
+        while (bo != end) {
+            Shape *current = bo->s;
+            if (current->debug && !(rc->showDebugObjects)) {
+                bo = bo->next;
+                continue;
+            }
+            if (current->s != NULL && rc->spheres) {
+                float t = meetsSphere(p0, delta, current->s, NULL);
+                if (t >= 0) {
+                    res->collisions++;
+                    res->potentialCollisions++;
+                    if (t < res->t) {
+                        res->obj = current;
+                        res->t = t;
+                        res->p0 = p0 + (res->t * delta);
+                        res->normal = res->p0 - current->s->center;
+                        res->norm = norm(res->normal);
+                    }
+                }
+            } else if (current->t != NULL && rc->triangles) {
+                Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
+                Vec3 nNormal = norm(normal);
+                float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
+                if (t >= 0) {
+                    res->potentialCollisions++;
+                    if (t < res->t) {
+                        Vec3 cPoint = p0 + (t * delta);
+                        if (meetsTriangle(nNormal, cPoint, current->t)) {
+                            res->collisions++;
+                            res->obj = current;
+                            res->t = t;
+                            res->p0 = cPoint;
+                            res->normal = normal;
+                            res->norm = nNormal;
+                        } else {
+                            res->potentialCollisions--;
+                        }
+                    }
+                }
+            }
+            bo = bo->next;
+        }*/
+        traversalRay(res, o->s->c, p0, delta, rc);
+        /*if (res->collisions > 0 && res->obj != NULL) { // && res->obj->opacity == 1.f) { might be useful for transparency
+            break;
+        }*/
+        // "Increment" the voxel
+        if (tMax[0] < tMax[1] && tMax[0] < tMax[2]) {
+            origin[0] += step[0];
+            if (origin[0] < 0 || origin[0] >= subdivision) {
+                break;
+            }
+            tMax[0] += tDelta[0];
+        } else if (tMax[1] < tMax[0] && tMax[1] < tMax[2]) {
+            origin[1] += step[1];
+            if (origin[1] < 0 || origin[1] >= subdivision) {
+                break;
+            }
+            tMax[1] += tDelta[1];
+        } else {
+            origin[2] += step[2];
+            if (origin[2] < 0 || origin[2] >= subdivision) {
+                break;
+            }
+            tMax[2] += tDelta[2];
+        }
+        o = c->start + origin[0] + subdivision * (origin[1] + subdivision * origin[2]);
+    }
+}
+
+void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
     Bound *bo = c->start;
     while (bo != c->end->next) {
         Shape *current = bo->s;
@@ -322,6 +432,14 @@ void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConf
             }
         }
         bo = bo->next;
+    }
+}
+
+void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
+    if (splitterIndex == 2) {
+        voxelRay(res, c, p0, delta, rc);
+    } else {
+        traversalRay(res, c, p0, delta, rc);
     }
 }
 
@@ -476,6 +594,9 @@ void WorldMap::optimizeMap(int level, int splitterIndex) {
             break;
         case 1:
             optimizedObj = splitBVH(flatObj, splitSAH, level);
+            break;
+        case 2:
+            optimizedObj = splitVoxels(flatObj, level);
             break;
     }
     optimizeLevel = level;

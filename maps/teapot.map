@@ -1,0 +1,6 @@
+map dimensions 50 50 50 brightness 0.3 shininess 5
+
+plight center 0 4.9 0 color #ffffff brightness 10 specular 0.2 color #ffffff
+plight center 5 2 1 color #ffffff brightness 1.0 specular 0.2 color #ffffff
+
+include teapot.obj translate 2 0 2 rotate 0 0.785398 0 scale .5

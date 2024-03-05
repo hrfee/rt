@@ -233,7 +233,7 @@ std::string GLWindow::frameInfo() {
 
 namespace {
     const char *modes[] = {"Raycasting", "Raycasting w/ Reflections", "Basic Lighting"};
-    const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)"};
+    const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel"};
 }
 
 void GLWindow::showUI() {

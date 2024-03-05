@@ -25,7 +25,7 @@ add_library(hierarchy STATIC hierarchy.cpp ${HEADER_LIST})
 set_target_properties(hierarchy PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(hierarchy PUBLIC ../include)
 target_link_libraries(hierarchy PUBLIC shape)
-target_link_libraries(hierarchy PRIVATE vec)
+target_link_libraries(hierarchy PRIVATE vec ray)
 
 add_library(map STATIC map.cpp ${HEADER_LIST})
 set_target_properties(map PROPERTIES LINKER_LANGUAGE CXX)

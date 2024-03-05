@@ -43,6 +43,7 @@ struct Container {
     Bound *end;
     bool plane;
     int splitAxis;
+    bool voxelSubdiv;
     int size;
 };
 

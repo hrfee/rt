@@ -60,7 +60,7 @@ bool pointInTriangle(Vec2 p, Vec2 a, Vec2 b, Vec2 c) {
 
 // Finds the normal of a triangle (abc) that points towards given vector p0
 Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
-    Vec3 norms[2] = {cross(a - c, b - c), cross(c - a, b - a)};
+    /* Vec3 norms[2] = {cross(a - c, b - c), cross(c - a, b - a)};
     float components[2] = {0, 0};
     for (int i = 0; i < 2; i++) {
         // Roughly computing component of each normal along vector v0,
@@ -70,7 +70,10 @@ Vec3 getVisibleTriNormal(Vec3 v0, Vec3 a, Vec3 b, Vec3 c) {
     }
     if (components[0] <= components[1])
         return norms[0];
-    return norms[1];
+    return norms[1]; */
+    Vec3 norm = cross(c-a, b-a);
+    if (dot(norm, v0) <= 0.f) return norm;
+    else return cross(a-c, b-c);
 }
 
 float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere, float *t1) {
@@ -190,25 +193,51 @@ Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir) {
 }*/
 
 bool meetsAABB(Vec3 p0, Vec3 delta, Container *container) {
-    float p[3] = {p0.x, p0.y, p0.z};
-    float d[3] = {delta.x, delta.y, delta.z};
-    float min[3] = {container->a.x, container->a.y, container->a.z};
-    float max[3] = {container->b.x, container->b.y, container->b.z};
-    float tmin = -9999.f;
-    float tmax = 9999.f;
-    for (int i = 0; i < 3;  i++) {
-        float t0 = (min[i] - p[i]) / d[i];
-        float t1 = (max[i] - p[i]) / d[i];
-        if (d[i] < 0.f) {
-            float t_ = t0;
-            t0 = t1;
-            t1 = t_;
-        }
+    return meetAABB(p0, delta, container->a, container->b) < -9990.f ? false : true;
+}
 
-        tmin = t0 > tmin ? t0 : tmin;
-        tmax = t1 < tmax ? t1 : tmax;
+float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
+    // float p[3] = {p0.x, p0.y, p0.z};
+    // float d[3] = {delta.x, delta.y, delta.z};
+    // float min[3] = {a.x, a.y, a.z};
+    // float max[3] = {b.x, b.y, b.z};
+    // float tmin = -9999.f;
+    // float tmax = 9999.f;
+    // for (int i = 0; i < 3;  i++) {
+    //     float divisor = 1.f / d[i];
+    //     float t0 = (min[i] - p[i]) * divisor;
+    //     float t1 = (max[i] - p[i]) * divisor;
+    //     /*if (d[i] < 0.f) {
+    //         float t_ = t0;
+    //         t0 = t1;
+    //         t1 = t_;
+    //     }*/
 
-        if (tmax <= tmin) return false;
-    }
-    return true;
+    //     tmin = std::max(tmin, std::min(t0, t1));
+    //     tmax = std::min(tmax, std::max(t0, t1));
+    //     /*tmin = t0 > tmin ? t0 : tmin;
+    //     tmax = t1 < tmax ? t1 : tmax;*/
+
+    //     if (tmax <= tmin) return -1.f;
+    // }
+    // // tmax > 0 to ensure we're in the right direction
+    // if (tmax > tmin && tmax > 0) {
+    //     return tmin;
+    // }
+    // return -1.f;
+    Vec3 d = {1.f/delta.x, 1.f/delta.y, 1.f/delta.z};
+    float t[6] = {
+        (a.x - p0.x)*d.x,
+        (b.x - p0.x)*d.x,
+        (a.y - p0.y)*d.y,
+        (b.y - p0.y)*d.y,
+        (a.z - p0.z)*d.z,
+        (b.z - p0.z)*d.z,
+    };
+    float tmin = std::max(std::max(std::min(t[0], t[1]), std::min(t[2], t[3])), std::min(t[4], t[5]));
+    float tmax = std::min(std::min(std::max(t[0], t[1]), std::max(t[2], t[3])), std::max(t[4], t[5]));
+
+    if (tmax < 0) return -9999.f;
+    if (tmin > tmax) return -9998.f;
+    return tmin;
 }

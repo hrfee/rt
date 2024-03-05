@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "shape.hpp"
 #include "vec.hpp"
+#include "ray.hpp"
 
 bool sortByX(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
@@ -345,6 +346,90 @@ float splitEqually(Container *o, Container *a, Container *b, Vec3 minCorner, Vec
     return spl[bestAxis];
 }
 
+void getVoxelIndex(Container *c, int subdivision, Vec3 p, Vec3 delta, int *x, int *y, int *z, float *t) {
+    Vec3 dims = {c->b.x-c->a.x, c->b.y-c->a.y, c->b.z-c->a.z};
+    Vec3 vox = dims / subdivision;
+    // std::printf("got vox(%f %f %f\n", vox.x, vox.y, vox.z);
+    Vec3 ap = (p - c->a);
+    if (!(ap.x < 0 || ap.x > dims.x || ap.y < 0 || ap.y > dims.y || ap.z < 0 || ap.z > dims.z)) {
+        Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
+        *x = apVox.x;
+        *y = apVox.y;
+        *z = apVox.z;
+        return;
+    }
+    *t = meetAABB(ap, delta, {0.f, 0.f, 0.f}, dims);
+    if (*t < -9990.f) {
+        *x = -1;
+        *y = -1;
+        *z = -1;
+        return;
+    }
+    ap = p + (*t * delta) - c->a;
+    Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
+    // std::printf("got t=%f, %f %f %f\n", t, apVox.x, apVox.y, apVox.z);
+    *x = apVox.x;
+    *y = apVox.y;
+    *z = apVox.z;
+}
+
+// Split container into subcontainer "voxel" grid of dimensions subdivision^3.
+// "start"/"end" is a pointer to start of a subdivision^3 array.
+Container* splitVoxels(Container *o, int subdivision) {
+    Container *out = emptyContainer();
+    out->a = {9999, 9999, 9999};
+    out->b = {-9999, -9999, -9999};
+    out->voxelSubdiv = subdivision;
+    determineBounds(o, &(out->a), &(out->b));
+    Vec3 dims = {out->b.x-out->a.x, out->b.y-out->a.y, out->b.z-out->a.z};
+    Vec3 vox = dims / subdivision;
+    std::printf("global dim(%f %f %f), vox(%f %f %f)\n", dims.x, dims.y, dims.z, vox.x, vox.y, vox.z);
+    size_t totalSize = subdivision*subdivision*subdivision;
+    out->size = totalSize;
+    Bound *grid = (Bound*)malloc(sizeof(Bound)*totalSize);
+    std::memset(grid, 0, sizeof(Bound)*totalSize);
+    appendToContainer(out, grid);
+    for (int z = 0; z < subdivision; z++) {
+        for (int y = 0; y < subdivision; y++) { 
+            for (int x = 0; x < subdivision; x++) { 
+                Bound *b = grid + x + subdivision * (y + subdivision * z);
+                b->s = emptyShape();
+                b->s->c = emptyContainer();
+                Container *c = b->s->c;
+                c->a = {vox.x * x, vox.y * y, vox.z * z};
+                c->b = c->a + vox;
+                b->min = c->a;
+                b->max = c->b;
+                float min[3] = {c->a.x, c->a.y, c->a.z};
+                float max[3] = {c->b.x, c->b.y, c->b.z};
+                c->splitAxis = -1;
+                Bound *bo = o->start;
+                while (bo != o->end->next) {
+                    float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
+                    float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
+                    bool added = true;
+                    for (int d = 0; d < 3; d++) {
+                        if (!(
+                            ((bmin[d] >= min[d]) || (bmax[d] >= min[d])) &&
+                            ((bmin[d] <= max[d]) || (bmax[d] <= max[d]))
+                           )) {
+                            added = false;
+                            break;
+                        }
+                    }
+                    if (added) {
+                        appendToContainer(c, *bo); // Make copy of bound rather than appending pointer
+                    }
+                    bo = bo->next;
+                }
+                containerCube(c, {1.f, 1.f, 1.f});
+            }
+        }
+    }
+    return out;
+}
+
+
 Container* splitBVH(Container *o, bvhSplitter split, int splitLimit, int splitCount, int lastAxis, int colorIndex) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
@@ -398,7 +483,7 @@ Container* splitBVH(Container *o, bvhSplitter split, int splitLimit, int splitCo
             }
             // DEBUG SPHERES
             // containerSphereCorners(c);
-            containerCube(c, distinctColors[colorIndex]);
+            containerCube(c, distinctColors[colorIndex % 16]);
             colorIndex++;
             
             sections[i]->c = c;
@@ -456,7 +541,7 @@ void containerCube(Container *c, Vec3 color) {
     color.x = 0.5f + (float(std::rand() % 500) / 500.f);
     color.y = 0.5f + (float(std::rand() % 500) / 500.f);
     color.z = 0.5f + (float(std::rand() % 500) / 500.f); */
-    float width = 0.2f;
+    float width = 0.08f;
     float pts[2][3] = {{c->a.x, c->a.y, c->a.z}, {c->b.x, c->b.y, c->b.z}};
     Vec3 vtx[8];
     int idx = 0;

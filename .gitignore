@@ -10,3 +10,5 @@ Makefile
 **/Makefile
 *.make
 .cache/
+perf.data
+perf.data*
