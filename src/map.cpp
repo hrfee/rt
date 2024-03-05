@@ -382,6 +382,9 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                 }
             }
         } else if (current->t != NULL && rc->triangles) {
+            if (current->color.x == 1.f && current->color.y == 1.f && current->color.z == 1.f) {
+                std::printf("white tested!\n");
+            }
             Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
             Vec3 nNormal = norm(normal);
             float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
@@ -472,7 +475,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         res->color = ((1.f - res->obj->reflectiveness)*res->color);
     }
 
-    if (rc->lighting && res->obj->reflectiveness != 0) {
+    if (rc->lighting) {//  && res->obj->reflectiveness != 0) {
         castShadowRays(-1.f*delta, p0PlusABit, rc, res);
     }
 
@@ -590,10 +593,10 @@ void WorldMap::optimizeMap(int level, int splitterIndex) {
     }
     switch (splitterIndex) {
         case 0:
-            optimizedObj = splitBVH(flatObj, splitEqually, level);
+            optimizedObj = splitKdBvhHybrid(flatObj, splitEqually, bvh, level);
             break;
         case 1:
-            optimizedObj = splitBVH(flatObj, splitSAH, level);
+            optimizedObj = splitKdBvhHybrid(flatObj, splitSAH, bvh, level);
             break;
         case 2:
             optimizedObj = splitVoxels(flatObj, level);
@@ -780,6 +783,7 @@ void flattenRootContainer(Container *dst, Container *src) {
             if (current->s != NULL) {
                 b->min = current->s->center - current->s->radius;
                 b->max = current->s->center + current->s->radius;
+                b->centroid = current->s->center;
                 Sphere *s = (Sphere*)alloc(sizeof(Sphere));
                 std::memcpy(s, current->s, sizeof(Sphere));
                 b->s->s = s;
@@ -793,6 +797,7 @@ void flattenRootContainer(Container *dst, Container *src) {
                 maxPerComponent(&(b->max), current->t->b);
                 minPerComponent(&(b->min), current->t->c);
                 maxPerComponent(&(b->max), current->t->c);
+                b->centroid = 0.333f * (current->t->a + current->t->b + current->t->c);
                 Triangle *t = (Triangle*)alloc(sizeof(Triangle));
                 std::memcpy(t, current->t, sizeof(Triangle));
                 b->s->t = t;

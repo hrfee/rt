@@ -155,6 +155,7 @@ void GLWindow::loadUI() {
     state.rc.showDebugObjects = false;
     state.hierarchyDepth = 1;
     state.hierarchySplitterIndex = 1; // SAH
+    state.useBVH = false;
     state.renderOptimizedHierarchy = false;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -265,8 +266,9 @@ void GLWindow::showUI() {
         state.rc.renderNow = ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount);
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
         
-        state.rc.renderNow = ImGui::Checkbox("Use/Generate BVH hierarchy", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
         if (state.useOptimizedMap) {
+            state.rc.renderNow = ImGui::Checkbox("Use proper BVH", &(state.useBVH)) ? true : state.rc.renderNow;
             state.rc.renderNow = ImGui::SliderInt("Hierarchy depth", &(state.hierarchyDepth), 1, 100);
             state.rc.renderNow = ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
             ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));

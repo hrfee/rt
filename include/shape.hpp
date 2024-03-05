@@ -24,7 +24,7 @@ struct Shape {
 };
 
 struct Bound {
-    Vec3 min, max; // Bounding box
+    Vec3 min, max, centroid; // Bounding box
     Shape *s;
     Bound *next;
 };

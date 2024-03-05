@@ -53,6 +53,7 @@ class WorldMap {
         void optimizeMap(int level = 1, int splitterIndex = 1);
         int optimizeLevel;
         int splitterIndex;
+        bool bvh;
         std::vector<PointLight> pointLights;
         Container unoptimizedObj;
         Container *obj;
