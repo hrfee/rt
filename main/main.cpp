@@ -37,6 +37,11 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.reloadMap = false;
         window->state.useOptimizedMap = false;
         change = true;
+        window->state.camPresets = &(map->camPresets);
+        if (map->camPresetNames != NULL && map->camPresets.size() != 0) {
+            window->state.camPresetNames = map->camPresetNames;
+            window->state.camPresetCount = map->camPresets.size();
+        }
     }
 
     if (window->state.useOptimizedMap) {
@@ -182,6 +187,11 @@ int main(int argc, char **argv) {
     window = new GLWindow(windowWidth, windowHeight, windowScaleFactor, WINDOW_TITLE);
     map = new WorldMap(mapPath.c_str());
     window->state.mapPath = mapPath.c_str();
+    if (map->camPresetNames != NULL) {
+        window->state.camPresets = &(map->camPresets);
+        window->state.camPresetNames = map->camPresetNames;
+        window->state.camPresetCount = map->camPresets.size();
+    }
 
     // map->o = splitKD(&(map->o), 10);
 

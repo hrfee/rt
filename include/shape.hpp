@@ -67,6 +67,13 @@ struct PointLight {
     Vec3 specularColor;
 };
 
+struct CamPreset {
+    std::string name;
+    float phi, theta;
+    Vec3 pos;
+    float fov;
+};
+
 std::string encodePointLight(PointLight *p);
 
 PointLight decodePointLight(std::string in);
@@ -100,5 +107,8 @@ void appendToContainer(Container *cParent, Container *c);
 Bound *boundByIndex(Container *c, int i);
 
 int clearContainer(Container *c, bool clearChildShapes = true);
+
+CamPreset decodeCamPreset(std::string in);
+std::string encodeCamPreset(CamPreset *p);
 
 #endif

@@ -34,6 +34,10 @@ struct GLWindowState {
     bool staleHierarchyConfig;
     int threadCount;
     int maxThreadCount;
+    std::vector<CamPreset> *camPresets;
+    const char** camPresetNames;
+    int camPresetIndex;
+    int camPresetCount;
     struct Mouse {
         bool enabled;
         float sensitivity;

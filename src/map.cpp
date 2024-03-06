@@ -1,5 +1,6 @@
 #include "map.hpp"
 
+#include "shape.hpp"
 #include "util.hpp"
 #include "ray.hpp"
 #include "mat.hpp"
@@ -532,6 +533,7 @@ namespace {
     const char* w_scale = "scale";
     const char* w_comment = "//";
     const char* w_container = "container";
+    const char* w_campreset = "campreset";
     const char* w_a = "a";
     const char* w_b = "b";
     const char* w_c = "c";
@@ -571,10 +573,17 @@ void WorldMap::encode(char const* path) {
 }
 
 WorldMap::WorldMap(char const* path) {
+    optimizeLevel = 0;
+    splitterIndex = -1;
+    currentlyRendering = false;
+    lastRenderTime = 0.f;
     obj = &unoptimizedObj;
+    std::memset(&unoptimizedObj, 0, sizeof(Container));
     clearContainer(&unoptimizedObj, true);
+    flatObj = NULL;
     clearContainer(flatObj, true);
     optimizedObj = NULL;
+    camPresetNames = NULL;
     loadFile(path);
 }
 
@@ -610,6 +619,8 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIndex
 void WorldMap::loadFile(char const* path) {
     std::printf("Frees: %d\n", clearContainer(&unoptimizedObj, true));
     pointLights.clear();
+    camPresets.clear();
+    free(camPresetNames);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
     optimizedObj = NULL;
@@ -617,6 +628,10 @@ void WorldMap::loadFile(char const* path) {
     flatObj = NULL;
     obj = &unoptimizedObj;
     std::printf("Allocations: %d\n", loadObjFile(path));
+    camPresetNames = (const char**)malloc(sizeof(char*)*camPresets.size());
+    for (int i = 0; i < camPresets.size(); i++) {
+        camPresetNames[i] = camPresets.at(i).name.c_str();
+    }
 }
 
 int WorldMap::loadObjFile(const char* path, Mat4 transform) {
@@ -729,6 +744,9 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
             PointLight pl = decodePointLight(line);
             pl.center = pl.center * transform;
             pointLights.emplace_back(pl);
+        } else if (token == w_campreset) {
+            CamPreset cp = decodeCamPreset(line);
+            camPresets.emplace_back(cp);
         } else if (token == w_comment) {
             continue;
         } else if (token == w_include) {

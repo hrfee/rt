@@ -15,4 +15,6 @@ triangle a 50 -5 5.4 b -5 -5 5.5 c -5 15 5.3 color #ffffff reflectiveness 0.2
 plight center 0 4.9 0 color #ffffff brightness 10 specular 0.2 color #ffffff
 plight center 5 2 1 color #ffffff brightness 1.0 specular 0.2 color #ffffff
 
+campreset birds_eye pos -3.19468 2.41251 -13.4276 phi -1.08917 theta -0.0904921 fov 60
+
 include teapot.obj translate 2 0 2 rotate 0 0.785398 0 scale .5

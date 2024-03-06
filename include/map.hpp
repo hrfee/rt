@@ -42,7 +42,7 @@ struct RayResult {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0), splitterIndex(-1) { obj = &unoptimizedObj; };
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0), splitterIndex(-1), camPresetNames(NULL), currentlyRendering(false), lastRenderTime(0.f) { obj = &unoptimizedObj; };
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
@@ -55,6 +55,8 @@ class WorldMap {
         bool bvh;
         int splitterParam;
         std::vector<PointLight> pointLights;
+        std::vector<CamPreset> camPresets;
+        const char **camPresetNames;
         Container unoptimizedObj;
         Container *obj;
         Container *flatObj;

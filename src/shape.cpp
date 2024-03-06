@@ -22,6 +22,58 @@ namespace {
     const char* w_a = "a";
     const char* w_b = "b";
     const char* w_c = "c";
+    const char* w_campreset = "campreset";
+    const char* w_pos = "pos";
+    const char* w_phi = "phi";
+    const char* w_theta = "theta";
+    const char* w_fov = "fov";
+}
+
+std::string encodeCamPreset(CamPreset *p) {
+    std::ostringstream fmt;
+    fmt << w_campreset << " ";
+    fmt << p->name << " ";
+    fmt << w_pos << " ";
+    fmt << p->pos.x << " " << p->pos.y << " " << p->pos.z << " ";
+    fmt << w_phi << " ";
+    fmt << p->phi << " ";
+    fmt << w_theta << " ";
+    fmt << p->theta << " ";
+    fmt << w_fov << " ";
+    fmt << p->fov << " ";
+    fmt << std::endl;
+    return fmt.str();
+}
+
+CamPreset decodeCamPreset(std::string in) {
+    std::stringstream stream(in);
+    CamPreset p;
+    std::memset(&p, 0, sizeof(CamPreset));
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_campreset) {
+            stream >> w;
+            p.name = w;
+        } else if (w == w_pos) {
+            stream >> w;
+            p.pos.x = std::stof(w);
+            stream >> w;
+            p.pos.y = std::stof(w);
+            stream >> w;
+            p.pos.z = std::stof(w);
+        } else if (w == w_phi) {
+            stream >> w;
+            p.phi = std::stof(w);
+        } else if (w == w_theta) {
+            stream >> w;
+            p.theta = std::stof(w);
+        } else if (w == w_fov) {
+            stream >> w;
+            p.fov = std::stof(w);
+        }
+    } while (stream);
+    return p;
 }
 
 Shape *emptyShape() {

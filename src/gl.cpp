@@ -49,6 +49,11 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.scale = scale;
     state.prevScale = scale;
     state.reloadMap = false;
+    state.currentlyRendering = false;
+    state.lastRenderTime = 0.f;
+    state.camPresetNames = NULL;
+    state.camPresetCount = 0;
+    state.camPresetIndex = 0;
     title = windowTitle;
     int success = glfwInit();
     if (!success) {
@@ -325,8 +330,9 @@ void GLWindow::showUI() {
         ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.rc.renderOnChange ? 2.f : 10.f);
         ImGui::Text("Effective resolution: %dx%d", int(float(state.requestedFbW) * state.scale), int(float(state.requestedFbH) * state.scale));
         if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button("Render", ImVec2(120, 40));
-        if (state.lastRenderTime != 0.f)
+        if (state.lastRenderTime != 0.f) {
             ImGui::Text(frameInfo().c_str());
+        }
         
         ImGui::Text("Dump render to .tga file");
         ImGui::InputText(".tga path", &(state.filePath));
@@ -352,6 +358,25 @@ void GLWindow::showUI() {
         // ImGui::EndChild();
         ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
         state.rc.renderNow = ImGui::InputFloat3("Position", (float*)&(state.rc.manualPosition)) ? true : state.rc.renderNow;
+        if (state.camPresetNames != NULL && state.camPresetCount != 0) {
+            ImGui::Combo("Camera Preset", &(state.camPresetIndex), state.camPresetNames, state.camPresetCount);
+            if (ImGui::Button("Load preset") && state.camPresets != NULL) {
+                CamPreset p = state.camPresets->at(state.camPresetIndex);
+                state.mouse.phi = p.phi;
+                state.mouse.theta = p.theta;
+                state.fovDeg = p.fov;
+                state.rc.manualPosition = p.pos;
+            }
+        }
+        if (ImGui::Button("Dump cam preset to console")) {
+            CamPreset p;
+            p.name = "NAME_HERE";
+            p.pos = state.rc.manualPosition;
+            p.phi = state.mouse.phi;
+            p.theta = state.mouse.theta;
+            p.fov = state.fovDeg;
+            std::cout << encodeCamPreset(&p) << std::endl;
+        }
     }
     ImGui::End();
     showKeyboardHelp();
