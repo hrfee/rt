@@ -43,6 +43,14 @@ struct Vec3 {
     constexpr float const& operator() (std::size_t i) const noexcept {
         return i == 0 ? x : (i == 1 ? y : z);
     }
+
+    constexpr float& idx(std::size_t i) noexcept {
+        return i == 0 ? x : (i == 1 ? y : z);
+    }
+    
+    constexpr float const& idx(std::size_t i) const noexcept {
+        return i == 0 ? x : (i == 1 ? y : z);
+    }
 };
 
 constexpr

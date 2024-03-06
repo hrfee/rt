@@ -395,13 +395,9 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
 
                 // FIXME: Use vector indexing!
                 if (!bvh || i == 0) {
-                    if (bestAxis == 0) boundary->x = bbEdges[0];
-                    else if (bestAxis == 1) boundary->y = bbEdges[0];
-                    else boundary->z = bbEdges[0];
+                    boundary->idx(bestAxis) = bbEdges[0];
                 } else {
-                    if (bestAxis == 0) boundary->x = bbEdges[1];
-                    else if (bestAxis == 1) boundary->y = bbEdges[1];
-                    else boundary->z = bbEdges[1];
+                    boundary->idx(bestAxis) = bbEdges[1];
                 }
             }
             // DEBUG SPHERES
@@ -411,6 +407,8 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
             
             sections[i]->c = c;
             Bound bo;
+            bo.min = c->a;
+            bo.max = c->b;
             bo.s = sections[i];
             appendToContainer(out, bo);
         }
