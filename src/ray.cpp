@@ -197,45 +197,23 @@ bool meetsAABB(Vec3 p0, Vec3 delta, Container *container) {
 }
 
 float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
-    // float p[3] = {p0.x, p0.y, p0.z};
-    // float d[3] = {delta.x, delta.y, delta.z};
-    // float min[3] = {a.x, a.y, a.z};
-    // float max[3] = {b.x, b.y, b.z};
-    // float tmin = -9999.f;
-    // float tmax = 9999.f;
-    // for (int i = 0; i < 3;  i++) {
-    //     float divisor = 1.f / d[i];
-    //     float t0 = (min[i] - p[i]) * divisor;
-    //     float t1 = (max[i] - p[i]) * divisor;
-    //     /*if (d[i] < 0.f) {
-    //         float t_ = t0;
-    //         t0 = t1;
-    //         t1 = t_;
-    //     }*/
-
-    //     tmin = std::max(tmin, std::min(t0, t1));
-    //     tmax = std::min(tmax, std::max(t0, t1));
-    //     /*tmin = t0 > tmin ? t0 : tmin;
-    //     tmax = t1 < tmax ? t1 : tmax;*/
-
-    //     if (tmax <= tmin) return -1.f;
-    // }
-    // // tmax > 0 to ensure we're in the right direction
-    // if (tmax > tmin && tmax > 0) {
-    //     return tmin;
-    // }
-    // return -1.f;
+    // Based on the "slab method".
+    // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
+    // then select the largest distance to one of the nearer faces, and the shortest distance to one of the furthest faces.
+    // If the latter is negative, we're looking in the wrong direction.
+    // Where the ray actually intersects the AABB, the latter (furthest) should be greater than the former (nearest).
+    // and therefore if a nearer face appears to be closer than a farther face, we do not intersect.
+    
+    // Pre-divide, since multiplication is faster and we have a loop
     Vec3 d = {1.f/delta.x, 1.f/delta.y, 1.f/delta.z};
-    float t[6] = {
-        (a.x - p0.x)*d.x,
-        (b.x - p0.x)*d.x,
-        (a.y - p0.y)*d.y,
-        (b.y - p0.y)*d.y,
-        (a.z - p0.z)*d.z,
-        (b.z - p0.z)*d.z,
-    };
-    float tmin = std::max(std::max(std::min(t[0], t[1]), std::min(t[2], t[3])), std::min(t[4], t[5]));
-    float tmax = std::min(std::min(std::max(t[0], t[1]), std::max(t[2], t[3])), std::max(t[4], t[5]));
+    float tmin = -9999.f;
+    float tmax = 9999.f;
+    for (int i = 0; i < 3; i++) {
+        float t0 = (a(i) - p0(i)) * d(i);
+        float t1 = (b(i) - p0(i)) * d(i);
+        tmin = std::max(tmin, std::min(t0, t1));
+        tmax = std::min(tmax, std::max(t0, t1));
+    }
 
     if (tmax < 0) return -9999.f;
     if (tmin > tmax) return -9998.f;
