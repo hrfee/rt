@@ -6,7 +6,6 @@
 #include "cam.hpp"
 #include "img.hpp"
 #include "mat.hpp"
-#include "hierarchy.hpp"
 
 struct RenderConfig {
     bool renderOnChange;

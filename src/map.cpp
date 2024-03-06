@@ -382,9 +382,6 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                 }
             }
         } else if (current->t != NULL && rc->triangles) {
-            if (current->color.x == 1.f && current->color.y == 1.f && current->color.z == 1.f) {
-                std::printf("white tested!\n");
-            }
             Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
             Vec3 nNormal = norm(normal);
             float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
@@ -593,10 +590,10 @@ void WorldMap::optimizeMap(int level, int splitterIndex) {
     }
     switch (splitterIndex) {
         case 0:
-            optimizedObj = splitKdBvhHybrid(flatObj, splitEqually, bvh, level);
+            optimizedObj = generateHierarchy(flatObj, splitEqually, bvh, level);
             break;
         case 1:
-            optimizedObj = splitKdBvhHybrid(flatObj, splitSAH, bvh, level);
+            optimizedObj = generateHierarchy(flatObj, splitSAH, bvh, level);
             break;
         case 2:
             optimizedObj = splitVoxels(flatObj, level);

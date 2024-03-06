@@ -162,8 +162,7 @@ int whichSideCentroid(float centroid, float a, float mid, float b) {
 // As discovered in review paper:
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
-float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 maxCorner, int *splitAxis, int lastAxis, float *bvhSpl2) {
-    bool bvh = bvhSpl2 != NULL;
+void splitSAH(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
@@ -174,10 +173,7 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
     // Assumed cost of traversing an interior node (C_i)
     float cTraverse = 1.f;
 
-    float min[3] = {minCorner.x, minCorner.y, minCorner.z};
-    float max[3] = {maxCorner.x, maxCorner.y, maxCorner.z};
-
-    float spl[3];
+    Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
     float bestCosts[3] = {9999, 9999, 9999};
@@ -187,9 +183,7 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
         Bound *bsplit = o->start;
         while (bsplit != o->end->next) {
             Vec3 split = bvh ? bsplit->centroid : bsplit->max;
-            if (i == 0) spl[i] = split.x;
-            else if (i == 1) spl[i] = split.y;
-            else if (i == 2) spl[i] = split.z;
+            spl(i) = split(i);
             float sa = 0.f;
             // index 0 = spheres, 1 = triangles
             float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
@@ -203,12 +197,9 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
                 // h++;
                 int side = -1;
                 if (bvh) {
-                    float bCentroid[3] = {bo->centroid.x, bo->centroid.y, bo->centroid.z};
-                    side = whichSideCentroid(bCentroid[i], min[i], spl[i], max[i]);
+                    side = whichSideCentroid(bo->centroid(i), o->a(i), spl(i), o->b(i));
                 } else {
-                    float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
-                    float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
-                    side = whichSide(bmin[i], bmax[i], min[i], spl[i], max[i]);
+                    side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
                 }
                 if (side == 0 || side == 2) {
                     sa0[shapeIndex] += s;
@@ -221,7 +212,6 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
                 bo = bo->next;
             }
             
-            // FIXME: Adapt to use sphere and triangle costs!
             float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]/sa) + h1[0]*(sa1[0]/sa))) + (cTri * (h0[1]*(sa0[1]/sa) + h1[1]*(sa1[1]/sa)));
             // std::printf("h0(%d), h1(%d), cost(%d): %f\n", h0[0] + h0[1], h1[0] + h1[1], splitIndex, cost);
             if (cost < bestCosts[i]) {
@@ -236,6 +226,7 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
     int bestAxis = 0;
     float bestCost = 9999.f;
     for (int i = 0; i < 3; i++) {
+        // Splitting on the same axis is fine since we have an actual heuristic.
         /* if (i == lastAxis) {
             continue;
         } */
@@ -248,61 +239,15 @@ float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 ma
     *splitAxis = bestAxis;
 
     Bound *splitOn = boundByIndex(o, bestIndices[bestAxis]);
-    Vec3 split = bvh ? splitOn->centroid : splitOn->max;
-    if (bestAxis == 0) spl[bestAxis] = split.x;
-    else if (bestAxis == 1) spl[bestAxis] = split.y;
-    else if (bestAxis == 2) spl[bestAxis] = split.z;
-
-    // If doing a BVH, this will store the actual edges of the volumes, since there isn't a shared "split" edge.
-    float bvhSplit[2] = {spl[bestAxis], spl[bestAxis]};
-    // std::printf("spl %f on index %d!\n", spl[bestAxis], bestIndices[bestAxis]);
-
-    Bound *bo = o->start;
-    while (bo != o->end->next) {
-        bool added = false;
-        int side = -1;
-        float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
-        float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
-        if (bvh) {
-            float bCentroid[3] = {bo->centroid.x, bo->centroid.y, bo->centroid.z};
-            side = whichSideCentroid(bCentroid[bestAxis], min[bestAxis], spl[bestAxis], max[bestAxis]);
-        } else {
-            side = whichSide(bmin[bestAxis], bmax[bestAxis], min[bestAxis], spl[bestAxis], max[bestAxis]);
-        }
-        if (side == 0 || side == 2) {
-            appendToContainer(a, *bo); // Make copy rather than appending existing pointer
-            added = true;
-            if (bvh) {
-                bvhSplit[0] = std::max(bvhSplit[0], bmax[bestAxis]);
-            }
-        }
-        if (side == 1 || side == 2) {
-            appendToContainer(b, *bo); // Make copy rather than appending existing pointer
-            added = true;
-            if (bvh) {
-                bvhSplit[1] = std::min(bvhSplit[1], bmin[bestAxis]);
-            }
-        }
-        if (!added) std::printf("skipped!\n");
-        bo = bo->next;
-    }
-    if (bvh) {
-        *bvhSpl2 = bvhSplit[1];
-        return bvhSplit[0];
-    } else {
-        return spl[bestAxis];
-    }
+    *split = (bvh ? splitOn->centroid : splitOn->max)(bestAxis);
 }
+
+// FIXME: Generally make use of the subscriptable Vec3s!
 
 // splitEqually: Heuristic find split that best divides the -number- of elements between the two children.
 // sets splitAxis to the axis split on, and returns the float value of where that occurs on that axis.
-float splitEqually(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 maxCorner, int *splitAxis, int lastAxis, float *bvhSpl2) {
-    return -1.f; // FIXME: Support proper BVH!
-
-    float min[3] = {minCorner.x, minCorner.y, minCorner.z};
-    float max[3] = {maxCorner.x, maxCorner.y, maxCorner.z};
-
-    float spl[3];
+void splitEqually(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis) {
+    Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
     int bestSizes[3] = {9999, 9999, 9999};
@@ -312,16 +257,16 @@ float splitEqually(Container *o, Container *a, Container *b, Vec3 minCorner, Vec
         int splitIndex = 0;
         Bound *bsplit = o->start;
         while (bsplit != o->end->next) {
-            Vec3 split = bsplit->max;
-            if (i == 0) spl[i] = split.x;
-            else if (i == 1) spl[i] = split.y;
-            else if (i == 2) spl[i] = split.z;
+            spl(i) = bsplit->max(i);
             int h0 = 0, h1 = 0;
             Bound *bo = o->start;
             while (bo != o->end->next) {
-                float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
-                float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
-                int side = whichSide(bmin[i], bmax[i], min[i], spl[i], max[i]);
+                int side = -1;
+                if (bvh) {
+                    side = whichSideCentroid(bo->centroid(i), o->a(i), spl(i), o->b(i));
+                } else {
+                    side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
+                }
                 if (side == 0 || side == 2) {
                     h0++;
                 }
@@ -345,10 +290,12 @@ float splitEqually(Container *o, Container *a, Container *b, Vec3 minCorner, Vec
             bsplit = bsplit->next;
         }
     }
+
     int bestAxis = 0;
     int bestSize = 9999;
     float bestRatio = -9999.f;
     for (int i = 0; i < 3; i++) {
+        // Don't split on the same axis as before, no real logic behind this but nor is there for this heuristic.
         if (i == lastAxis) {
             continue;
         }
@@ -360,121 +307,20 @@ float splitEqually(Container *o, Container *a, Container *b, Vec3 minCorner, Vec
 
     *splitAxis = bestAxis;
 
-    Vec3 split = boundByIndex(o, bestIndices[bestAxis])->max;
-    if (bestAxis == 0) spl[bestAxis] = split.x;
-    else if (bestAxis == 1) spl[bestAxis] = split.y;
-    else if (bestAxis == 2) spl[bestAxis] = split.z;
-    Bound *bo = o->start;
-    while (bo != o->end->next) {
-        float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
-        float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
-        bool added = false;
-        int side = whichSide(bmin[bestAxis], bmax[bestAxis], min[bestAxis], spl[bestAxis], max[bestAxis]);
-        if (side == 0 || side == 2) {
-            appendToContainer(a, *bo); // Make copy rather than appending existing pointer
-            added = true;
-        }
-        if (side == 1 || side == 2) {
-            appendToContainer(b, *bo); // Make copy rather than appending existing pointer
-            added = true;
-        }
-        if (!added) std::printf("skipped!\n");
-        bo = bo->next;
-    }
-    return spl[bestAxis];
-}
-
-void getVoxelIndex(Container *c, int subdivision, Vec3 p, Vec3 delta, int *x, int *y, int *z, float *t) {
-    Vec3 dims = {c->b.x-c->a.x, c->b.y-c->a.y, c->b.z-c->a.z};
-    Vec3 vox = dims / subdivision;
-    // std::printf("got vox(%f %f %f\n", vox.x, vox.y, vox.z);
-    Vec3 ap = (p - c->a);
-    if (!(ap.x < 0 || ap.x > dims.x || ap.y < 0 || ap.y > dims.y || ap.z < 0 || ap.z > dims.z)) {
-        Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
-        *x = apVox.x;
-        *y = apVox.y;
-        *z = apVox.z;
-        return;
-    }
-    *t = meetAABB(ap, delta, {0.f, 0.f, 0.f}, dims);
-    if (*t < -9990.f) {
-        *x = -1;
-        *y = -1;
-        *z = -1;
-        return;
-    }
-    ap = p + (*t * delta) - c->a;
-    Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
-    // std::printf("got t=%f, %f %f %f\n", t, apVox.x, apVox.y, apVox.z);
-    *x = apVox.x;
-    *y = apVox.y;
-    *z = apVox.z;
-}
-
-// Split container into subcontainer "voxel" grid of dimensions subdivision^3.
-// "start"/"end" is a pointer to start of a subdivision^3 array.
-Container* splitVoxels(Container *o, int subdivision) {
-    Container *out = emptyContainer();
-    out->a = {9999, 9999, 9999};
-    out->b = {-9999, -9999, -9999};
-    out->voxelSubdiv = subdivision;
-    determineBounds(o, &(out->a), &(out->b));
-    Vec3 dims = {out->b.x-out->a.x, out->b.y-out->a.y, out->b.z-out->a.z};
-    Vec3 vox = dims / subdivision;
-    std::printf("global dim(%f %f %f), vox(%f %f %f)\n", dims.x, dims.y, dims.z, vox.x, vox.y, vox.z);
-    size_t totalSize = subdivision*subdivision*subdivision;
-    out->size = totalSize;
-    Bound *grid = (Bound*)malloc(sizeof(Bound)*totalSize);
-    std::memset(grid, 0, sizeof(Bound)*totalSize);
-    appendToContainer(out, grid);
-    for (int z = 0; z < subdivision; z++) {
-        for (int y = 0; y < subdivision; y++) { 
-            for (int x = 0; x < subdivision; x++) { 
-                Bound *b = grid + x + subdivision * (y + subdivision * z);
-                b->s = emptyShape();
-                b->s->c = emptyContainer();
-                Container *c = b->s->c;
-                c->a = {vox.x * x, vox.y * y, vox.z * z};
-                c->b = c->a + vox;
-                b->min = c->a;
-                b->max = c->b;
-                float min[3] = {c->a.x, c->a.y, c->a.z};
-                float max[3] = {c->b.x, c->b.y, c->b.z};
-                c->splitAxis = -1;
-                Bound *bo = o->start;
-                while (bo != o->end->next) {
-                    float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
-                    float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
-                    bool added = true;
-                    for (int d = 0; d < 3; d++) {
-                        if (!(
-                            ((bmin[d] >= min[d]) || (bmax[d] >= min[d])) &&
-                            ((bmin[d] <= max[d]) || (bmax[d] <= max[d]))
-                           )) {
-                            added = false;
-                            break;
-                        }
-                    }
-                    if (added) {
-                        appendToContainer(c, *bo); // Make copy of bound rather than appending pointer
-                    }
-                    bo = bo->next;
-                }
-                containerCube(c, {1.f, 1.f, 1.f});
-            }
-        }
-    }
-    return out;
+    Bound *splitOn = boundByIndex(o, bestIndices[bestAxis]);
+    *split = (bvh ? splitOn->centroid : splitOn->max)(bestAxis);
 }
 
 
 // Not really either, as space is partitioned on a plane (like KD-trees), but splits are constrained to the boundaries of their contents, like BVHs.
-Container* splitKdBvhHybrid(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex) {
+Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
     out->a = {9999, 9999, 9999};
     out->b = {-9999, -9999, -9999};
     determineBounds(o, &(out->a), &(out->b));
+    o->a = out->a;
+    o->b = out->b;
     /*std::vector<Bound> v[3];
     v[0] = *o;
     v[1] = v[0];
@@ -492,9 +338,38 @@ Container* splitKdBvhHybrid(Container *o, bvhSplitter split, bool bvh, int split
 
     // SPLITTING ALGORITHM/HEURISTIC
     // float spl = splitEqually(o, containers[0], containers[1], out->a, out->b, &bestAxis, lastAxis);
-    float spl2 = -1.f;
-    float spl = split(o, containers[0], containers[1], out->a, out->b, &bestAxis, lastAxis, bvh ? &spl2 : NULL);
+    float splA = -1.f;
+    split(o, containers[0], containers[1], &splA, &bestAxis, bvh, lastAxis);
+    // If doing a BVH, this will soon store the actual edges of the volumes, since there isn't a shared "split" edge.
+    float bbEdges[2] = {splA, splA};
     // std::printf("got split axis %d, spl1 %f spl2 %f\n", bestAxis, spl, spl2);
+
+    Bound *bo = o->start;
+    while (bo != o->end->next) {
+        bool added = false;
+        int side = -1;
+        if (bvh) {
+            side = whichSideCentroid(bo->centroid(bestAxis), o->a(bestAxis), splA, o->b(bestAxis));
+        } else {
+            side = whichSide(bo->min(bestAxis), bo->max(bestAxis), o->a(bestAxis), splA, o->b(bestAxis));
+        }
+        if (side == 0 || side == 2) {
+            appendToContainer(containers[0], *bo); // Make copy rather than appending existing pointer
+            added = true;
+            if (bvh) {
+                bbEdges[0] = std::max(bbEdges[0], bo->max(bestAxis));
+            }
+        }
+        if (side == 1 || side == 2) {
+            appendToContainer(containers[1], *bo); // Make copy rather than appending existing pointer
+            added = true;
+            if (bvh) {
+                bbEdges[1] = std::min(bbEdges[1], bo->min(bestAxis));
+            }
+        }
+        if (!added) std::printf("skipped!\n");
+        bo = bo->next;
+    }
 
     Shape *sections[2] = {emptyShape(), emptyShape()};
    
@@ -505,7 +380,7 @@ Container* splitKdBvhHybrid(Container *o, bvhSplitter split, bool bvh, int split
             free(c);
 
         } else */if (c->size != 0) {
-            Container *splitAgain = splitKdBvhHybrid(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex);
+            Container *splitAgain = generateHierarchy(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex);
             colorIndex += (splitLimit - splitCount)*2;
             if (splitAgain != NULL) {
                 free(c);
@@ -518,14 +393,15 @@ Container* splitKdBvhHybrid(Container *o, bvhSplitter split, bool bvh, int split
                 Vec3 *boundary = &(c->b);
                 if (i == 1) boundary = &(c->a);
 
+                // FIXME: Use vector indexing!
                 if (!bvh || i == 0) {
-                    if (bestAxis == 0) boundary->x = spl;
-                    else if (bestAxis == 1) boundary->y = spl;
-                    else boundary->z = spl;
+                    if (bestAxis == 0) boundary->x = bbEdges[0];
+                    else if (bestAxis == 1) boundary->y = bbEdges[0];
+                    else boundary->z = bbEdges[0];
                 } else {
-                    if (bestAxis == 0) boundary->x = spl2;
-                    else if (bestAxis == 1) boundary->y = spl2;
-                    else boundary->z = spl2;
+                    if (bestAxis == 0) boundary->x = bbEdges[1];
+                    else if (bestAxis == 1) boundary->y = bbEdges[1];
+                    else boundary->z = bbEdges[1];
                 }
             }
             // DEBUG SPHERES
@@ -671,3 +547,89 @@ void containerSphereCorners(Container *c, Vec3 color) {
         appendToContainer(c, bo);
     }
 }
+
+// Unused/Broken Voxel stuff.
+
+void getVoxelIndex(Container *c, int subdivision, Vec3 p, Vec3 delta, int *x, int *y, int *z, float *t) {
+    Vec3 dims = {c->b.x-c->a.x, c->b.y-c->a.y, c->b.z-c->a.z};
+    Vec3 vox = dims / subdivision;
+    // std::printf("got vox(%f %f %f\n", vox.x, vox.y, vox.z);
+    Vec3 ap = (p - c->a);
+    if (!(ap.x < 0 || ap.x > dims.x || ap.y < 0 || ap.y > dims.y || ap.z < 0 || ap.z > dims.z)) {
+        Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
+        *x = apVox.x;
+        *y = apVox.y;
+        *z = apVox.z;
+        return;
+    }
+    *t = meetAABB(ap, delta, {0.f, 0.f, 0.f}, dims);
+    if (*t < -9990.f) {
+        *x = -1;
+        *y = -1;
+        *z = -1;
+        return;
+    }
+    ap = p + (*t * delta) - c->a;
+    Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
+    // std::printf("got t=%f, %f %f %f\n", t, apVox.x, apVox.y, apVox.z);
+    *x = apVox.x;
+    *y = apVox.y;
+    *z = apVox.z;
+}
+
+// Split container into subcontainer "voxel" grid of dimensions subdivision^3.
+// "start"/"end" is a pointer to start of a subdivision^3 array.
+Container* splitVoxels(Container *o, int subdivision) {
+    Container *out = emptyContainer();
+    out->a = {9999, 9999, 9999};
+    out->b = {-9999, -9999, -9999};
+    out->voxelSubdiv = subdivision;
+    determineBounds(o, &(out->a), &(out->b));
+    Vec3 dims = {out->b.x-out->a.x, out->b.y-out->a.y, out->b.z-out->a.z};
+    Vec3 vox = dims / subdivision;
+    std::printf("global dim(%f %f %f), vox(%f %f %f)\n", dims.x, dims.y, dims.z, vox.x, vox.y, vox.z);
+    size_t totalSize = subdivision*subdivision*subdivision;
+    out->size = totalSize;
+    Bound *grid = (Bound*)malloc(sizeof(Bound)*totalSize);
+    std::memset(grid, 0, sizeof(Bound)*totalSize);
+    appendToContainer(out, grid);
+    for (int z = 0; z < subdivision; z++) {
+        for (int y = 0; y < subdivision; y++) { 
+            for (int x = 0; x < subdivision; x++) { 
+                Bound *b = grid + x + subdivision * (y + subdivision * z);
+                b->s = emptyShape();
+                b->s->c = emptyContainer();
+                Container *c = b->s->c;
+                c->a = {vox.x * x, vox.y * y, vox.z * z};
+                c->b = c->a + vox;
+                b->min = c->a;
+                b->max = c->b;
+                float min[3] = {c->a.x, c->a.y, c->a.z};
+                float max[3] = {c->b.x, c->b.y, c->b.z};
+                c->splitAxis = -1;
+                Bound *bo = o->start;
+                while (bo != o->end->next) {
+                    float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
+                    float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
+                    bool added = true;
+                    for (int d = 0; d < 3; d++) {
+                        if (!(
+                            ((bmin[d] >= min[d]) || (bmax[d] >= min[d])) &&
+                            ((bmin[d] <= max[d]) || (bmax[d] <= max[d]))
+                           )) {
+                            added = false;
+                            break;
+                        }
+                    }
+                    if (added) {
+                        appendToContainer(c, *bo); // Make copy of bound rather than appending pointer
+                    }
+                    bo = bo->next;
+                }
+                containerCube(c, {1.f, 1.f, 1.f});
+            }
+        }
+    }
+    return out;
+}
+

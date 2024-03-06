@@ -5,12 +5,12 @@
 #include "vec.hpp"
 #include <vector>
 
-typedef float (&bvhSplitter)(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 maxCorner, int *splitAxis, int lastAxis, float* bvhSpl2);
+typedef void (&bvhSplitter)(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis);
 
-float splitSAH(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 maxCorner, int *splitAxis, int lastAxis, float *bvhSpl2);
-float splitEqually(Container *o, Container *a, Container *b, Vec3 minCorner, Vec3 maxCorner, int *splitAxis, int lastAxis, float *bvlSph2);
+void splitSAH(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis);
+void splitEqually(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis);
 
-Container* splitKdBvhHybrid(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount = 0, int lastAxis = -1, int colorIndex = 0);
+Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount = 0, int lastAxis = -1, int colorIndex = 0);
 void printShapes(Container *c, int tabIndex = 0);
 
 float containerSA(Container *o);
