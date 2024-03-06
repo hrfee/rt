@@ -10,7 +10,7 @@
 
 bool sortByX(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
-    float mins[2] = {9999.f, 9999.f};
+    float mins[2] = {1e30f, 1e30f};
     for (int i = 0; i < 2; i++) {
         if (bo[i]->s->s != NULL) {
             mins[i] = bo[i]->s->s->center.x - bo[i]->s->s->radius;
@@ -23,7 +23,7 @@ bool sortByX(Bound a, Bound b) {
 
 bool sortByY(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
-    float mins[2] = {9999.f, 9999.f};
+    float mins[2] = {1e30f, 1e30f};
     for (int i = 0; i < 2; i++) {
         if (bo[i]->s->s != NULL) {
             mins[i] = bo[i]->s->s->center.y - bo[i]->s->s->radius;
@@ -36,7 +36,7 @@ bool sortByY(Bound a, Bound b) {
 
 bool sortByZ(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
-    float mins[2] = {9999.f, 9999.f};
+    float mins[2] = {1e30f, 1e30f};
     for (int i = 0; i < 2; i++) {
         if (bo[i]->s->s != NULL) {
             mins[i] = bo[i]->s->s->center.z - bo[i]->s->s->radius;
@@ -63,8 +63,8 @@ void flattenContainer(Container *o, std::vector<Bound> *v) {
                 b.max = current->s->center + current->s->radius;
                 b.centroid = current->s->center;
             } else if (current->t != NULL) {
-                b.min = {9999, 9999, 9999};
-                b.max = {-9999, -9999, -9999};
+                b.min = {1e30, 1e30, 1e30};
+                b.max = {-1e30, -1e30, -1e30};
                 minPerComponent(&(b.min), current->t->a);
                 maxPerComponent(&(b.max), current->t->a);
                 minPerComponent(&(b.min), current->t->b);
@@ -157,26 +157,45 @@ int whichSideCentroid(float centroid, float a, float mid, float b) {
     return centroid <= mid ? 0 : 1;
 }
 
+// splitSIROM: Uses the Scene-interior ray origin metric
+// "BARTOSZ FABIANOWSKI et al.: A Cost Metric for Scene-Interior Ray Origins"
+void splitSIROM(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis) {
+}
+
+void growBound(Bound *dst, Bound *src) {
+    minPerComponent(&(dst->min), src->min);
+    maxPerComponent(&(dst->max), src->max);
+}
+
+float aabbSA(Vec3 a, Vec3 b) {
+    Vec3 d = b - a;
+    return 2.f*(d.x*d.y + d.x*d.z + d.y*d.z);
+}
+
 // splitSAH: Use the SAH heuristic:
 // "MACDONALD J. D., BOOTH K. S.: Heuristics for Ray Tracing Using Space Subdivision."
 // As discovered in review paper:
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
-void splitSAH(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis) {
+int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
     
     // Assumed cost values (C_o)
     float cSphere = 1.f;
-    float cTri = 2.f;
-    // Assumed cost of traversing an interior node (C_i)
+    float cTri = 1.5f;
+    // Assumed added cost of traversing the extra nodes added when splitting (C_i)
     float cTraverse = 1.f;
 
     Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
-    float bestCosts[3] = {9999, 9999, 9999};
+    float bestCosts[3] = {1e30f, 1e30f, 1e30f};
+
+    // float *surfaceAreas = (float*)malloc(sizeof(float)*o->size);
+    int shapeCount[2] = {0, 0};
+    bool countComplete = false;
 
     for (int i = 0; i < 3; i++) {
         int splitIndex = 0;
@@ -184,17 +203,27 @@ void splitSAH(Container *o, Container *a, Container *b, float *split, int *split
         while (bsplit != o->end->next) {
             Vec3 split = bvh ? bsplit->centroid : bsplit->max;
             spl(i) = split(i);
-            float sa = 0.f;
             // index 0 = spheres, 1 = triangles
-            float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
+            // float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
+            Bound potentialSplit[2];
+            std::memset(&potentialSplit, 0, sizeof(Bound)*2);
+            potentialSplit[0].min = {1e30f, 1e30f, 1e30f};
+            potentialSplit[0].max = {-1e30f, -1e30f, -1e30f};
+            std::memcpy(&(potentialSplit[1]), &(potentialSplit[0]), sizeof(Bound));
             // int h = 0;
             int h0[2] = {0, 0}, h1[2] = {0, 0};
             Bound *bo = o->start;
             while (bo != o->end->next) {
-                float s = shapeSA(bo->s);
                 int shapeIndex = (bo->s->t != NULL) ? 1 : 0;
-                sa += s;
-                // h++;
+                /*if (!saCalculated) {
+                    surfaceAreas[j]= shapeSA(bo->s);
+                    totalSA[shapeIndex] += surfaceAreas[j];
+                    shapeCount[shapeIndex]++;
+                }*/
+// h++;
+                if (!countComplete) {
+                    shapeCount[shapeIndex]++;
+                }
                 int side = -1;
                 if (bvh) {
                     side = whichSideCentroid(bo->centroid(i), o->a(i), spl(i), o->b(i));
@@ -202,17 +231,35 @@ void splitSAH(Container *o, Container *a, Container *b, float *split, int *split
                     side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
                 }
                 if (side == 0 || side == 2) {
-                    sa0[shapeIndex] += s;
+                    growBound(&(potentialSplit[0]), bo);
+                    // sa0[shapeIndex] += surfaceAreas[j];
                     h0[shapeIndex]++;
                 }
                 if (side == 1 || side == 2) {
-                    sa1[shapeIndex] += s;
+                    growBound(&(potentialSplit[1]), bo);
+                    // sa1[shapeIndex] += surfaceAreas[j];
                     h1[shapeIndex]++;
                 }
                 bo = bo->next;
             }
+            countComplete = true;
+            // saCalculated = true;
             
-            float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]/sa) + h1[0]*(sa1[0]/sa))) + (cTri * (h0[1]*(sa0[1]/sa) + h1[1]*(sa1[1]/sa)));
+            // We don't need to divide by totalSA, since its the same for all compared values
+            
+            float sa[2] = {aabbSA(potentialSplit[0].min, potentialSplit[0].max), aabbSA(potentialSplit[1].min, potentialSplit[1].max)};
+            if (h0[0] + h0[1] == 0) {
+                sa[0] = 0.f;
+            }
+            if (h1[0] + h1[1] == 0) {
+                sa[1] = 0.f;
+            }
+
+            float cost = cTraverse + (sa[0]*(h0[0]*cSphere + h0[1]*cTri)) + (sa[1]*(h1[0]*cSphere + h1[1]*cTri));
+            // float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]) + h1[0]*(sa1[0]))) + (cTri * (h0[1]*(sa0[1]) + h1[1]*(sa1[1])));
+            // float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]) + h1[0]*(sa1[0]))) + (cTri * (h0[1]*(sa0[1]) + h1[1]*(sa1[1])));
+            // cost /= (totalSA[0] + totalSA[1]);
+            // float parentCost = (cSphere * (h0[0]+h1[0])*(sa0[0]+sa1[0])) + (cTri * (h0[1]+h1[1])*(sa0[1]+sa1[1]));
             // std::printf("h0(%d), h1(%d), cost(%d): %f\n", h0[0] + h0[1], h1[0] + h1[1], splitIndex, cost);
             if (cost < bestCosts[i]) {
                 bestIndices[i] = splitIndex;
@@ -223,8 +270,10 @@ void splitSAH(Container *o, Container *a, Container *b, float *split, int *split
         }
     }
 
+    // free(surfaceAreas);
+
     int bestAxis = 0;
-    float bestCost = 9999.f;
+    float bestCost = 1e30f;
     for (int i = 0; i < 3; i++) {
         // Splitting on the same axis is fine since we have an actual heuristic.
         /* if (i == lastAxis) {
@@ -236,22 +285,27 @@ void splitSAH(Container *o, Container *a, Container *b, float *split, int *split
         }
     }
 
+    // Determine the cost of just not traversing the given node unsplit, and check if it's any better.
+    // float noSplitCost = (cSphere*shapeCount[0]*totalSA[0]) + (cTri*shapeCount[1]*totalSA[1]);
+    float noSplitCost = aabbSA(o->a, o->b)*(cSphere*shapeCount[0] + cTri*shapeCount[1]);
+    if (bestCost >= noSplitCost) {
+        return 1;
+    }
     *splitAxis = bestAxis;
 
     Bound *splitOn = boundByIndex(o, bestIndices[bestAxis]);
     *split = (bvh ? splitOn->centroid : splitOn->max)(bestAxis);
+    return 0;
 }
-
-// FIXME: Generally make use of the subscriptable Vec3s!
 
 // splitEqually: Heuristic find split that best divides the -number- of elements between the two children.
 // sets splitAxis to the axis split on, and returns the float value of where that occurs on that axis.
-void splitEqually(Container *o, Container *a, Container *b, float *split, int *splitAxis, bool bvh, int lastAxis) {
+int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis) {
     Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
     int bestSizes[3] = {9999, 9999, 9999};
-    float bestRatios[3] = {-9999, -9999, -9999};
+    float bestRatios[3] = {-1e30, -1e30, -1e30};
 
     for (int i = 0; i < 3; i++) {
         int splitIndex = 0;
@@ -292,8 +346,8 @@ void splitEqually(Container *o, Container *a, Container *b, float *split, int *s
     }
 
     int bestAxis = 0;
-    int bestSize = 9999;
-    float bestRatio = -9999.f;
+    int bestSize = 1e9;
+    float bestRatio = -1e30f;
     for (int i = 0; i < 3; i++) {
         // Don't split on the same axis as before, no real logic behind this but nor is there for this heuristic.
         if (i == lastAxis) {
@@ -309,6 +363,8 @@ void splitEqually(Container *o, Container *a, Container *b, float *split, int *s
 
     Bound *splitOn = boundByIndex(o, bestIndices[bestAxis]);
     *split = (bvh ? splitOn->centroid : splitOn->max)(bestAxis);
+    
+    return 0;
 }
 
 
@@ -316,8 +372,8 @@ void splitEqually(Container *o, Container *a, Container *b, float *split, int *s
 Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
-    out->a = {9999, 9999, 9999};
-    out->b = {-9999, -9999, -9999};
+    out->a = {1e30, 1e30, 1e30};
+    out->b = {-1e30, -1e30, -1e30};
     determineBounds(o, &(out->a), &(out->b));
     o->a = out->a;
     o->b = out->b;
@@ -333,13 +389,20 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
 
     
 
-    Container *containers[2] = {emptyContainer(), emptyContainer()};
     int bestAxis = 0;
 
     // SPLITTING ALGORITHM/HEURISTIC
     // float spl = splitEqually(o, containers[0], containers[1], out->a, out->b, &bestAxis, lastAxis);
     float splA = -1.f;
-    split(o, containers[0], containers[1], &splA, &bestAxis, bvh, lastAxis);
+    int stopSplitting = split(o, &splA, &bestAxis, bvh, lastAxis);
+    if (stopSplitting) {
+        std::printf("stopped splitting @ %d\n", splitCount);
+        free(out);
+        return NULL;
+    }
+    
+    Container *containers[2] = {emptyContainer(), emptyContainer()};
+    
     // If doing a BVH, this will soon store the actual edges of the volumes, since there isn't a shared "split" edge.
     float bbEdges[2] = {splA, splA};
     // std::printf("got split axis %d, spl1 %f spl2 %f\n", bestAxis, spl, spl2);
@@ -579,8 +642,8 @@ void getVoxelIndex(Container *c, int subdivision, Vec3 p, Vec3 delta, int *x, in
 // "start"/"end" is a pointer to start of a subdivision^3 array.
 Container* splitVoxels(Container *o, int subdivision) {
     Container *out = emptyContainer();
-    out->a = {9999, 9999, 9999};
-    out->b = {-9999, -9999, -9999};
+    out->a = {1e30, 1e30, 1e30};
+    out->b = {-1e30, -1e30, -1e30};
     out->voxelSubdiv = subdivision;
     determineBounds(o, &(out->a), &(out->b));
     Vec3 dims = {out->b.x-out->a.x, out->b.y-out->a.y, out->b.z-out->a.z};

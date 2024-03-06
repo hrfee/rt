@@ -269,7 +269,7 @@ void GLWindow::showUI() {
         state.rc.renderNow = ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
         if (state.useOptimizedMap) {
             state.rc.renderNow = ImGui::Checkbox("Use proper BVH", &(state.useBVH)) ? true : state.rc.renderNow;
-            state.rc.renderNow = ImGui::SliderInt("Hierarchy depth", &(state.hierarchyDepth), 1, 100);
+            state.rc.renderNow = ImGui::SliderInt("Max hierarchy depth", &(state.hierarchyDepth), 1, 100);
             state.rc.renderNow = ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
             ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
             if (state.renderOptimizedHierarchy) {
