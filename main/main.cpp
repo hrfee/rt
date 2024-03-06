@@ -41,11 +41,25 @@ Image *mainLoop(RenderConfig *rc) {
 
     if (window->state.useOptimizedMap) {
 
-        if (map->optimizedObj == NULL || (window->state.hierarchyDepth != map->optimizeLevel && change) || window->state.hierarchySplitterIndex != map->splitterIndex || (window->state.useBVH != map->bvh && change)) {
+        bool hierarchyChanged = 
+            (window->state.hierarchyDepth != map->optimizeLevel ||
+            window->state.hierarchySplitterIndex != map->splitterIndex ||
+            window->state.useBVH != map->bvh ||
+            window->state.hierarchyExtraParam != map->splitterParam);
+
+        if (hierarchyChanged && !change) { window->state.staleHierarchyConfig = true; }
+
+        if (
+            map->optimizedObj == NULL ||
+            change && hierarchyChanged
+        ) {
             map->splitterIndex = window->state.hierarchySplitterIndex;
             map->bvh = window->state.useBVH;
-            map->optimizeMap(window->state.hierarchyDepth, map->splitterIndex);
+            map->splitterParam = window->state.hierarchyExtraParam;
+            map->optimizeMap(glfwGetTime, window->state.hierarchyDepth, map->splitterIndex);
+            window->state.lastOptimizeTime = map->lastOptimizeTime;
             window->state.optimizedMap = map->optimizedObj;
+            window->state.staleHierarchyConfig = false;
         }
         map->obj = map->optimizedObj;
     } else {

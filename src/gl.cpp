@@ -155,6 +155,7 @@ void GLWindow::loadUI() {
     state.rc.showDebugObjects = false;
     state.hierarchyDepth = 1;
     state.hierarchySplitterIndex = 1; // SAH
+    state.hierarchyExtraParam = 2;
     state.useBVH = false;
     state.renderOptimizedHierarchy = false;
 
@@ -210,6 +211,11 @@ void GLWindow::draw(Image *img) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+namespace {
+    const char *modes[] = {"Raycasting", "Raycasting w/ Reflections", "Basic Lighting"};
+    const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Glassner/Octree (Disables BVH)"};
+}
+
 std::string GLWindow::frameInfo() {
     std::ostringstream out;
     out.precision(5);
@@ -232,9 +238,24 @@ std::string GLWindow::frameInfo() {
     return out.str();
 }
 
-namespace {
-    const char *modes[] = {"Raycasting", "Raycasting w/ Reflections", "Basic Lighting"};
-    const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel"};
+std::string GLWindow::hierarchyInfo() {
+    std::ostringstream out;
+    if (state.staleHierarchyConfig) return out.str();
+    out.precision(5);
+    out << "Generation with \"" << splitters[state.hierarchySplitterIndex] << "\" ";
+    if (state.useBVH) {
+        out << "(BVH) ";
+    }
+    out << "took ";
+    out << int(state.lastOptimizeTime*1000.f) << "ms ";
+    if (state.lastOptimizeTime > 1.f) {
+        out << "(";
+        out << state.lastOptimizeTime << "s)";
+        out.precision(2);
+        out << 1.f/state.lastOptimizeTime;
+    }
+    out << "at max depth " << state.hierarchyDepth << ".";
+    return out.str();
 }
 
 void GLWindow::showUI() {
@@ -276,6 +297,11 @@ void GLWindow::showUI() {
                 renderTree(state.optimizedMap);
             }
             state.rc.renderNow = ImGui::Combo("BVH Splitter", &(state.hierarchySplitterIndex), splitters, IM_ARRAYSIZE(splitters));
+            if (state.hierarchySplitterIndex == 3) {
+                state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.hierarchyExtraParam), 1, 100) ? true : state.rc.renderNow;
+            }
+            if (state.lastOptimizeTime != 0.f)
+                ImGui::Text(hierarchyInfo().c_str());
         } else {
             state.renderOptimizedHierarchy = false;
         }

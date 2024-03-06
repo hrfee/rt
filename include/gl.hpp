@@ -26,9 +26,12 @@ struct GLWindowState {
     bool useOptimizedMap;
     bool renderOptimizedHierarchy;
     Container *optimizedMap;
+    double lastOptimizeTime;
     int hierarchySplitterIndex;
     int hierarchyDepth;
+    int hierarchyExtraParam;
     bool useBVH;
+    bool staleHierarchyConfig;
     int threadCount;
     int maxThreadCount;
     struct Mouse {
@@ -59,6 +62,7 @@ class GLWindow {
         void reloadTexture();
         void reloadScaledResolution();
         std::string frameInfo();
+        std::string hierarchyInfo();
     private:
         const char *title;
         std::string vertString, fragString;

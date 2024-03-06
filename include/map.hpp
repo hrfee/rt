@@ -49,10 +49,11 @@ class WorldMap {
         float baseBrightness, globalShininess;
         void loadFile(char const* path);
         int loadObjFile(char const* path, Mat4 transform = mat44Identity);
-        void optimizeMap(int level = 1, int splitterIndex = 1);
+        void optimizeMap(double (*getTime)(void), int level = 1, int splitterIndex = 1);
         int optimizeLevel;
         int splitterIndex;
         bool bvh;
+        int splitterParam;
         std::vector<PointLight> pointLights;
         Container unoptimizedObj;
         Container *obj;
@@ -61,6 +62,7 @@ class WorldMap {
         Camera *cam;
         bool currentlyRendering;
         double lastRenderTime;
+        double lastOptimizeTime;
         void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f, float thickness = -1.f);
         void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f); 
         void createDebugVector(Vec3 p0, Vec3 delta, Vec3 color = {1.f, 0.f, 0.f});

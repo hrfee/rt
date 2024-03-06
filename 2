@@ -173,20 +173,18 @@ float aabbSA(Vec3 a, Vec3 b) {
 // Recursively subdivide scene until this number of objects is reached.
 // Makes things very simple, all we do here is tell the caller to split halfway along a cycling axis.
 // Ignores the bvh param.
-int splitOctree(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis, int maxNodesPerVox) {
-    if (maxNodesPerVox < 1) return 1;
-    if (o->size <= maxNodesPerVox) return 1;
-
+int splitOctree(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis) {
+    int maxNodesPerVox = 2;
     int axis = lastAxis+1;
     if (axis > 2) axis = 0;
     *splitAxis = axis;
     *split = o->a(axis) + 0.5f*(o->b(axis) - o->a(axis));
-    return 0;
-    /*
+
     int shapeCount[2] = {0, 0};
     Bound *bo = o->start;
     while (bo != o->end->next) {
-        int side = whichSide(bo->min(axis), bo->max(axis), o->a(axis), *split, o->b(axis));
+        int shapeIndex = (bo->s->t != NULL) ? 1 : 0;
+        int side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
         if (side == 0 || side == 2) {
             shapeCount[0]++;
         }
@@ -194,7 +192,8 @@ int splitOctree(Container *o, float *split, int *splitAxis, bool bvh, int lastAx
             shapeCount[1]++;
         }
         bo = bo->next;
-    }*/
+    }
+
 }
 
 // splitSAH: Use the SAH heuristic:
@@ -202,7 +201,7 @@ int splitOctree(Container *o, float *split, int *splitAxis, bool bvh, int lastAx
 // As discovered in review paper:
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
-int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis, int) {
+int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
@@ -325,7 +324,7 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
 
 // splitEqually: Heuristic find split that best divides the -number- of elements between the two children.
 // sets splitAxis to the axis split on, and returns the float value of where that occurs on that axis.
-int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis, int) {
+int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis) {
     Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
@@ -394,7 +393,7 @@ int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastA
 
 
 // Not really either, as space is partitioned on a plane (like KD-trees), but splits are constrained to the boundaries of their contents, like BVHs.
-Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
+Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
     out->a = {1e30, 1e30, 1e30};
@@ -419,7 +418,7 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
     // SPLITTING ALGORITHM/HEURISTIC
     // float spl = splitEqually(o, containers[0], containers[1], out->a, out->b, &bestAxis, lastAxis);
     float splA = -1.f;
-    int stopSplitting = split(o, &splA, &bestAxis, bvh, lastAxis, extra);
+    int stopSplitting = split(o, &splA, &bestAxis, bvh, lastAxis);
     if (stopSplitting) {
         std::printf("stopped splitting @ %d\n", splitCount);
         free(out);
@@ -468,7 +467,7 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
             free(c);
 
         } else */if (c->size != 0) {
-            Container *splitAgain = generateHierarchy(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
+            Container *splitAgain = generateHierarchy(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex);
             colorIndex += (splitLimit - splitCount)*2;
             if (splitAgain != NULL) {
                 free(c);

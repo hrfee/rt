@@ -579,7 +579,7 @@ WorldMap::WorldMap(char const* path) {
 }
 
 // splitterIndex: 0 = splitEqually, 1 = SAH
-void WorldMap::optimizeMap(int level, int splitterIndex) {
+void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIndex) {
     std::printf("Optimizing map with splitter %d, depth %d\n", splitterIndex, level);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
@@ -588,6 +588,7 @@ void WorldMap::optimizeMap(int level, int splitterIndex) {
         flatObj = emptyContainer();
         flattenRootContainer(flatObj, &unoptimizedObj);
     }
+    lastOptimizeTime = getTime();
     switch (splitterIndex) {
         case 0:
             optimizedObj = generateHierarchy(flatObj, splitEqually, bvh, level);
@@ -598,7 +599,11 @@ void WorldMap::optimizeMap(int level, int splitterIndex) {
         case 2:
             optimizedObj = splitVoxels(flatObj, level);
             break;
+        case 3:
+            optimizedObj = generateHierarchy(flatObj, splitOctree, false, level, 0, -1, 0, splitterParam);
+            break;
     }
+    lastOptimizeTime = getTime() - lastOptimizeTime;
     optimizeLevel = level;
 }
 
