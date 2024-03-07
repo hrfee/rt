@@ -8,13 +8,27 @@
 #include "map.hpp"
 #include <string>
 
+struct Dimensions {
+    int w, h;
+    int pW, pH;
+    constexpr bool dirty() noexcept {
+        return (w != pW || h != pH);
+    };
+    void update() {
+        pW = w;
+        pH = h;
+    };
+    void scaleFrom(Dimensions *base, float s) {
+        w = int(float(base->w) * s);
+        h = int(float(base->h) * s);
+    }
+};
+
 struct GLWindowState {
     // The render resolution
-    int w, h, prevW, prevH;
-    // The window resolution
-    int fbWidth, fbHeight, prevFbWidth, prevFbHeight;
-    int requestedFbW, requestedFbH;
-    float scale, prevScale;
+    Dimensions vpDim, rDim, fbDim, texDim;
+    float scale;
+    bool scaleDirty;
     double lastFrameTime;
     double lastRenderTime;
     int lastRenderW, lastRenderH;
@@ -51,7 +65,7 @@ struct GLWindowState {
 
 struct GLWindowUI {
     ImGuiContext *ctx;
-    bool widthApply, heightApply, saveToTGA;
+    bool saveToTGA;
     int renderMode;
 };
 
@@ -65,8 +79,10 @@ class GLWindow {
         GLWindowState state;
         void reloadTexture();
         void reloadScaledResolution();
+        void loadRequestedWindowResolution();
         std::string frameInfo();
         std::string hierarchyInfo();
+        void generateFrameVertices();
     private:
         const char *title;
         std::string vertString, fragString;
@@ -76,6 +92,7 @@ class GLWindow {
         void loadUI();
         void showUI();
         void renderTree(Container *c, int tabIndex = 0);
+        GLfloat glFrameVertices[8];
 };
 
 void resizeWindowCallback(GLFWwindow *, int, int);

@@ -1,3 +1,5 @@
 include 3sphere.map
 include floor.obj
 include wall.obj
+
+campreset roomview pos 0 1 0 phi -1.08917 theta -0.182 fov 70

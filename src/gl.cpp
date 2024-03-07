@@ -40,14 +40,8 @@ void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
 }
 
 GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) {
-    state.fbWidth = width;
-    state.fbHeight = height;
-    state.requestedFbW = width;
-    state.requestedFbH = height;
-    state.w = float(width)*scale;
-    state.h = float(height)*scale;
+    state.fbDim = {width, height, width, height};
     state.scale = scale;
-    state.prevScale = scale;
     state.reloadMap = false;
     state.currentlyRendering = false;
     state.lastRenderTime = 0.f;
@@ -67,14 +61,14 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     // The line above is equivalent to below, but won't fail to compile on older versions.
     // glfwInitHint(GLFW_WAYLAND_LIBDECOR, GLFW_WAYLAND_PREFER_LIBDECOR);
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
     glfwWindowHint(GLFW_DEPTH_BITS, 24);
 
-    window = glfwCreateWindow(state.fbWidth, state.fbHeight, title, nullptr, nullptr);
+    window = glfwCreateWindow(state.fbDim.w, state.fbDim.h, title, nullptr, nullptr);
     if (!window) {
         char const* error = nullptr;
         int code = glfwGetError(&error);
@@ -116,8 +110,19 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
 
     // Apply the actual window size and generate the texture for it,
     // and bind the callback so this happens on resizes.
-    glfwGetFramebufferSize(window, &(state.fbWidth), &(state.fbHeight));
-    resizeWindowCallback(window, state.fbWidth, state.fbHeight);
+    glfwGetFramebufferSize(window, &(state.fbDim.w), &(state.fbDim.h));
+    resizeWindowCallback(window, state.fbDim.w, state.fbDim.h);
+    state.fbDim.update();
+    // Initially, render image/viewport at full size of window.
+    
+    state.vpDim.w = state.fbDim.w;
+    state.vpDim.h = state.fbDim.h;
+    state.vpDim.update();
+    state.rDim.scaleFrom(&(state.vpDim), state.scale);
+    state.texDim.w = state.rDim.w;
+    state.texDim.h = state.rDim.h;
+    // state.texDim.update();
+
     glfwSetFramebufferSizeCallback(window, &resizeWindowCallback);
     
     // Bind controls
@@ -169,7 +174,7 @@ void GLWindow::loadUI() {
 }
 
 void GLWindow::reloadTexture() {
-    std::fprintf(stderr, "Will render @ %dx%d\n", state.w, state.h);
+    std::fprintf(stderr, "Will render @ %dx%d\n", state.texDim.w, state.texDim.h);
     GLuint newTex = 0;
     glGenTextures(1, &newTex);
     glBindTexture(GL_TEXTURE_2D, newTex);
@@ -177,7 +182,7 @@ void GLWindow::reloadTexture() {
             GL_TEXTURE_2D,
             1,
             GL_SRGB8_ALPHA8,
-            GLsizei(state.w), GLsizei(state.h)
+            GLsizei(state.texDim.w), GLsizei(state.texDim.h)
     );
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -191,6 +196,8 @@ void GLWindow::reloadTexture() {
         glDeleteTextures(1, &tex);
         tex = newTex;
     }
+  
+    generateFrameVertices();
 }
 
 void GLWindow::draw(Image *img) {
@@ -202,15 +209,18 @@ void GLWindow::draw(Image *img) {
             GL_TEXTURE_2D,
             0,
             0, 0,
-            GLsizei(state.w), GLsizei(state.h),
+            GLsizei(state.texDim.w), GLsizei(state.texDim.h),
             GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV,
             img->rgbxImg
     );
 
     glUseProgram(prog);
+
     glBindVertexArray(vao);
+    glUniform2fv(64, 4, (GLfloat*)&glFrameVertices);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	
+
+
     glBindVertexArray(0);
 	glUseProgram(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -321,14 +331,21 @@ void GLWindow::showUI() {
 
         // ImGui::BeginChild("Window Resolution");
         ImGui::Text("Window Resolution");
-        if (state.rc.renderOnChange) ImGui::Text("Press <Enter> to apply changes.");
-        else ImGui::Text("Changes will be applied when \"Render\" is pressed.");
-        ui.widthApply = ImGui::InputInt("Width", &(state.requestedFbW), 1, 100, state.rc.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
-        ui.heightApply = ImGui::InputInt("Height", &(state.requestedFbH), 1, 100, state.rc.renderOnChange ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None);
+        // if (state.rc.renderOnChange) 
+        ImGui::Text("Press <Enter> to apply w/h changes.");
+        // ImGui::Text("Changes will be applied when \"Render\" is pressed.");
+        ImGui::InputInt("Width", &(state.vpDim.w), 1, 100, ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::InputInt("Height", &(state.vpDim.h), 1, 100, ImGuiInputTextFlags_EnterReturnsTrue);
         // ImGui::EndChild();
-
-        ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.rc.renderOnChange ? 2.f : 10.f);
-        ImGui::Text("Effective resolution: %dx%d", int(float(state.requestedFbW) * state.scale), int(float(state.requestedFbH) * state.scale));
+        if (ImGui::Button("Fit to window")) {
+            state.vpDim.w = state.fbDim.w;
+            state.vpDim.h = state.fbDim.h;
+        }
+        if (ImGui::SliderFloat("Resolution Scale", &(state.scale), 0.f, state.rc.renderOnChange ? 2.f : 10.f) || state.vpDim.dirty()) {
+            state.rDim.scaleFrom(&(state.vpDim), state.scale);
+            state.vpDim.update();
+        }
+        ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
         if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button("Render", ImVec2(120, 40));
         if (state.lastRenderTime != 0.f) {
             ImGui::Text(frameInfo().c_str());
@@ -392,18 +409,26 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
         ImGui::NewFrame();
 
         state.rc.renderNow = false;
-        ui.widthApply = false, ui.heightApply = false;
         ui.saveToTGA = false;
 
         showUI();
 
-        if ((state.rc.renderNow || (state.rc.renderOnChange && (ui.widthApply || ui.heightApply))) && (state.requestedFbW != state.fbWidth || state.requestedFbH != state.fbHeight)) {
-            glfwSetWindowSize(window, state.requestedFbW, state.requestedFbH);
+        bool resizeRequested = state.rDim.dirty();
+        bool windowResized = state.fbDim.dirty();
+        if (windowResized) {
+            // FIXME: We might need this, so probably don't clean it!
+            state.fbDim.update();
         }
 
-        if ((state.rc.renderNow || state.rc.renderOnChange) && state.scale != state.prevScale) {
-            reloadScaledResolution();
+        // Indicates the texture has been updated.
+        if (state.texDim.dirty()) {
+            reloadTexture();
+            state.texDim.update();
         }
+
+        // Wipe screen, since rendered image may not cover the whole thing
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         Image *img = func(&(state.rc));
         draw(img);
@@ -419,20 +444,50 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
     }
 }
 
-void resizeWindowCallback(GLFWwindow *window, int width, int height) {
-    GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
-    w->state.fbWidth = width;
-    w->state.fbHeight = height;
-    w->state.requestedFbW = width;
-    w->state.requestedFbH = height;
-    glViewport(0, 0, width, height);
-    w->reloadScaledResolution();
+void GLWindow::generateFrameVertices() {
+    // Generate the triangle in screen coords that will letterbox our image if required.
+
+    Vec2 scaled = {float(state.texDim.w), float(state.texDim.h)};
+    float ar[2] = {float(state.texDim.w)/float(state.texDim.h), float(state.fbDim.w)/float(state.fbDim.h)};
+
+    float ratio = 0.f;
+    if (ar[0] > ar[1]) { // Image wider
+        ratio = float(state.fbDim.w) / float(state.texDim.w);
+    } else {
+        ratio = float(state.fbDim.h) / float(state.texDim.h);
+    }
+    scaled.x = scaled.x * ratio;
+    scaled.y = scaled.y * ratio;
+
+    float nW = float(scaled.x)/float(state.fbDim.w);
+    float nH = float(scaled.y)/float(state.fbDim.h);
+
+    glFrameVertices[0] = GLfloat(0.f);
+    glFrameVertices[1] = GLfloat(nH);
+    glFrameVertices[2] = GLfloat(0.f);
+    glFrameVertices[3] = GLfloat(0.f);
+    glFrameVertices[4] = GLfloat(nW);
+    glFrameVertices[5] = GLfloat(nH);
+    glFrameVertices[6] = GLfloat(nW);
+    glFrameVertices[7] = GLfloat(0.f);
+
+    for (int i = 0; i < 8; i++) {
+        // Letterbox x and y
+        if (i % 2 == 0 && nW < 1.f) glFrameVertices[i] += 0.5f*(1.f - nW);
+        else if (i % 2 == 1 && nH < 1.f) glFrameVertices[i] += 0.5f*(1.f - nH);
+        glFrameVertices[i] = 2.f * (glFrameVertices[i] - 0.5f);
+    }
 }
 
-void GLWindow::reloadScaledResolution() {
-    state.w = float(state.fbWidth) * state.scale;
-    state.h = float(state.fbHeight) * state.scale;
-    reloadTexture();
+void resizeWindowCallback(GLFWwindow *window, int width, int height) {
+    GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
+    glViewport(0, 0, width, height);
+    w->state.fbDim.w = width;
+    w->state.fbDim.h = height;
+
+    w->generateFrameVertices();
+    // Window resizing does not affect render/viewport resolution.
+    // w->reloadScaledResolution();
 }
 
 void mouseCallback(GLFWwindow *window, double x, double y) {

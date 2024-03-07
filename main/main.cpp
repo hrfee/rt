@@ -71,17 +71,19 @@ Image *mainLoop(RenderConfig *rc) {
         map->obj = &(map->unoptimizedObj);
     }
 
-    if (rc->renderOnChange || rc->renderNow) {
-        if (window->state.w != window->state.prevW || window->state.h != window->state.prevH) {
-            map->cam->setDimensions(window->state.w, window->state.h);
-            resizeImage(img, window->state.w, window->state.h);
-            window->state.prevW = window->state.w;
-            window->state.prevH = window->state.h;
-            window->state.prevScale = window->state.scale;
+    // If the requested render res has changed
+    if (window->state.rDim.dirty()) {
+        map->cam->setDimensions(window->state.rDim.w, window->state.rDim.h);
+        resizeImage(img, window->state.rDim.w, window->state.rDim.h);
+        window->state.texDim.w = window->state.rDim.w;
+        window->state.texDim.h = window->state.rDim.h;
+        clearImage(img);
 #ifndef FRAMETIME
-            change = true;
+        if (rc->renderOnChange) change = true;
 #endif
-        }
+    }
+    // std::printf("current values: %dx%d, %dx%d, %dx%d, %dx%d, %dx%d\n", window->state.w, window->state.h, window->state.fbWidth, window->state.fbHeight, window->state.prevW, window->state.prevH, window->state.prevFbWidth, window->state.prevFbHeight, map->cam->w, map->cam->h);
+    if (rc->renderOnChange || rc->renderNow) {
         if (window->state.fovDeg != window->state.prevFovDeg) {
             map->cam->setFOV(window->state.fovDeg * M_PI / 180.f);
             window->state.prevFovDeg = window->state.fovDeg;
@@ -118,6 +120,7 @@ Image *mainLoop(RenderConfig *rc) {
     if (change && !map->currentlyRendering) {
 #endif
         clearImage(img);
+        window->state.rDim.update();
         // map->castRays(img, rc, glfwGetTime);
         window->state.currentlyRendering = true;
         if (window->state.mouse.enabled) {
@@ -134,8 +137,8 @@ Image *mainLoop(RenderConfig *rc) {
     } else if (!map->currentlyRendering) {
         window->state.currentlyRendering = false;
         window->state.lastRenderTime = map->lastRenderTime;
-        window->state.lastRenderW = window->state.w;
-        window->state.lastRenderH = window->state.h;
+        window->state.lastRenderW = window->state.rDim.w;
+        window->state.lastRenderH = window->state.rDim.h;
     } else {
         window->state.lastRenderTime = glfwGetTime() - map->lastRenderTime;
     }
@@ -195,7 +198,7 @@ int main(int argc, char **argv) {
 
     // map->o = splitKD(&(map->o), 10);
 
-    map->cam = new Camera(window->state.w, window->state.h, cameraFOV, {0.f, -0.5f, 0.f});
+    map->cam = new Camera(window->state.rDim.w, window->state.rDim.h, cameraFOV, {0.f, -0.5f, 0.f});
     window->state.fovDeg = cameraFOV * 180.f / M_PI;
     window->state.prevFovDeg = window->state.fovDeg;
     window->state.mouse.phi = 0.f;
@@ -204,7 +207,7 @@ int main(int argc, char **argv) {
    
     // map->cam->debugPrintCorners();
 
-    img = newImage(window->state.w, window->state.h);
+    img = newImage(window->state.rDim.w, window->state.rDim.h);
     clearImage(img);
 
     window->mainLoop(mainLoop);

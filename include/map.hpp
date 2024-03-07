@@ -73,7 +73,7 @@ class WorldMap {
         void encode(char const* path);
     private:
         void castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
-        void castSubRays(Image *img, RenderConfig *rc, int w0, int w1);
+        void castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1);
         void ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);

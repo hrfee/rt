@@ -18,34 +18,6 @@
 #define RI_AIR 1.f
 #define RI_GLASS 1.52f
 
-void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity, float reflectiveness, float specular, float shininess, float thickness) {
-    Shape *sh = emptyShape();
-    sh->s = (Sphere*)alloc(sizeof(Sphere));
-    sh->s->center = center;
-    sh->s->radius = radius;
-    sh->s->thickness = thickness;
-    sh->color = color;
-    sh->opacity = opacity;
-    sh->reflectiveness = reflectiveness;
-    sh->specular = specular;
-    sh->shininess = shininess;
-    appendToContainer(&unoptimizedObj, sh);
-}
-
-void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity, float reflectiveness, float specular, float shininess) {
-    Shape *sh = emptyShape();
-    sh->t = (Triangle*)alloc(sizeof(Triangle));
-    sh->t->a = a;
-    sh->t->b = b;
-    sh->t->c = c;
-    sh->color = color;
-    sh->opacity = opacity;
-    sh->reflectiveness = reflectiveness;
-    sh->specular = specular;
-    sh->shininess = shininess;
-    appendToContainer(&unoptimizedObj, sh);
-}
-
 double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads) {
     if (nthreads == -1) nthreads = std::thread::hardware_concurrency();
     lastRenderTime = getTime();
@@ -74,7 +46,7 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
             w += (cam->w % nthreads);
         }
         int w1 = w0 + w;
-        threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1);
+        threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1, 0, cam->h);
     }
     for (int i = 0; i < nthreads; i++) {
         threadptrs[i].join();
@@ -117,6 +89,34 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
     delete[] threadptrs;
     // free(res);
     return lastRenderTime;
+}
+
+void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity, float reflectiveness, float specular, float shininess, float thickness) {
+    Shape *sh = emptyShape();
+    sh->s = (Sphere*)alloc(sizeof(Sphere));
+    sh->s->center = center;
+    sh->s->radius = radius;
+    sh->s->thickness = thickness;
+    sh->color = color;
+    sh->opacity = opacity;
+    sh->reflectiveness = reflectiveness;
+    sh->specular = specular;
+    sh->shininess = shininess;
+    appendToContainer(&unoptimizedObj, sh);
+}
+
+void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity, float reflectiveness, float specular, float shininess) {
+    Shape *sh = emptyShape();
+    sh->t = (Triangle*)alloc(sizeof(Triangle));
+    sh->t->a = a;
+    sh->t->b = b;
+    sh->t->c = c;
+    sh->color = color;
+    sh->opacity = opacity;
+    sh->reflectiveness = reflectiveness;
+    sh->specular = specular;
+    sh->shininess = shininess;
+    appendToContainer(&unoptimizedObj, sh);
 }
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
@@ -500,11 +500,12 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     res->color.z = std::fmin(res->color.z, 1.f);
 }
 
-void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1) {
+void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1) {
     RayResult res;
     Vec3 startCol = w0 * cam->viewportCol;
-    Vec3 baseRowVec = cam->viewportCorner + startCol;
-    for (int y = 0; y < cam->h; y++) {
+    Vec3 startRow = h0 * cam->viewportRow;
+    Vec3 baseRowVec = cam->viewportCorner + startRow + startCol;
+    for (int y = h0; y < h1; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = w0; x < w1; x++) {
