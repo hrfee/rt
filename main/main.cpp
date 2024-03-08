@@ -14,8 +14,6 @@
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
 #define MAP_PATH "maps/checker.map"
-// Uncomment to get printouts of frametime & fps. Forces re-rendering every frame.
-// #define FRAMETIME
 
 namespace {
     WorldMap *map;
@@ -24,14 +22,7 @@ namespace {
 }
 
 Image *mainLoop(RenderConfig *rc) {
-#ifdef FRAMETIME
-    double frameTime = glfwGetTime();
-    std::fprintf(stderr, "Frame time: %dms (%.2f FPS)\n", int((frameTime-window->state.lastFrameTime)*1000.f), 1.f/(frameTime-window->state.lastFrameTime));
-    window->state.lastFrameTime = glfwGetTime();
-#endif
-#ifndef FRAMETIME
     bool change = rc->renderNow;
-#endif
     if (window->state.reloadMap) {
         map->loadFile(window->state.mapPath.c_str());
         window->state.reloadMap = false;
@@ -56,7 +47,7 @@ Image *mainLoop(RenderConfig *rc) {
 
         if (
             map->optimizedObj == NULL ||
-            change && hierarchyChanged
+            (change && hierarchyChanged)
         ) {
             map->splitterIndex = window->state.hierarchySplitterIndex;
             map->bvh = window->state.useBVH;
@@ -78,25 +69,20 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.texDim.w = window->state.rDim.w;
         window->state.texDim.h = window->state.rDim.h;
         clearImage(img);
-#ifndef FRAMETIME
         if (rc->renderOnChange) change = true;
-#endif
+        window->state.rDim.update();
     }
     // std::printf("current values: %dx%d, %dx%d, %dx%d, %dx%d, %dx%d\n", window->state.w, window->state.h, window->state.fbWidth, window->state.fbHeight, window->state.prevW, window->state.prevH, window->state.prevFbWidth, window->state.prevFbHeight, map->cam->w, map->cam->h);
     if (rc->renderOnChange || rc->renderNow) {
         if (window->state.fovDeg != window->state.prevFovDeg) {
             map->cam->setFOV(window->state.fovDeg * M_PI / 180.f);
             window->state.prevFovDeg = window->state.fovDeg;
-#ifndef FRAMETIME
             change = true;
-#endif
         }
     }
     if (map->cam->phi != window->state.mouse.phi || map->cam->theta != window->state.mouse.theta) {
         map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);
-#ifndef FRAMETIME
         change = true;
-#endif
     }
     if (window->state.mouse.moveForward != 0.f) {
         map->cam->setPosition(map->cam->position + (window->state.mouse.moveForward * map->cam->viewportNormal));
@@ -116,11 +102,8 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.threadCount = std::thread::hardware_concurrency();
     }
 
-#ifndef FRAMETIME
     if (change && !map->currentlyRendering) {
-#endif
         clearImage(img);
-        window->state.rDim.update();
         // map->castRays(img, rc, glfwGetTime);
         window->state.currentlyRendering = true;
         if (window->state.mouse.enabled) {
@@ -129,11 +112,6 @@ Image *mainLoop(RenderConfig *rc) {
             std::thread cast(&WorldMap::castRays, map, img, rc, glfwGetTime, window->state.threadCount);
             cast.detach(); // Keep running when this loop finishes and cast goes out of scope
         }
-        /*cast.join();
-        window->state.lastRenderTime = map->lastRenderTime;
-        window->state.lastRenderW = window->state.w;
-        window->state.lastRenderH = window->state.h;*/
-#ifndef FRAMETIME
     } else if (!map->currentlyRendering) {
         window->state.currentlyRendering = false;
         window->state.lastRenderTime = map->lastRenderTime;
@@ -143,7 +121,6 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.lastRenderTime = glfwGetTime() - map->lastRenderTime;
     }
 
-#endif
     return img;
 }
 

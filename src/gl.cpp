@@ -49,6 +49,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.camPresetCount = 0;
     state.camPresetIndex = 0;
     title = windowTitle;
+    ui.hide = false;
     int success = glfwInit();
     if (!success) {
         char const* error = nullptr;
@@ -273,7 +274,19 @@ std::string GLWindow::hierarchyInfo() {
     return out.str();
 }
 
-void GLWindow::showUI() {
+void GLWindow::addUI() {
+    bool backgroundText = ui.hide;
+    if (backgroundText) {
+        ImGui::Begin("backgroundtext", NULL, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoInputs);
+        {
+            if (state.mouse.enabled) {
+                ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
+            }
+            showKeyboardHelp();
+        }
+        ImGui::End();
+        return;
+    }
     ImGui::Begin("render controls");
     {
         state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes));
@@ -289,7 +302,7 @@ void GLWindow::showUI() {
             case 2:
                 state.rc.reflections = true;
                 state.rc.lighting = true;
-                state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 1.f, 100.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 0.1f, 5.f) ? true : state.rc.renderNow;
                 state.rc.renderNow = ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f) ? true : state.rc.renderNow;
                 state.rc.renderNow = ImGui::Checkbox("Phong specular", &(state.rc.specular)) ? true : state.rc.renderNow;
                 if (state.rc.specular) {
@@ -365,9 +378,6 @@ void GLWindow::showUI() {
     ImGui::End();
     ImGui::Begin("camera controls");
     {
-        if (state.mouse.enabled) {
-            ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
-        }
         // ImGui::BeginChild("Camera Angle");
         ImGui::Text("Camera Angle");
         ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
@@ -396,7 +406,11 @@ void GLWindow::showUI() {
         }
     }
     ImGui::End();
-    showKeyboardHelp();
+    ImGui::Begin("keyboard controls");
+    {
+        showKeyboardHelp();
+    }
+    ImGui::End();
 }
 
 
@@ -411,7 +425,7 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
         state.rc.renderNow = false;
         ui.saveToTGA = false;
 
-        showUI();
+        addUI();
 
         bool resizeRequested = state.rDim.dirty();
         bool windowResized = state.fbDim.dirty();
@@ -511,17 +525,15 @@ void mouseCallback(GLFWwindow *window, double x, double y) {
 
 
 void showKeyboardHelp() {
-    ImGui::Begin("keyboard controls");
-    {
-        ImGui::Text(R"(
+    ImGui::Text(R"(
+<H>: Show/Hide UI
 <M>: Movement mode (use mouse+WASD to control camera)
-   - Frames will be rendered with every movement,
-     so make sure resolution scale is low enough.
+- Frames will be rendered with every movement,
+ so make sure resolution scale is low enough.
+- UI will be hidden initially, press <H> to bring it back up.
 <ESC>: Exit
 <Ctrl+LMB> on a slider: set exact value
-        )");
-    }
-    ImGui::End();
+    )");
 }
 
 void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
@@ -531,11 +543,15 @@ void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int 
     if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         w->state.mouse.enabled = true;
+        w->hideUI();
     } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && action == GLFW_PRESS && w->state.mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         w->state.mouse.enabled = false;
+        w->showUI();
     } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && !w->state.mouse.enabled) {
         glfwSetWindowShouldClose(window, GL_TRUE);
+    } else if (key == GLFW_KEY_H && action == GLFW_PRESS) {
+        w->toggleUI();
     }
     if (!(w->state.mouse.enabled)) return;
     if (key == GLFW_KEY_W) {

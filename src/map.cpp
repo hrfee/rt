@@ -37,16 +37,23 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
     if (rc->manualPosition != cam->position) {
         cam->setPosition(rc->manualPosition);
     }
-    int sectionWidth = cam->w / nthreads;
+    // Image is split into horizontal strips for each thread (Previously vertical, because i forgot about contiguous memory access)
+    // int sectionWidth = cam->w / nthreads;
+    int sectionHeight = cam->h / nthreads;
     std::thread *threadptrs = new std::thread[nthreads];
     for (int i = 0; i < nthreads; i++) {
-        int w = sectionWidth;
-        int w0 = i*w;
+        // int w = sectionWidth;
+        int h = sectionHeight;
+        // int w0 = i*w;
+        int h0 = i*h;
         if (i == nthreads-1) {
-            w += (cam->w % nthreads);
+            // w += (cam->w % nthreads);
+            h += (cam->h % nthreads);
         }
-        int w1 = w0 + w;
-        threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1, 0, cam->h);
+        // int w1 = w0 + w;
+        int h1 = h0 + h;
+        // threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1, 0, cam->h);
+        threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, 0, cam->w, h0, h1);
     }
     for (int i = 0; i < nthreads; i++) {
         threadptrs[i].join();

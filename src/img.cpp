@@ -22,6 +22,7 @@ void closeImage(Image *img) {
 }
 
 void resizeImage(Image *img, int w, int h) {
+    std::printf("Resizing image to %dx%d\n", w, h);
     free(img->img);
     free(img->rgbxImg);
     img->w = w;

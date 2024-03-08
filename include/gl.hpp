@@ -65,6 +65,7 @@ struct GLWindowState {
 
 struct GLWindowUI {
     ImGuiContext *ctx;
+    bool hide;
     bool saveToTGA;
     int renderMode;
 };
@@ -83,6 +84,9 @@ class GLWindow {
         std::string frameInfo();
         std::string hierarchyInfo();
         void generateFrameVertices();
+        void toggleUI() { ui.hide = !ui.hide; };
+        void hideUI() { ui.hide = true; };
+        void showUI() { ui.hide = false; };
     private:
         const char *title;
         std::string vertString, fragString;
@@ -90,7 +94,7 @@ class GLWindow {
         void loadShader(GLuint *s, GLenum shaderType, char const *fname);
         GLWindowUI ui;
         void loadUI();
-        void showUI();
+        void addUI();
         void renderTree(Container *c, int tabIndex = 0);
         GLfloat glFrameVertices[8];
 };
