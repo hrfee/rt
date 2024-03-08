@@ -40,8 +40,8 @@ std::string encodeCamPreset(CamPreset *p) {
     fmt << w_theta << " ";
     fmt << p->theta << " ";
     fmt << w_fov << " ";
-    fmt << p->fov << " ";
-    fmt << std::endl;
+    fmt << p->fov << "";
+    // fmt << std::endl;
     return fmt.str();
 }
 

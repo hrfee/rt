@@ -7,6 +7,7 @@
 #include <sstream>
 #include <cmath>
 
+#include "shape.hpp"
 #include "tga.hpp"
 #include "imgui_stdlib.h"
 #include "imgui_impl_glfw.h"
@@ -395,14 +396,15 @@ void GLWindow::addUI() {
                 state.rc.manualPosition = p.pos;
             }
         }
-        if (ImGui::Button("Dump cam preset to console")) {
+        if (ImGui::Button("Copy cam preset to clipboard")) {
             CamPreset p;
             p.name = "NAME_HERE";
             p.pos = state.rc.manualPosition;
             p.phi = state.mouse.phi;
             p.theta = state.mouse.theta;
             p.fov = state.fovDeg;
-            std::cout << encodeCamPreset(&p) << std::endl;
+            std::string camString = encodeCamPreset(&p);
+            glfwSetClipboardString(window, camString.c_str());
         }
     }
     ImGui::End();
