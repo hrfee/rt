@@ -20,7 +20,6 @@
 
 double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads) {
     if (nthreads == -1) nthreads = std::thread::hardware_concurrency();
-    lastRenderTime = getTime();
     currentlyRendering = true;
     if (rc->baseBrightness == -1.f) {
         rc->baseBrightness = baseBrightness;
@@ -40,7 +39,11 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
     // Image is split into horizontal strips for each thread (Previously vertical, because i forgot about contiguous memory access)
     // int sectionWidth = cam->w / nthreads;
     int sectionHeight = cam->h / nthreads;
-    std::thread *threadptrs = new std::thread[nthreads];
+    std::thread *threadPtrs = new std::thread[nthreads];
+    rc->threadStates = new int[nthreads];
+    rc->nthreads = nthreads;
+    lastRenderTime = getTime();
+    // std::printf("Thread line height: [1..n-1]:%d, [n]:%d\n", int(sectionHeight), int(sectionHeight) + (cam->h % nthreads));
     for (int i = 0; i < nthreads; i++) {
         // int w = sectionWidth;
         int h = sectionHeight;
@@ -53,47 +56,16 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
         // int w1 = w0 + w;
         int h1 = h0 + h;
         // threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1, 0, cam->h);
-        threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, 0, cam->w, h0, h1);
+        threadPtrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, 0, cam->w, h0, h1, &(rc->threadStates[i]));
     }
     for (int i = 0; i < nthreads; i++) {
-        threadptrs[i].join();
+        threadPtrs[i].join();
     }
-    /* RayResult *res = (RayResult*)malloc(sizeof(RayResult)*nthreads);
-    for (int y = 0; y < cam->h; y++) {
-        // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
-        Vec3 delta = baseRowVec;
-        int remainingPixels = cam->w;
-        int x = 0;
-        while (remainingPixels > 0) {
-            int threads = std::min(remainingPixels, nthreads);
-            int groupX = x;
-            for (int i = 0; i < threads; i++) {
-                threadptrs[i] = std::thread(&WorldMap::castRay, this, res+i, obj, cam->position, delta, rc, 0);
-                delta = delta + cam->viewportCol;
-                remainingPixels--;
-                x++;
-            }
-            for (int i = 0; i < threads; i++) {
-                threadptrs[i].join();
-                if (res[i].collisions > 0) {
-                    writePixel(img, groupX+i, y, res[i].color);
-                }
-            }
-        }
-        // for (int x = 0; x < cam->w; x++) {
-        //     RayResult r;
-        //     castRay(&r, obj, cam->position, delta, rc);
-        //     if (r.collisions > 0) {
-        //         writePixel(img, x, y, r.color);
-        //     }
-        //     
-        //     delta = delta + cam->viewportCol; 
-        // }
-        baseRowVec = baseRowVec + cam->viewportRow;
-    } */
-    currentlyRendering = false;
     lastRenderTime = getTime() - lastRenderTime;
-    delete[] threadptrs;
+    currentlyRendering = false;
+    delete[] threadPtrs;
+    delete[] rc->threadStates;
+    rc->threadStates = NULL;
     // free(res);
     return lastRenderTime;
 }
@@ -370,6 +342,10 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
 
 void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
     Bound *bo = c->start;
+    // When using --octrees/kd-trees--, the two sub-nodes always span the area of the parent.
+    // Missing one of them means we must hit the other.
+    // Hitting one does not imply we dont't hit the other, so "true" can be our default state.
+    bool siblingContainerCollision = true;
     while (bo != c->end->next) {
         Shape *current = bo->s;
         if (current->debug && !(rc->showDebugObjects)) {
@@ -411,7 +387,10 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             }
         } else if (current->c != NULL) {
             bool collision = false;
-            if (current->c->plane) {
+            if (!siblingContainerCollision && splitterIndex == 3) {
+                // Octree, see comment at top of this method
+                collision = true;
+            } else if (current->c->plane) {
                 // Test container collision
                 Triangle tris[2] = {
                     {current->c->a, current->c->b, current->c->c},
@@ -432,6 +411,9 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                 }
             } else {
                 collision = meetsAABB(p0, delta, current->c);
+                if (!collision) {
+                    siblingContainerCollision = false;
+                }
                 // collision = true;
             }
             // If collision, cast ray to objects within the container
@@ -507,11 +489,12 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     res->color.z = std::fmin(res->color.z, 1.f);
 }
 
-void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1) {
+void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1, int *state) {
     RayResult res;
     Vec3 startCol = w0 * cam->viewportCol;
     Vec3 startRow = h0 * cam->viewportRow;
     Vec3 baseRowVec = cam->viewportCorner + startRow + startCol;
+    *state = 1;
     for (int y = h0; y < h1; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
@@ -522,9 +505,12 @@ void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0,
             }
             
             delta = delta + cam->viewportCol; 
+            if (*state == -1) break;
         }
         baseRowVec = baseRowVec + cam->viewportRow;
+        if (*state == -1) break;
     }
+    *state = 0;
 }
 
 namespace {
@@ -596,7 +582,7 @@ WorldMap::WorldMap(char const* path) {
 }
 
 // splitterIndex: 0 = splitEqually, 1 = SAH
-void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIndex) {
+void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIdx) {
     std::printf("Optimizing map with splitter %d, depth %d\n", splitterIndex, level);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
@@ -606,6 +592,7 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIndex
         flattenRootContainer(flatObj, &unoptimizedObj);
     }
     lastOptimizeTime = getTime();
+    splitterIndex = splitterIdx;
     switch (splitterIndex) {
         case 0:
             optimizedObj = generateHierarchy(flatObj, splitEqually, bvh, level);
@@ -797,13 +784,17 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
     return allocCounter;
 }
 
-void flattenRootContainer(Container *dst, Container *src) {
-    if (src == NULL) return;
+void flattenRootContainer(Container *dst, Container *src, bool root) {
+    if (src == NULL || src->size == 0) return;
+    if (root) {
+        dst->a = {1e10, 1e10, 1e30};
+        dst->b = {-1e10, -1e10, -1e30};
+    }
     Bound *bo = src->start;
     while (bo != src->end->next) {
         Shape *current = bo->s;
         if (current->c != NULL) {
-            flattenRootContainer(dst, current->c);
+            flattenRootContainer(dst, current->c, false);
         } else {
             Bound *b = emptyBound();
             b->s = emptyShape();
@@ -819,17 +810,24 @@ void flattenRootContainer(Container *dst, Container *src) {
             if (current->t != NULL) {
                 b->min = {9999, 9999, 9999};
                 b->max = {-9999, -9999, -9999};
-                minPerComponent(&(b->min), current->t->a);
-                maxPerComponent(&(b->max), current->t->a);
-                minPerComponent(&(b->min), current->t->b);
-                maxPerComponent(&(b->max), current->t->b);
-                minPerComponent(&(b->min), current->t->c);
-                maxPerComponent(&(b->max), current->t->c);
+                for (int i = 0; i < 3; i++) {
+                    b->min(i) = std::min(b->min(i), current->t->a(i));
+                    b->min(i) = std::min(b->min(i), current->t->b(i));
+                    b->min(i) = std::min(b->min(i), current->t->c(i));
+                    b->max(i) = std::max(b->max(i), current->t->a(i));
+                    b->max(i) = std::max(b->max(i), current->t->b(i));
+                    b->max(i) = std::max(b->max(i), current->t->c(i));
+                }
                 b->centroid = 0.333f * (current->t->a + current->t->b + current->t->c);
                 Triangle *t = (Triangle*)alloc(sizeof(Triangle));
                 std::memcpy(t, current->t, sizeof(Triangle));
                 b->s->t = t;
             }
+            for (int i = 0; i < 3; i++) {
+                dst->a(i) = std::min(dst->a(i), b->min(i));
+                dst->b(i) = std::max(dst->b(i), b->max(i));
+            }
+            
             appendToContainer(dst, b);
         }
         bo = bo->next;

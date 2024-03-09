@@ -47,53 +47,32 @@ bool sortByZ(Bound a, Bound b) {
     return mins[0] < mins[1];
 }
 
-void flattenContainer(Container *o, std::vector<Bound> *v) {
-    Bound *bo = o->start;
-    while (bo != o->end->next) {
-        Shape *current = bo->s;
-        if (current->c != NULL) {
-            std::vector<Bound> cv;
-            flattenContainer(current->c, &cv);
-            v->insert(v->end(), cv.begin(), cv.end());
-        } else {
-            Bound b;
-            b.s = current;
-            if (current->s != NULL) {
-                b.min = current->s->center - current->s->radius;
-                b.max = current->s->center + current->s->radius;
-                b.centroid = current->s->center;
-            } else if (current->t != NULL) {
-                b.min = {1e30, 1e30, 1e30};
-                b.max = {-1e30, -1e30, -1e30};
-                minPerComponent(&(b.min), current->t->a);
-                maxPerComponent(&(b.max), current->t->a);
-                minPerComponent(&(b.min), current->t->b);
-                maxPerComponent(&(b.max), current->t->b);
-                minPerComponent(&(b.min), current->t->c);
-                maxPerComponent(&(b.max), current->t->c);
-                b.centroid = 0.333f * (current->t->a + current->t->b + current->t->c);
-            }
-            v->push_back(b);
-        }
-        bo = bo->next;
-    }
-}
-
 void determineBounds(Container *o, Vec3 *min, Vec3 *max) {
+    if (o->size == 0) {
+        *min = {0, 0, 0};
+        *max = {0, 0, 0};
+    }
+    *min = {1e30, 1e30, 1e30};
+    *max = {-1e30, -1e30, -1e30};
     Bound *bo = o->start;
     while (bo != o->end->next) {
-        Shape *current = bo->s;
-        if (current->t != NULL) {
-            minPerComponent(min, current->t->a);
-            maxPerComponent(max, current->t->a);
-            minPerComponent(min, current->t->b);
-            maxPerComponent(max, current->t->b);
-            minPerComponent(min, current->t->c);
-            maxPerComponent(max, current->t->c);
+        for (int i = 0; i < 3; i++) {
+            min->idx(i) = std::min(min->idx(i), bo->min(i));
+            max->idx(i) = std::max(max->idx(i), bo->max(i));
+        }
+        /*if (current->t != NULL) {
+            for (int i = 0; i < 3; i++) {
+                min->idx(i) = std::min(min->idx(i), current->t->a(i));
+                min->idx(i) = std::min(min->idx(i), current->t->b(i));
+                min->idx(i) = std::min(min->idx(i), current->t->c(i));
+                max->idx(i) = std::max(max->idx(i), current->t->a(i));
+                max->idx(i) = std::max(max->idx(i), current->t->b(i));
+                max->idx(i) = std::max(max->idx(i), current->t->c(i));
+            }
         } else if (current->s != NULL) {
             minPerComponent(min, current->s->center - current->s->radius);
             maxPerComponent(max, current->s->center + current->s->radius);
-        }
+        }*/
         bo = bo->next;
     }
 }
@@ -158,8 +137,10 @@ int whichSideCentroid(float centroid, float a, float mid, float b) {
 }
 
 void growBound(Bound *dst, Bound *src) {
-    minPerComponent(&(dst->min), src->min);
-    maxPerComponent(&(dst->max), src->max);
+    for (int i = 0; i < 3; i++) {
+        dst->min(i) = std::min(dst->min(i), src->min(i));
+        dst->max(i) = std::max(dst->max(i), src->max(i));
+    }
 }
 
 float aabbSA(Vec3 a, Vec3 b) {
@@ -173,7 +154,7 @@ float aabbSA(Vec3 a, Vec3 b) {
 // Recursively subdivide scene until this number of objects is reached.
 // Makes things very simple, all we do here is tell the caller to split halfway along a cycling axis.
 // Ignores the bvh param.
-int splitOctree(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis, int maxNodesPerVox) {
+int splitOctree(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int maxNodesPerVox) {
     if (maxNodesPerVox < 1) return 1;
     if (o->size <= maxNodesPerVox) return 1;
 
@@ -202,7 +183,7 @@ int splitOctree(Container *o, float *split, int *splitAxis, bool bvh, int lastAx
 // As discovered in review paper:
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
-int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis, int) {
+int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
@@ -217,8 +198,10 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
 
     int bestIndices[3] = {0, 0, 0};
     float bestCosts[3] = {1e30f, 1e30f, 1e30f};
+    Bound bestBounds[3][2];
 
     // float *surfaceAreas = (float*)malloc(sizeof(float)*o->size);
+    // shapeCount[0]: number of spheres, [1]: number of tris.
     int shapeCount[2] = {0, 0};
     bool countComplete = false;
 
@@ -230,22 +213,16 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
             spl(i) = split(i);
             // index 0 = spheres, 1 = triangles
             // float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
-            Bound potentialSplit[2];
-            std::memset(&potentialSplit, 0, sizeof(Bound)*2);
-            potentialSplit[0].min = {1e30f, 1e30f, 1e30f};
-            potentialSplit[0].max = {-1e30f, -1e30f, -1e30f};
-            std::memcpy(&(potentialSplit[1]), &(potentialSplit[0]), sizeof(Bound));
+            Bound splitBounds[2];
+            std::memset(&splitBounds, 0, sizeof(Bound)*2);
+            splitBounds[0].min = {1e30f, 1e30f, 1e30f};
+            splitBounds[0].max = {-1e30f, -1e30f, -1e30f};
+            std::memcpy(&(splitBounds[1]), &(splitBounds[0]), sizeof(Bound));
             // int h = 0;
             int h0[2] = {0, 0}, h1[2] = {0, 0};
             Bound *bo = o->start;
             while (bo != o->end->next) {
                 int shapeIndex = (bo->s->t != NULL) ? 1 : 0;
-                /*if (!saCalculated) {
-                    surfaceAreas[j]= shapeSA(bo->s);
-                    totalSA[shapeIndex] += surfaceAreas[j];
-                    shapeCount[shapeIndex]++;
-                }*/
-// h++;
                 if (!countComplete) {
                     shapeCount[shapeIndex]++;
                 }
@@ -256,23 +233,26 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
                     side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
                 }
                 if (side == 0 || side == 2) {
-                    growBound(&(potentialSplit[0]), bo);
+                    growBound(&(splitBounds[0]), bo);
                     // sa0[shapeIndex] += surfaceAreas[j];
                     h0[shapeIndex]++;
                 }
                 if (side == 1 || side == 2) {
-                    growBound(&(potentialSplit[1]), bo);
+                    growBound(&(splitBounds[1]), bo);
                     // sa1[shapeIndex] += surfaceAreas[j];
                     h1[shapeIndex]++;
                 }
                 bo = bo->next;
             }
+            /* for (int j = 0; j < 2; j++) {
+                std::printf("bound[%d] = (%f %f %f - %f %f %f)\n", j, potentialSplit[j].min.x, potentialSplit[j].min.y, potentialSplit[j].min.z, potentialSplit[j].max.x, potentialSplit[j].max.y, potentialSplit[j].max.z);
+            } */ 
             countComplete = true;
             // saCalculated = true;
             
             // We don't need to divide by totalSA, since its the same for all compared values
             
-            float sa[2] = {aabbSA(potentialSplit[0].min, potentialSplit[0].max), aabbSA(potentialSplit[1].min, potentialSplit[1].max)};
+            float sa[2] = {aabbSA(splitBounds[0].min, splitBounds[0].max), aabbSA(splitBounds[1].min, splitBounds[1].max)};
             if (h0[0] + h0[1] == 0) {
                 sa[0] = 0.f;
             }
@@ -281,14 +261,11 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
             }
 
             float cost = cTraverse + (sa[0]*(h0[0]*cSphere + h0[1]*cTri)) + (sa[1]*(h1[0]*cSphere + h1[1]*cTri));
-            // float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]) + h1[0]*(sa1[0]))) + (cTri * (h0[1]*(sa0[1]) + h1[1]*(sa1[1])));
-            // float cost = cTraverse + (cSphere * (h0[0]*(sa0[0]) + h1[0]*(sa1[0]))) + (cTri * (h0[1]*(sa0[1]) + h1[1]*(sa1[1])));
-            // cost /= (totalSA[0] + totalSA[1]);
-            // float parentCost = (cSphere * (h0[0]+h1[0])*(sa0[0]+sa1[0])) + (cTri * (h0[1]+h1[1])*(sa0[1]+sa1[1]));
-            // std::printf("h0(%d), h1(%d), cost(%d): %f\n", h0[0] + h0[1], h1[0] + h1[1], splitIndex, cost);
             if (cost < bestCosts[i]) {
                 bestIndices[i] = splitIndex;
                 bestCosts[i] = cost;
+                bestBounds[i][0] = splitBounds[0];
+                bestBounds[i][1] = splitBounds[1];
             }
             splitIndex++;
             bsplit = bsplit->next;
@@ -307,6 +284,8 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
         if (bestCosts[i] < bestCost) {
             bestAxis = i;
             bestCost = bestCosts[i];
+            *b0 = bestBounds[i][0];
+            *b1 = bestBounds[i][1];
         }
     }
 
@@ -325,18 +304,26 @@ int splitSAH(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis,
 
 // splitEqually: Heuristic find split that best divides the -number- of elements between the two children.
 // sets splitAxis to the axis split on, and returns the float value of where that occurs on that axis.
-int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastAxis, int) {
+int splitEqually(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int) {
     Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
     int bestSizes[3] = {9999, 9999, 9999};
     float bestRatios[3] = {-1e30, -1e30, -1e30};
+    Bound bestBounds[3][2];
 
     for (int i = 0; i < 3; i++) {
         int splitIndex = 0;
         Bound *bsplit = o->start;
         while (bsplit != o->end->next) {
             spl(i) = bsplit->max(i);
+            
+            Bound splitBounds[2];
+            std::memset(&splitBounds, 0, sizeof(Bound)*2);
+            splitBounds[0].min = {1e30f, 1e30f, 1e30f};
+            splitBounds[0].max = {-1e30f, -1e30f, -1e30f};
+            std::memcpy(&(splitBounds[1]), &(splitBounds[0]), sizeof(Bound));
+
             int h0 = 0, h1 = 0;
             Bound *bo = o->start;
             while (bo != o->end->next) {
@@ -347,9 +334,11 @@ int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastA
                     side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
                 }
                 if (side == 0 || side == 2) {
+                    growBound(&(splitBounds[0]), bo);
                     h0++;
                 }
                 if (side == 1 || side == 2) {
+                    growBound(&(splitBounds[1]), bo);
                     h1++;
                 }
                 bo = bo->next;
@@ -364,6 +353,8 @@ int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastA
                 bestIndices[i] = splitIndex;
                 bestRatios[i] = ratio;
                 bestSizes[i] = h0 + h1;
+                bestBounds[i][0] = splitBounds[0];
+                bestBounds[i][1] = splitBounds[1];
             }
             splitIndex++;
             bsplit = bsplit->next;
@@ -381,6 +372,8 @@ int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastA
         if ((bestRatios[i] <= 1 && bestRatios[i] > bestRatio) && bestSizes[i] <= bestSize) {
             bestAxis = i;
             bestSize = bestSizes[i];
+            *b0 = bestBounds[i][0];
+            *b1 = bestBounds[i][1];
         }
     }
 
@@ -397,29 +390,14 @@ int splitEqually(Container *o, float *split, int *splitAxis, bool bvh, int lastA
 Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
-    out->a = {1e30, 1e30, 1e30};
-    out->b = {-1e30, -1e30, -1e30};
-    determineBounds(o, &(out->a), &(out->b));
-    o->a = out->a;
-    o->b = out->b;
-    /*std::vector<Bound> v[3];
-    v[0] = *o;
-    v[1] = v[0];
-    v[2] = v[0];*/
-
-    /*// Sort shapes by increasing (axis: 0=x,1=y,2=z)
-    std::sort(v[0].begin(), v[0].end(), sortByX);
-    std::sort(v[1].begin(), v[1].end(), sortByY);
-    std::sort(v[2].begin(), v[2].end(), sortByZ);*/
-
-    
+    out->a = o->a; // {1e30, 1e30, 1e30};
+    out->b = o->b; // {-1e30, -1e30, -1e30};
 
     int bestAxis = 0;
 
-    // SPLITTING ALGORITHM/HEURISTIC
-    // float spl = splitEqually(o, containers[0], containers[1], out->a, out->b, &bestAxis, lastAxis);
     float splA = -1.f;
-    int stopSplitting = split(o, &splA, &bestAxis, bvh, lastAxis, extra);
+    Bound b[2];
+    int stopSplitting = split(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
     if (stopSplitting) {
         std::printf("stopped splitting @ %d\n", splitCount);
         free(out);
@@ -427,10 +405,7 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
     }
     
     Container *containers[2] = {emptyContainer(), emptyContainer()};
-    
-    // If doing a BVH, this will soon store the actual edges of the volumes, since there isn't a shared "split" edge.
-    float bbEdges[2] = {splA, splA};
-    // std::printf("got split axis %d, spl1 %f spl2 %f\n", bestAxis, spl, spl2);
+
 
     Bound *bo = o->start;
     while (bo != o->end->next) {
@@ -444,16 +419,16 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
         if (side == 0 || side == 2) {
             appendToContainer(containers[0], *bo); // Make copy rather than appending existing pointer
             added = true;
-            if (bvh) {
+            /* if (bvh) {
                 bbEdges[0] = std::max(bbEdges[0], bo->max(bestAxis));
-            }
+            } */
         }
         if (side == 1 || side == 2) {
             appendToContainer(containers[1], *bo); // Make copy rather than appending existing pointer
             added = true;
-            if (bvh) {
+            /* if (bvh) {
                 bbEdges[1] = std::min(bbEdges[1], bo->min(bestAxis));
-            }
+            } */
         }
         if (!added) std::printf("skipped!\n");
         bo = bo->next;
@@ -467,12 +442,11 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
             std::memcpy(sections[i], c->start, sizeof(Shape));
             free(c);
 
-        } else */if (c->size != 0) {
-            Container *splitAgain = generateHierarchy(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
-            colorIndex += (splitLimit - splitCount)*2;
-            if (splitAgain != NULL) {
-                free(c);
-                c = splitAgain;
+        } else */
+        if (c->size != 0) {
+            if (bvh) {
+                c->a = b[i].min;
+                c->b = b[i].max;
             } else {
                 c->a = out->a;
                 c->b = out->b;
@@ -481,12 +455,14 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
                 Vec3 *boundary = &(c->b);
                 if (i == 1) boundary = &(c->a);
 
-                // FIXME: Use vector indexing!
-                if (!bvh || i == 0) {
-                    boundary->idx(bestAxis) = bbEdges[0];
-                } else {
-                    boundary->idx(bestAxis) = bbEdges[1];
-                }
+                boundary->idx(bestAxis) = splA;
+            }
+
+            Container *splitAgain = generateHierarchy(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
+            colorIndex += (splitLimit - splitCount)*2;
+            if (splitAgain != NULL) {
+                free(c);
+                c = splitAgain;
             }
             // DEBUG SPHERES
             // containerSphereCorners(c);
@@ -494,11 +470,10 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
             colorIndex++;
             
             sections[i]->c = c;
-            Bound bo;
-            bo.min = c->a;
-            bo.max = c->b;
-            bo.s = sections[i];
-            appendToContainer(out, bo);
+            b[i].min = c->a;
+            b[i].max = c->b;
+            b[i].s = sections[i];
+            appendToContainer(out, b[i]);
         }
     }
 

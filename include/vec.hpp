@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
+#include <algorithm>
 
 struct Vec2 {
     float x, y;
@@ -36,20 +37,24 @@ Vec2 operator/(Vec2 a, float b) noexcept {
 struct Vec3 {
     float x, y, z;
     
-    constexpr float& operator() (std::size_t i) noexcept {
-        return i == 0 ? x : (i == 1 ? y : z);
+    float& operator() (std::size_t i) noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
     }
     
-    constexpr float const& operator() (std::size_t i) const noexcept {
-        return i == 0 ? x : (i == 1 ? y : z);
+    float const& operator() (std::size_t i) const noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
     }
 
-    constexpr float& idx(std::size_t i) noexcept {
-        return i == 0 ? x : (i == 1 ? y : z);
+    float& idx(std::size_t i) noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
     }
     
-    constexpr float const& idx(std::size_t i) const noexcept {
-        return i == 0 ? x : (i == 1 ? y : z);
+    float const& idx(std::size_t i) const noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
     }
 };
 
@@ -122,20 +127,6 @@ float mag(Vec3 a) noexcept {
 constexpr
 Vec3 norm(Vec3 a) noexcept {
     return a/mag(a);
-}
-
-constexpr
-void maxPerComponent(Vec3 *a, Vec3 b) noexcept {
-    a->x = std::fmax(a->x, b.x);
-    a->y = std::fmax(a->y, b.y);
-    a->z = std::fmax(a->z, b.z);
-}
-
-constexpr
-void minPerComponent(Vec3 *a, Vec3 b) noexcept {
-    a->x = std::fmin(a->x, b.x);
-    a->y = std::fmin(a->y, b.y);
-    a->z = std::fmin(a->z, b.z);
 }
 
 struct Vec3ui {

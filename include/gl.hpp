@@ -83,6 +83,7 @@ class GLWindow {
         void loadRequestedWindowResolution();
         std::string frameInfo();
         std::string hierarchyInfo();
+        std::string threadInfo();
         void generateFrameVertices();
         void toggleUI() { ui.hide = !ui.hide; };
         void hideUI() { ui.hide = true; };

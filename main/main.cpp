@@ -29,10 +29,8 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.useOptimizedMap = false;
         change = true;
         window->state.camPresets = &(map->camPresets);
-        if (map->camPresetNames != NULL && map->camPresets.size() != 0) {
-            window->state.camPresetNames = map->camPresetNames;
-            window->state.camPresetCount = map->camPresets.size();
-        }
+        window->state.camPresetNames = map->camPresetNames;
+        window->state.camPresetCount = map->camPresets.size();
     }
 
     if (window->state.useOptimizedMap) {
@@ -46,7 +44,7 @@ Image *mainLoop(RenderConfig *rc) {
         if (hierarchyChanged && !change) { window->state.staleHierarchyConfig = true; }
 
         if (
-            map->optimizedObj == NULL ||
+            // map->optimizedObj == NULL ||
             (change && hierarchyChanged)
         ) {
             map->splitterIndex = window->state.hierarchySplitterIndex;

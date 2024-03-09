@@ -357,6 +357,12 @@ void appendToContainer(Container *c, Bound *bo) {
     if (c->start == NULL) c->start = bo;
     if (c->end != NULL) c->end->next = bo;
     c->end = bo;
+    /* if (c->plane == false) {
+        for (int i = 0; i < 3; i++) {
+            c->a(i) = std::min(c->a(i), bo->min(i));
+            c->b(i) = std::max(c->b(i), bo->max(i));
+        }
+    } */
     c->size++;
 }
 

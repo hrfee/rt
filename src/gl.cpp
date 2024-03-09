@@ -149,6 +149,7 @@ void GLWindow::loadUI() {
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    state.rc.threadStates = NULL;
     state.rc.renderOnChange = false;
     ui.renderMode = 1;
     state.rc.distanceDivisor = 1.f;
@@ -233,6 +234,17 @@ namespace {
     const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Glassner/Octree (Disables BVH)"};
 }
 
+std::string GLWindow::threadInfo() {
+    std::ostringstream out;
+    if (state.rc.threadStates == NULL) return out.str();
+    int done = 0;
+    for (int i = 0; i < state.rc.nthreads; i++) {
+        if (state.rc.threadStates[i] == 0) done++;
+    }
+    out << done << "/" << state.rc.nthreads << " threads complete.";
+    return out.str();
+}
+
 std::string GLWindow::frameInfo() {
     std::ostringstream out;
     out.precision(5);
@@ -251,7 +263,7 @@ std::string GLWindow::frameInfo() {
         out << int(1.f/state.lastRenderTime);
     }
     out << "fps) ";
-    out << "at " << state.lastRenderW << 'x' << state.lastRenderH << ".";
+    out << "at " << state.lastRenderW << 'x' << state.lastRenderH << " on " << state.rc.nthreads << " threads.";
     return out.str();
 }
 
@@ -266,10 +278,7 @@ std::string GLWindow::hierarchyInfo() {
     out << "took ";
     out << int(state.lastOptimizeTime*1000.f) << "ms ";
     if (state.lastOptimizeTime > 1.f) {
-        out << "(";
-        out << state.lastOptimizeTime << "s)";
-        out.precision(2);
-        out << 1.f/state.lastOptimizeTime;
+        out << "(" << state.lastOptimizeTime << "s) ";
     }
     out << "at max depth " << state.hierarchyDepth << ".";
     return out.str();
@@ -360,9 +369,17 @@ void GLWindow::addUI() {
             state.vpDim.update();
         }
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
-        if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button("Render", ImVec2(120, 40));
+        if (!state.rc.renderOnChange && !state.currentlyRendering) state.rc.renderNow = ImGui::Button("Render", ImVec2(120, 40));
+        if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {
+            for (int i = 0; i < state.rc.nthreads; i++) {
+                state.rc.threadStates[i] = -1;
+            }
+        }
         if (state.lastRenderTime != 0.f) {
             ImGui::Text(frameInfo().c_str());
+        }
+        if (state.currentlyRendering) {
+            ImGui::Text(threadInfo().c_str());
         }
         
         ImGui::Text("Dump render to .tga file");
