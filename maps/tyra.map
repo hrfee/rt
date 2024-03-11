@@ -5,4 +5,4 @@ plight center 5 2 1 color #b5d5ff brightness 10 specular 0.2 color #ffffff
 
 include mattewall.obj
 include plainfloor.obj
-include tyra.obj translate 4 -1.2 0 rotate 0 0.985398 0 scale 0.5
+include tyra.obj translate 4 0 0 rotate 0 0.985398 0 scale 0.5

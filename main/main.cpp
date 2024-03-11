@@ -2,6 +2,7 @@
 #include "img.hpp"
 #include "gl.hpp"
 #include "cam.hpp"
+#include "hierarchy.hpp"
 #include <math.h>
 #include <cstdio>
 #include <getopt.h>
@@ -19,6 +20,37 @@ namespace {
     WorldMap *map;
     Image *img;
     GLWindow *window;
+}
+
+// RENDER STATS
+// mapName,numTris,numSpheres,numLights,rayBounces,renderMode,camPhi,camTheta,camFOVDeg,camPos(spaceseparated),renderTime(ms),width,height,nthreads,bvhMethod,maxDepth,buildTime(ms)
+std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
+    std::ostringstream out;
+    if (header) {
+        out << "Map Name,# Tris,# Spheres,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms)" << ",";
+        out << std::endl;
+    }
+    // Map & Cam info
+    out << map->mapStats.name << "," << map->mapStats.tris << "," << map->mapStats.spheres << "," << map->mapStats.lights << ",";
+    out << window->state.rc.maxBounce << ",";
+    out << modes[window->ui.renderMode] << ",";
+    out << window->state.mouse.phi << "," << window->state.mouse.theta << "," << window->state.fovDeg << ",";
+    out << window->state.rc.manualPosition.x << " " << window->state.rc.manualPosition.y << " " << window->state.rc.manualPosition.z << ",";
+    // Render info
+    out << int(window->state.lastRenderTime * 1000.f) << ",";
+    out << window->state.lastRenderW << "," << window->state.lastRenderH << ",";
+    out << window->state.rc.nthreads << ",";
+    // Hierarchy Info
+    if (window->state.staleHierarchyConfig || !(window->state.useOptimizedMap)) {
+        out << ",,,";
+    } else {
+        out << splitters[window->state.hierarchySplitterIndex] << ",";
+        out << window->state.hierarchyDepth << ",";
+        out << int(window->state.lastOptimizeTime * 1000.f) << ",";
+    }
+    
+    out << std::endl;
+    return out.str();
 }
 
 Image *mainLoop(RenderConfig *rc) {
@@ -45,15 +77,21 @@ Image *mainLoop(RenderConfig *rc) {
 
         if (
             // map->optimizedObj == NULL ||
-            (change && hierarchyChanged)
+            (change && hierarchyChanged && !map->currentlyOptimizing)
         ) {
             map->splitterIndex = window->state.hierarchySplitterIndex;
             map->bvh = window->state.useBVH;
             map->splitterParam = window->state.hierarchyExtraParam;
-            map->optimizeMap(glfwGetTime, window->state.hierarchyDepth, map->splitterIndex);
+            window->state.currentlyOptimizing = true;
+            std::thread opt(&WorldMap::optimizeMap, map, glfwGetTime, window->state.hierarchyDepth, map->splitterIndex);
+            opt.detach();
+            window->state.staleHierarchyConfig = false;
+        } else if (!map->currentlyOptimizing) {
             window->state.lastOptimizeTime = map->lastOptimizeTime;
             window->state.optimizedMap = map->optimizedObj;
-            window->state.staleHierarchyConfig = false;
+            window->state.currentlyOptimizing = false;
+        } else {
+            window->state.lastOptimizeTime = glfwGetTime() - map->lastOptimizeTime;
         }
         map->obj = map->optimizedObj;
     } else {
@@ -100,9 +138,10 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.threadCount = std::thread::hardware_concurrency();
     }
 
-    if (change && !map->currentlyRendering) {
+    if (change && !map->currentlyRendering && !window->state.currentlyOptimizing) {
         clearImage(img);
         // map->castRays(img, rc, glfwGetTime);
+        window->state.csvDirty = true;
         window->state.currentlyRendering = true;
         if (window->state.mouse.enabled) {
             map->castRays(img, rc, glfwGetTime, window->state.threadCount);
@@ -115,6 +154,10 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.lastRenderTime = map->lastRenderTime;
         window->state.lastRenderW = window->state.rDim.w;
         window->state.lastRenderH = window->state.rDim.h;
+        if (window->state.dumpToCsv && window->state.csvDirty) {
+            window->state.csvStats << csvStats(window, map, window->state.csvStats.tellp() == 0 ? true : false);
+            window->state.csvDirty = false;
+        }
     } else {
         window->state.lastRenderTime = glfwGetTime() - map->lastRenderTime;
     }

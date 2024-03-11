@@ -7,6 +7,8 @@
 #include "img.hpp"
 #include "mat.hpp"
 
+extern const char *modes[3];
+
 struct RenderConfig {
     int *threadStates;
     int nthreads;
@@ -42,9 +44,14 @@ struct RayResult {
     Shape *obj;
 };
 
+struct MapStats {
+    std::string name;
+    int spheres, tris, lights;
+};
+
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0), splitterIndex(-1), camPresetNames(NULL), currentlyRendering(false), lastRenderTime(0.f) { obj = &unoptimizedObj; };
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0), splitterIndex(-1), camPresetNames(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f) { obj = &unoptimizedObj; };
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
@@ -63,8 +70,10 @@ class WorldMap {
         Container *obj;
         Container *flatObj;
         Container *optimizedObj;
+        MapStats mapStats;
         Camera *cam;
         bool currentlyRendering;
+        bool currentlyOptimizing;
         double lastRenderTime;
         double lastOptimizeTime;
         void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f, float thickness = -1.f);

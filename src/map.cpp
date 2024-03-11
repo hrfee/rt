@@ -12,11 +12,12 @@
 #include <iostream>
 #include <sstream>
 #include <filesystem>
-#include <functional>
 #include <thread>
 
 #define RI_AIR 1.f
 #define RI_GLASS 1.52f
+
+const char *modes[3] = {"Raycasting", "Raycasting w/ Reflections", "Lighting w/ Phong Specular"};
 
 double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads) {
     if (nthreads == -1) nthreads = std::thread::hardware_concurrency();
@@ -570,6 +571,7 @@ WorldMap::WorldMap(char const* path) {
     optimizeLevel = 0;
     splitterIndex = -1;
     currentlyRendering = false;
+    currentlyOptimizing = false;
     lastRenderTime = 0.f;
     obj = &unoptimizedObj;
     std::memset(&unoptimizedObj, 0, sizeof(Container));
@@ -583,6 +585,9 @@ WorldMap::WorldMap(char const* path) {
 
 // splitterIndex: 0 = splitEqually, 1 = SAH
 void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIdx) {
+    currentlyOptimizing = true;
+    optimizeLevel = level;
+    splitterIndex = splitterIdx;
     std::printf("Optimizing map with splitter %d, depth %d\n", splitterIndex, level);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
@@ -592,7 +597,6 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIdx) 
         flattenRootContainer(flatObj, &unoptimizedObj);
     }
     lastOptimizeTime = getTime();
-    splitterIndex = splitterIdx;
     switch (splitterIndex) {
         case 0:
             optimizedObj = generateHierarchy(flatObj, splitEqually, bvh, level);
@@ -608,7 +612,7 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIdx) 
             break;
     }
     lastOptimizeTime = getTime() - lastOptimizeTime;
-    optimizeLevel = level;
+    currentlyOptimizing = false;
 }
 
 void WorldMap::loadFile(char const* path) {
@@ -622,6 +626,10 @@ void WorldMap::loadFile(char const* path) {
     clearContainer(flatObj, true);
     flatObj = NULL;
     obj = &unoptimizedObj;
+
+    std::memset(&mapStats, 0, sizeof(MapStats));
+    mapStats.name = std::string(path);
+
     std::printf("Allocations: %d\n", loadObjFile(path));
     camPresetNames = (const char**)malloc(sizeof(char*)*camPresets.size());
     for (int i = 0; i < camPresets.size(); i++) {
@@ -720,6 +728,7 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 } else {
                     appendToContainer(c, sphere);
                 }
+                mapStats.spheres++;
                 allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
                 Shape *triangle = decodeTriangle(line);
@@ -733,12 +742,14 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 } else {
                     appendToContainer(c, triangle);
                 }
+                mapStats.tris++;
                 allocCounter += 2; // One for triangle, one for shape container
             }
         } else if (token == w_pointLight) {
             PointLight pl = decodePointLight(line);
             pl.center = pl.center * transform;
             pointLights.emplace_back(pl);
+            mapStats.lights++;
         } else if (token == w_campreset) {
             CamPreset cp = decodeCamPreset(line);
             camPresets.emplace_back(cp);

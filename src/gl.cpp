@@ -7,6 +7,7 @@
 #include <sstream>
 #include <cmath>
 
+#include "hierarchy.hpp"
 #include "shape.hpp"
 #include "tga.hpp"
 #include "imgui_stdlib.h"
@@ -45,10 +46,13 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.scale = scale;
     state.reloadMap = false;
     state.currentlyRendering = false;
+    state.currentlyOptimizing = false;
     state.lastRenderTime = 0.f;
     state.camPresetNames = NULL;
     state.camPresetCount = 0;
     state.camPresetIndex = 0;
+    state.dumpToCsv = false;
+    state.csvDirty = false;
     title = windowTitle;
     ui.hide = false;
     int success = glfwInit();
@@ -229,11 +233,6 @@ void GLWindow::draw(Image *img) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-namespace {
-    const char *modes[] = {"Raycasting", "Raycasting w/ Reflections", "Basic Lighting"};
-    const char *splitters[] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Glassner/Octree (Disables BVH)"};
-}
-
 std::string GLWindow::threadInfo() {
     std::ostringstream out;
     if (state.rc.threadStates == NULL) return out.str();
@@ -275,7 +274,11 @@ std::string GLWindow::hierarchyInfo() {
     if (state.useBVH) {
         out << "(BVH) ";
     }
-    out << "took ";
+    if (state.currentlyOptimizing) {
+        out << "has taken ";
+    } else {
+        out << "took ";
+    }
     out << int(state.lastOptimizeTime*1000.f) << "ms ";
     if (state.lastOptimizeTime > 1.f) {
         out << "(" << state.lastOptimizeTime << "s) ";
@@ -297,6 +300,16 @@ void GLWindow::addUI() {
         ImGui::End();
         return;
     }
+    if (state.csvStats.tellp() != 0) {
+        ImGui::Begin("csv stats");
+        {
+            ImGui::Text(state.csvStats.str().c_str());
+            if (ImGui::Button("Copy to clipboard")) {
+                glfwSetClipboardString(window, state.csvStats.str().c_str());
+            }
+        }
+        ImGui::End();
+    }
     ImGui::Begin("render controls");
     {
         state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes));
@@ -314,9 +327,10 @@ void GLWindow::addUI() {
                 state.rc.lighting = true;
                 state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 0.1f, 5.f) ? true : state.rc.renderNow;
                 state.rc.renderNow = ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::Checkbox("Phong specular", &(state.rc.specular)) ? true : state.rc.renderNow;
+                state.rc.specular = true;
+                // state.rc.renderNow = ImGui::Checkbox("Phong specular", &(state.rc.specular)) ? true : state.rc.renderNow;
                 if (state.rc.specular) {
-                    state.rc.renderNow = ImGui::SliderFloat("Global shininess (n)", &(state.rc.globalShininess), 0.f, 100.f) ? true : state.rc.renderNow;
+                    state.rc.renderNow = ImGui::SliderFloat("Global shininess (phong) (n)", &(state.rc.globalShininess), 0.f, 100.f) ? true : state.rc.renderNow;
                 }
                 break;
         };
@@ -338,8 +352,9 @@ void GLWindow::addUI() {
             if (state.hierarchySplitterIndex == 3) {
                 state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.hierarchyExtraParam), 1, 100) ? true : state.rc.renderNow;
             }
-            if (state.lastOptimizeTime != 0.f)
+            if (state.lastOptimizeTime != 0.f) {
                 ImGui::Text(hierarchyInfo().c_str());
+            }
         } else {
             state.renderOptimizedHierarchy = false;
         }
@@ -369,7 +384,10 @@ void GLWindow::addUI() {
             state.vpDim.update();
         }
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
-        if (!state.rc.renderOnChange && !state.currentlyRendering) state.rc.renderNow = ImGui::Button("Render", ImVec2(120, 40));
+        if (!state.rc.renderOnChange && !state.currentlyRendering) state.rc.renderNow = ImGui::Button(
+                state.staleHierarchyConfig ? "Optimize" : "Render",
+                ImVec2(120, 40)
+        );
         if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {
             for (int i = 0; i < state.rc.nthreads; i++) {
                 state.rc.threadStates[i] = -1;
@@ -381,7 +399,9 @@ void GLWindow::addUI() {
         if (state.currentlyRendering) {
             ImGui::Text(threadInfo().c_str());
         }
-        
+       
+        ImGui::Checkbox("Dump future render stats to CSV buffer", &(state.dumpToCsv));
+
         ImGui::Text("Dump render to .tga file");
         ImGui::InputText(".tga path", &(state.filePath));
         ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));

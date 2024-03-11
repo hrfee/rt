@@ -61,6 +61,10 @@ struct GLWindowState {
         float moveSideways;
     } mouse;
     bool currentlyRendering;
+    bool currentlyOptimizing;
+    std::stringstream csvStats;
+    bool dumpToCsv;
+    bool csvDirty;
 };
 
 struct GLWindowUI {
@@ -88,12 +92,12 @@ class GLWindow {
         void toggleUI() { ui.hide = !ui.hide; };
         void hideUI() { ui.hide = true; };
         void showUI() { ui.hide = false; };
+        GLWindowUI ui;
     private:
         const char *title;
         std::string vertString, fragString;
         GLuint tex, vert, frag, prog, vao;
         void loadShader(GLuint *s, GLenum shaderType, char const *fname);
-        GLWindowUI ui;
         void loadUI();
         void addUI();
         void renderTree(Container *c, int tabIndex = 0);

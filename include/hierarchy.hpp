@@ -5,6 +5,8 @@
 #include "vec.hpp"
 #include <vector>
 
+extern const char *splitters[4];
+
 // A bvhSplitter returns 1 if it believes a split should not occur.
 typedef int (&bvhSplitter)(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int);
 

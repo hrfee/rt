@@ -4,9 +4,12 @@
 #include <cstdlib>
 #include <ctime>
 #include <algorithm>
+#include <thread>
 #include "shape.hpp"
 #include "vec.hpp"
 #include "ray.hpp"
+
+const char *splitters[4] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Glassner/Octree (Disables BVH)"};
 
 bool sortByX(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
@@ -178,22 +181,93 @@ int splitOctree(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis
     }*/
 }
 
+namespace {
+    // Assumed cost values (C_o)
+    const float cSphere = 1.f;
+    const float cTri = 1.5f;
+    // Assumed added cost of traversing the extra nodes added when splitting (C_i)
+    const float cTraverse = 1.f;
+}
+
+void sahAxisSplits(int i, Container *o, float *spl, int *bestIndex, float *bestCost, Bound *bestBound, bool bvh, int *shapeCount) {
+    int splitIndex = 0;
+    bool countComplete = false;
+    Bound *bsplit = o->start;
+    while (bsplit != o->end->next) {
+        Vec3 split = bvh ? bsplit->centroid : bsplit->max;
+        *spl = split(i);
+        // index 0 = spheres, 1 = triangles
+        // float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
+        Bound splitBounds[2];
+        std::memset(&splitBounds, 0, sizeof(Bound)*2);
+        splitBounds[0].min = {1e30f, 1e30f, 1e30f};
+        splitBounds[0].max = {-1e30f, -1e30f, -1e30f};
+        std::memcpy(&(splitBounds[1]), &(splitBounds[0]), sizeof(Bound));
+        // int h = 0;
+        int h0[2] = {0, 0}, h1[2] = {0, 0};
+        Bound *bo = o->start;
+        while (bo != o->end->next) {
+            int shapeIndex = (bo->s->t != NULL) ? 1 : 0;
+            if (!countComplete && shapeCount != NULL) {
+                shapeCount[shapeIndex]++;
+            }
+            int side = -1;
+            if (bvh) {
+                side = whichSideCentroid(bo->centroid(i), o->a(i), *spl, o->b(i));
+            } else {
+                side = whichSide(bo->min(i), bo->max(i), o->a(i), *spl, o->b(i));
+            }
+            if (side == 0 || side == 2) {
+                growBound(&(splitBounds[0]), bo);
+                // sa0[shapeIndex] += surfaceAreas[j];
+                h0[shapeIndex]++;
+            }
+            if (side == 1 || side == 2) {
+                growBound(&(splitBounds[1]), bo);
+                // sa1[shapeIndex] += surfaceAreas[j];
+                h1[shapeIndex]++;
+            }
+            bo = bo->next;
+        }
+        /* for (int j = 0; j < 2; j++) {
+            std::printf("bound[%d] = (%f %f %f - %f %f %f)\n", j, potentialSplit[j].min.x, potentialSplit[j].min.y, potentialSplit[j].min.z, potentialSplit[j].max.x, potentialSplit[j].max.y, potentialSplit[j].max.z);
+        } */ 
+        countComplete = true;
+        // saCalculated = true;
+        
+        // We don't need to divide by totalSA, since its the same for all compared values
+        
+        float sa[2] = {aabbSA(splitBounds[0].min, splitBounds[0].max), aabbSA(splitBounds[1].min, splitBounds[1].max)};
+        if (h0[0] + h0[1] == 0) {
+            sa[0] = 0.f;
+        }
+        if (h1[0] + h1[1] == 0) {
+            sa[1] = 0.f;
+        }
+
+        float cost = cTraverse + (sa[0]*(h0[0]*cSphere + h0[1]*cTri)) + (sa[1]*(h1[0]*cSphere + h1[1]*cTri));
+        if (cost < *bestCost) {
+            *bestIndex = splitIndex;
+            *bestCost = cost;
+            bestBound[0] = splitBounds[0];
+            bestBound[1] = splitBounds[1];
+        }
+        splitIndex++;
+        bsplit = bsplit->next;
+    }
+}
+
 // splitSAH: Use the SAH heuristic:
 // "MACDONALD J. D., BOOTH K. S.: Heuristics for Ray Tracing Using Space Subdivision."
 // As discovered in review paper:
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
+// In it's current state, this is roughly O(3n^2).
 int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
     
-    // Assumed cost values (C_o)
-    float cSphere = 1.f;
-    float cTri = 1.5f;
-    // Assumed added cost of traversing the extra nodes added when splitting (C_i)
-    float cTraverse = 1.f;
-
     Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
@@ -203,75 +277,22 @@ int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, b
     // float *surfaceAreas = (float*)malloc(sizeof(float)*o->size);
     // shapeCount[0]: number of spheres, [1]: number of tris.
     int shapeCount[2] = {0, 0};
-    bool countComplete = false;
+
+    std::thread *axisThreads = new std::thread[3];
 
     for (int i = 0; i < 3; i++) {
-        int splitIndex = 0;
-        Bound *bsplit = o->start;
-        while (bsplit != o->end->next) {
-            Vec3 split = bvh ? bsplit->centroid : bsplit->max;
-            spl(i) = split(i);
-            // index 0 = spheres, 1 = triangles
-            // float sa0[2] = {0.f, 0.f}, sa1[2] = {0.f, 0.f};
-            Bound splitBounds[2];
-            std::memset(&splitBounds, 0, sizeof(Bound)*2);
-            splitBounds[0].min = {1e30f, 1e30f, 1e30f};
-            splitBounds[0].max = {-1e30f, -1e30f, -1e30f};
-            std::memcpy(&(splitBounds[1]), &(splitBounds[0]), sizeof(Bound));
-            // int h = 0;
-            int h0[2] = {0, 0}, h1[2] = {0, 0};
-            Bound *bo = o->start;
-            while (bo != o->end->next) {
-                int shapeIndex = (bo->s->t != NULL) ? 1 : 0;
-                if (!countComplete) {
-                    shapeCount[shapeIndex]++;
-                }
-                int side = -1;
-                if (bvh) {
-                    side = whichSideCentroid(bo->centroid(i), o->a(i), spl(i), o->b(i));
-                } else {
-                    side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
-                }
-                if (side == 0 || side == 2) {
-                    growBound(&(splitBounds[0]), bo);
-                    // sa0[shapeIndex] += surfaceAreas[j];
-                    h0[shapeIndex]++;
-                }
-                if (side == 1 || side == 2) {
-                    growBound(&(splitBounds[1]), bo);
-                    // sa1[shapeIndex] += surfaceAreas[j];
-                    h1[shapeIndex]++;
-                }
-                bo = bo->next;
-            }
-            /* for (int j = 0; j < 2; j++) {
-                std::printf("bound[%d] = (%f %f %f - %f %f %f)\n", j, potentialSplit[j].min.x, potentialSplit[j].min.y, potentialSplit[j].min.z, potentialSplit[j].max.x, potentialSplit[j].max.y, potentialSplit[j].max.z);
-            } */ 
-            countComplete = true;
-            // saCalculated = true;
-            
-            // We don't need to divide by totalSA, since its the same for all compared values
-            
-            float sa[2] = {aabbSA(splitBounds[0].min, splitBounds[0].max), aabbSA(splitBounds[1].min, splitBounds[1].max)};
-            if (h0[0] + h0[1] == 0) {
-                sa[0] = 0.f;
-            }
-            if (h1[0] + h1[1] == 0) {
-                sa[1] = 0.f;
-            }
-
-            float cost = cTraverse + (sa[0]*(h0[0]*cSphere + h0[1]*cTri)) + (sa[1]*(h1[0]*cSphere + h1[1]*cTri));
-            if (cost < bestCosts[i]) {
-                bestIndices[i] = splitIndex;
-                bestCosts[i] = cost;
-                bestBounds[i][0] = splitBounds[0];
-                bestBounds[i][1] = splitBounds[1];
-            }
-            splitIndex++;
-            bsplit = bsplit->next;
-        }
+        axisThreads[i] = std::thread(&sahAxisSplits, i, o, &(spl(i)), &(bestIndices[i]), &(bestCosts[i]), &(bestBounds[i][0]), bvh, i == 0 ? &shapeCount[0] : NULL);
+        // sahAxisSplits(i, o, &(spl(i)), &(bestIndices[i]), &(bestCosts[i]), &(bestBounds[i][0]), bvh, i == 0 ? &shapeCount[0] : NULL);
+        /*axisThreads[i] = std::thread([&, i]() {
+        });
+        */
     }
 
+    for (int i = 0; i < 3; i++) {
+        axisThreads[i].join();
+    }
+
+    delete[] axisThreads;
     // free(surfaceAreas);
 
     int bestAxis = 0;
