@@ -385,7 +385,7 @@ void GLWindow::addUI() {
         }
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
         if (!state.rc.renderOnChange && !state.currentlyRendering) state.rc.renderNow = ImGui::Button(
-                state.staleHierarchyConfig ? "Optimize" : "Render",
+                (state.useOptimizedMap && state.staleHierarchyConfig) ? "Optimize" : "Render",
                 ImVec2(120, 40)
         );
         if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {

@@ -4,10 +4,13 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("obj", help="wavefront file")
-# parser.add_argument("-c", "--color", nargs="?", const="default", help="override color")
+parser.add_argument("-c", "--color", nargs="?", const="default", help="override color")
 parser.add_argument("-r", "--reflectiveness", nargs="?", const="default", help="set reflectiveness")
 
 args = parser.parse_args()
+
+if args.color:
+    c = [float(v) for v in args.color.split(",")]
 
 scene = pywavefront.Wavefront(args.obj)
 
@@ -27,6 +30,14 @@ for name, mat in scene.materials.items():
         reflectiveness = float(args.reflectiveness)
 
     for tri in tris:
-        print(f"triangle a {printVec(tri[0])} b {printVec(tri[1])} c {printVec(tri[2])} color {printVec(mat.diffuse)} specular {mat.specular[3]} color {printVec(mat.specular)} shininess {mat.shininess} opacity {mat.transparency} reflectiveness {reflectiveness}")
+        specPower = mat.specular[3]
+        if mat.specular[0] == 0 and mat.specular[1] == 0 and mat.specular[2] == 0:
+            specPower = 0
+
+        color = mat.diffuse
+        if args.color:
+            color = c
+
+        print(f"triangle a {printVec(tri[0])} b {printVec(tri[1])} c {printVec(tri[2])} color {printVec(color)} specular {specPower} shininess {mat.shininess} opacity {mat.transparency} reflectiveness {reflectiveness}")
 
 

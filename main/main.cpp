@@ -3,7 +3,6 @@
 #include "gl.hpp"
 #include "cam.hpp"
 #include "hierarchy.hpp"
-#include <math.h>
 #include <cstdio>
 #include <getopt.h>
 #include <thread>
@@ -59,6 +58,7 @@ Image *mainLoop(RenderConfig *rc) {
         map->loadFile(window->state.mapPath.c_str());
         window->state.reloadMap = false;
         window->state.useOptimizedMap = false;
+        window->state.staleHierarchyConfig = true;
         change = true;
         window->state.camPresets = &(map->camPresets);
         window->state.camPresetNames = map->camPresetNames;
@@ -71,7 +71,8 @@ Image *mainLoop(RenderConfig *rc) {
             (window->state.hierarchyDepth != map->optimizeLevel ||
             window->state.hierarchySplitterIndex != map->splitterIndex ||
             window->state.useBVH != map->bvh ||
-            window->state.hierarchyExtraParam != map->splitterParam);
+            window->state.hierarchyExtraParam != map->splitterParam ||
+            window->state.staleHierarchyConfig);
 
         if (hierarchyChanged && !change) { window->state.staleHierarchyConfig = true; }
 

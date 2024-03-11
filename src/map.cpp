@@ -455,7 +455,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     if (rc->collisionsOnly) return;
     
     // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-    Vec3 p0PlusABit = res->p0 + (0.001f * res->normal);
+    Vec3 p0PlusABit = res->p0 + (0.01f * res->norm);
     if (rc->reflections && res->obj->reflectiveness != 0) {
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
         Vec3 reflection = delta - 2.f*dot(delta, res->norm) * res->norm;
@@ -470,7 +470,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     if (res->obj->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
         if (res->collisions >= 1 && res->potentialCollisions > 1) {
-            Vec3 p0Transparent = res->p0 - (0.001f * res->normal);
+            Vec3 p0Transparent = res->p0 - (0.01f * res->norm);
             if (res->obj->t != NULL) {
                 RayResult r;
                 castRay(&r, obj, p0Transparent, delta, rc, callCount+1);
@@ -485,6 +485,9 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
    
     res->color = (res->obj->opacity * res->color) + ((1.f - res->obj->opacity) * res->refractColor) + (res->obj->reflectiveness * res->reflectionColor) + res->specularColor;
 
+    if (res->color.x == 0 && res->color.y == 0 && res->color.z == 0) {
+        std::printf("black! refract(%f %f %f), reflect(%f %f %f), specular(%f %f %f)\n", res->refractColor.x, res->refractColor.y, res->refractColor.z, res->reflectionColor.x, res->reflectionColor.y, res->reflectionColor.z, res->specularColor.x, res->specularColor.y, res->specularColor.z);
+    }
     res->color.x = std::fmin(res->color.x, 1.f);
     res->color.y = std::fmin(res->color.y, 1.f);
     res->color.z = std::fmin(res->color.z, 1.f);
