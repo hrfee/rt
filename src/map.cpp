@@ -151,6 +151,33 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     res->color = (res->color * lightColor);
 }
 
+void castThroughSolidSphere(float r0, float r1, Vec3 pb, Vec3 delta, Sphere *s, Vec3 *pOut, Vec3 *deltaOut) {
+    Vec3 normal = pb - s->center;
+    bool tir = true;
+    Vec3 r = Refract(r0, r1, delta, normal, &tir);
+    if (tir) {
+        r = delta - 2.f*dot(delta, normal) * normal;
+        *deltaOut = r;
+        *pOut = pb + (0.001f * r);
+        return;
+    }
+    tir = true;
+    while (tir) {
+        pb = pb + (0.001f * r);
+        float t = meetsSphere(pb, r, s, NULL);
+        pb = pb + (t * r);
+        Vec3 n = -1.f*(pb - s->center);
+        Vec3 r2 = Refract(r1, r0, r, n, &tir);
+        if (tir) {
+            r = r - 2.f*dot(r, n) * n;
+        } else {
+            r = r2;
+        }
+    }
+    *pOut = pb;
+    *deltaOut = r;
+}
+
 void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
     float ri = rc->refractiveIndex;
     float thickness = res->obj->s->thickness;
@@ -160,75 +187,51 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
         ri = RI_AIR;
         thickness = 1.f;
     }
-    // FIXME: Make thickness value look right!
-    // 1. Bounce into the sphere.
-    bool tir = false;
-    Vec3 refract = Refract(RI_AIR, ri, delta, res->normal, &tir);
 
-    if (tir) {
-        // Don't do anything, the sphere should be reflective so it'll look fine.
-        // std::printf("TIR!\n");
-        // res.color = {0.f, 1.f, 0.f};
+    Vec3 pb = res->p0;
+    Vec3 refract;
+    if (thickness == 1.f) {
+        castThroughSolidSphere(RI_AIR, ri, res->p0, delta, res->obj->s, &pb, &refract);
     } else {
-        // 2. Bounce around the glass until we can escape.
-        if (thickness == 1.f) {
-            tir = true;
-            Vec3 pb = res->p0;
-            while (tir) {
-                pb = pb + (0.001f * refract);
-                float t = meetsSphere(pb, refract, res->obj->s, NULL);
-                pb = pb + (t * refract);
-                // Since we're inside the sphere, invert the normal to point inwards
-                Vec3 normal = -1.f*(pb - center);
-                refract = Refract(ri, RI_AIR, refract, normal, &tir);
-            }
-            pb = pb + (0.001f * refract);
-            RayResult r = RayResult();
-            castRay(&r, obj, pb, refract, rc, callCount+1);
-            res->refractColor = r.color;
+        Vec3 normal = pb - center;
+        bool tir = true;
+        Vec3 r = Refract(RI_AIR, ri, delta, normal, &tir);
+        if (tir) {
+            refract = delta - 2.f*dot(delta, normal) * normal;
         } else {
-            // For hollow spheres, use an inner, smaller sphere with radius based on the thickness.
+            bool escaped = false;
+            refract = r;
             Sphere innerSphere = {center, res->obj->s->radius*(1.f - res->obj->s->thickness), 1.f};
-            tir = true;
-            Vec3 pb = res->p0;
-            bool hitInternalSphere = true;
-            while (tir) {
+            while (!escaped) {
                 float t = meetsSphere(pb, refract, &innerSphere, NULL);
-                if (t < 0) {
-                    hitInternalSphere = false;
-                    break;
-                }
-                pb = pb + (t * refract);
-                // Since we're inside the sphere, invert the normal to point inwards
-                Vec3 normal = -1.f*(pb - center);
-                refract = Refract(ri, RI_AIR, refract, normal, &tir);
-            }
-            if (hitInternalSphere) {
-                tir = true;
-                pb = pb + (0.001f * refract);
-                while (tir) {
-                    float t = meetsSphere(pb, refract, &innerSphere, NULL);
+                if (t >= 0) {
                     pb = pb + (t * refract);
-                    Vec3 normal = -1.f*(pb - center);
-                    refract  = Refract(RI_AIR, ri, refract, normal, &tir);
+                    Vec3 p2;
+                    castThroughSolidSphere(ri, RI_AIR, pb, refract, &innerSphere, &p2, &r);
+                    pb = p2;
+                    refract = r;
+                    t = meetsSphere(pb, refract, res->obj->s, NULL);
+                    pb = pb + (t * refract);
+                    normal = -1.f * (pb - center);
+                    r = Refract(ri, RI_AIR, refract, normal, &tir);
+                    if (tir) {
+                        refract = refract - 2.f*dot(refract, normal) * normal;
+                    } else {
+                        refract = r;
+                        escaped = true;
+                    }
+                } else { // Missing the internal sphere means we can pretend its not there.
+                    castThroughSolidSphere(RI_AIR, ri, res->p0, delta, res->obj->s, &pb, &refract);
+                    escaped = true;
                 }
             }
-            tir = true;
-            pb = pb + (0.001f * refract);
-            while (tir) {
-                float t = meetsSphere(pb, refract, res->obj->s, NULL);
-                pb = pb + (t * refract);
-                Vec3 normal = -1.f*(pb - center);
-                refract  = Refract(ri, RI_AIR, refract, normal, &tir);
-            }
-            pb = pb + (0.001f * refract);
-            RayResult r = RayResult();
-            castRay(&r, obj, pb, refract, rc, callCount+1);
-            // std::printf("col: %d\n", r.collisions);
-            if (r.collisions > 0 && r.obj->s == res->obj->s) std::printf("self!\n");
-            res->refractColor = r.color;
         }
     }
+    
+    pb = pb + (0.001f * refract);
+    RayResult r = RayResult();
+    castRay(&r, obj, pb, refract, rc, callCount+1);
+    res->refractColor = r.color;
 }
 
 void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {

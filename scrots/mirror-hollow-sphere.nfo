@@ -1,0 +1,3 @@
+Map Name,# Tris,# Spheres,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms),
+maps/room.map,1204,3,2,30,Lighting w/ Phong Specular,0.297253,-0.046543,70,-0.557706 1.02205 1.14304,288221,3840,2160,1080,Surface area heuristic (SAH),32,49,
+

@@ -155,12 +155,11 @@ Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir) {
     // \vec{T} = out,
     // \vec{N} = normal_,
     
-    // CGPaP describes \vec{I} in forwards ray tracing terms, so we invert ours.
-    Vec3 a_ = -1.f * norm(a);
+    Vec3 a_ = 1.f * norm(a);
     Vec3 normal_ = norm(normal); 
     *tir = false;
     float indexRatio = ra / rb;
-    float cosIncident = dot(normal_, a_);
+    float cosIncident = -dot(normal_, a_);
     // When the square root below (cosOut) is imaginary, TIR occurs.
     // Hence when sinIncidentSquared is greater than 1, TIR occurs.
     float sinIncidentSquared = (indexRatio * indexRatio) * (1.f - (cosIncident*cosIncident));
@@ -170,7 +169,7 @@ Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir) {
     }
     float cosOut = std::sqrt(1.f - sinIncidentSquared);
 
-    Vec3 out = (((indexRatio * cosIncident) - cosOut) * normal_) - (indexRatio * a_);
+    Vec3 out = (((indexRatio * cosIncident) - cosOut) * normal_) + (indexRatio * a_);
     return out;
 }
 
