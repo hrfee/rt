@@ -135,7 +135,7 @@ int whichSide(float bmin, float bmax, float a, float mid, float b) {
     return -1;
 }
 
-int whichSideCentroid(float centroid, float a, float mid, float b) {
+int whichSideCentroid(float centroid, float mid) {
     return centroid <= mid ? 0 : 1;
 }
 
@@ -157,7 +157,7 @@ float aabbSA(Vec3 a, Vec3 b) {
 // Recursively subdivide scene until this number of objects is reached.
 // Makes things very simple, all we do here is tell the caller to split halfway along a cycling axis.
 // Ignores the bvh param.
-int splitOctree(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int maxNodesPerVox) {
+int splitOctree(Container *o, float *split, Bound *, Bound *, int *splitAxis, bool, int lastAxis, int maxNodesPerVox) {
     if (maxNodesPerVox < 1) return 1;
     if (o->size <= maxNodesPerVox) return 1;
 
@@ -213,7 +213,7 @@ void sahAxisSplits(int i, Container *o, float *spl, int *bestIndex, float *bestC
             }
             int side = -1;
             if (bvh) {
-                side = whichSideCentroid(bo->centroid(i), o->a(i), *spl, o->b(i));
+                side = whichSideCentroid(bo->centroid(i), *spl);
             } else {
                 side = whichSide(bo->min(i), bo->max(i), o->a(i), *spl, o->b(i));
             }
@@ -263,7 +263,7 @@ void sahAxisSplits(int i, Container *o, float *spl, int *bestIndex, float *bestC
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
 // In it's current state, this is roughly O(3n^2).
-int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int) {
+int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int, int) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
@@ -350,7 +350,7 @@ int splitEqually(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxi
             while (bo != o->end->next) {
                 int side = -1;
                 if (bvh) {
-                    side = whichSideCentroid(bo->centroid(i), o->a(i), spl(i), o->b(i));
+                    side = whichSideCentroid(bo->centroid(i), spl(i));
                 } else {
                     side = whichSide(bo->min(i), bo->max(i), o->a(i), spl(i), o->b(i));
                 }
@@ -433,7 +433,7 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
         bool added = false;
         int side = -1;
         if (bvh) {
-            side = whichSideCentroid(bo->centroid(bestAxis), o->a(bestAxis), splA, o->b(bestAxis));
+            side = whichSideCentroid(bo->centroid(bestAxis), splA);
         } else {
             side = whichSide(bo->min(bestAxis), bo->max(bestAxis), o->a(bestAxis), splA, o->b(bestAxis));
         }

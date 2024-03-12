@@ -42,6 +42,21 @@ struct RayResult {
     Vec3 normal;
     Vec3 norm;
     Shape *obj;
+    RayResult() { resetObj(); };
+    void resetObj() {
+        collisions = 0;
+        potentialCollisions = 0;
+        t = 1e10;
+        t1 = 1e10;
+        color = {0,0,0};
+        reflectionColor = {0,0,0};
+        specularColor = {0,0,0};
+        refractColor = {0,0,0};
+        p0 = {0,0,0};
+        normal = {0,0,0};
+        norm = {0,0,0};
+        obj = NULL; 
+    };
 };
 
 struct MapStats {
@@ -51,7 +66,7 @@ struct MapStats {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), optimizedObj(NULL), optimizeLevel(0), splitterIndex(-1), camPresetNames(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f) { obj = &unoptimizedObj; };
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), splitterIndex(-1), bvh(false), splitterParam(-1), obj(NULL), flatObj(NULL), optimizedObj(NULL), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f), lastOptimizeTime(0.f) { obj = &unoptimizedObj; }
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;

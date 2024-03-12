@@ -47,8 +47,7 @@ std::string encodeCamPreset(CamPreset *p) {
 
 CamPreset decodeCamPreset(std::string in) {
     std::stringstream stream(in);
-    CamPreset p;
-    std::memset(&p, 0, sizeof(CamPreset));
+    CamPreset p = CamPreset();
     do {
         std::string w;
         stream >> w;
@@ -320,7 +319,7 @@ Vec3 decodeColour(std::stringstream *stream) {
                 // dump all we took back into the main stream.
                 *stream << nextWords.str();
             }
-        };
+        }; [[fallthrough]];
         case 0: {
             c.x = std::stof(w);
             *stream >> w;
@@ -382,7 +381,7 @@ void appendToContainer(Container *cParent, Container *c) {
     auto bo = emptyBound();
     bo->s = emptyShape();
     bo->s->c = c;
-    appendToContainer(c, bo);
+    appendToContainer(cParent, bo);
 }
 
 Bound *boundByIndex(Container *c, int i) {

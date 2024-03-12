@@ -72,6 +72,13 @@ struct CamPreset {
     float phi, theta;
     Vec3 pos;
     float fov;
+    CamPreset() {
+        name.clear();
+        phi = 0.f;
+        theta = 0.f;
+        pos = {0,0,0};
+        fov = 0.f;
+    };
 };
 
 std::string encodePointLight(PointLight *p);

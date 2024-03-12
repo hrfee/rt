@@ -483,7 +483,7 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
 
         addUI();
 
-        bool resizeRequested = state.rDim.dirty();
+        // bool resizeRequested = state.rDim.dirty();
         bool windowResized = state.fbDim.dirty();
         if (windowResized) {
             // FIXME: We might need this, so probably don't clean it!
@@ -592,11 +592,11 @@ void showKeyboardHelp() {
     )");
 }
 
-void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
+void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /* mod */) {
     // Ignore if any imgui fields are being typed in.
     if (ImGui::GetIO().WantTextInput) return;
     GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
-    if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled) {
+    if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled && !w->state.currentlyRendering && !w->state.currentlyOptimizing) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         w->state.mouse.enabled = true;
         w->hideUI();
