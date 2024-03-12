@@ -13,6 +13,7 @@
 #include "imgui_stdlib.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 #define MOVE_SPEED 0.1f
 
@@ -287,6 +288,14 @@ std::string GLWindow::hierarchyInfo() {
     return out.str();
 }
 
+void GLWindow::disable() {
+    if (state.currentlyRendering || state.currentlyOptimizing) ImGui::BeginDisabled();
+}
+
+void GLWindow::enable() {
+    if (state.currentlyRendering || state.currentlyOptimizing) ImGui::EndDisabled();
+}
+
 void GLWindow::addUI() {
     bool backgroundText = ui.hide;
     if (backgroundText) {
@@ -312,6 +321,7 @@ void GLWindow::addUI() {
     }
     ImGui::Begin("render controls");
     {
+        disable();
         state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes));
         switch(ui.renderMode) {
             case 0:
@@ -361,6 +371,7 @@ void GLWindow::addUI() {
 
         state.rc.renderNow = ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f) ? true : state.rc.renderNow;
+        enable();
     }
     ImGui::End();
     ImGui::Begin("output controls");
@@ -371,6 +382,7 @@ void GLWindow::addUI() {
         ImGui::Text("Window Resolution");
         // if (state.rc.renderOnChange) 
         ImGui::Text("Press <Enter> to apply w/h changes.");
+        disable();
         // ImGui::Text("Changes will be applied when \"Render\" is pressed.");
         ImGui::InputInt("Width", &(state.vpDim.w), 1, 100, ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::InputInt("Height", &(state.vpDim.h), 1, 100, ImGuiInputTextFlags_EnterReturnsTrue);
@@ -384,10 +396,11 @@ void GLWindow::addUI() {
             state.vpDim.update();
         }
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
-        if (!state.rc.renderOnChange && !state.currentlyRendering) state.rc.renderNow = ImGui::Button(
+        if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button(
                 (state.useOptimizedMap && state.staleHierarchyConfig) ? "Optimize" : "Render",
                 ImVec2(120, 40)
         );
+        enable();
         if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {
             for (int i = 0; i < state.rc.nthreads; i++) {
                 state.rc.threadStates[i] = -1;
@@ -407,24 +420,27 @@ void GLWindow::addUI() {
         ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
         ImGui::Text("Map Loading");
         ImGui::InputText(".map path", &(state.mapPath));
+        disable();
         state.reloadMap = ImGui::Button("Reload Map (50/50 SEGV)", ImVec2(90, 25));
         if (state.reloadMap) {
             state.rc.baseBrightness = -1.f;
             state.rc.globalShininess = -1.f;
         }
+        enable();
     }
     ImGui::End();
     ImGui::Begin("camera controls");
     {
-        // ImGui::BeginChild("Camera Angle");
+        disable();
         ImGui::Text("Camera Angle");
         ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
         ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), -M_PI/2.f, M_PI/2.f);
-        // ImGui::EndChild();
         ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
         state.rc.renderNow = ImGui::InputFloat3("Position", (float*)&(state.rc.manualPosition)) ? true : state.rc.renderNow;
+        enable();
         if (state.camPresetNames != NULL && state.camPresetCount != 0) {
             ImGui::Combo("Camera Preset", &(state.camPresetIndex), state.camPresetNames, state.camPresetCount);
+            disable();
             if (ImGui::Button("Load preset") && state.camPresets != NULL) {
                 CamPreset p = state.camPresets->at(state.camPresetIndex);
                 state.mouse.phi = p.phi;
@@ -432,6 +448,7 @@ void GLWindow::addUI() {
                 state.fovDeg = p.fov;
                 state.rc.manualPosition = p.pos;
             }
+            enable();
         }
         if (ImGui::Button("Copy cam preset to clipboard")) {
             CamPreset p;

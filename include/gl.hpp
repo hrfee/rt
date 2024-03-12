@@ -102,6 +102,8 @@ class GLWindow {
         void addUI();
         void renderTree(Container *c, int tabIndex = 0);
         GLfloat glFrameVertices[8];
+        void disable();
+        void enable();
 };
 
 void resizeWindowCallback(GLFWwindow *, int, int);
