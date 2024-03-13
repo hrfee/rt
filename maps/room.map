@@ -3,3 +3,4 @@ include floor.obj
 include wall.obj
 
 campreset roomview pos 0 1 0 phi -1.08917 theta -0.182 fov 70
+campreset wideangle pos 0 3 0 phi -0.550702 theta -0.443808 fov 90

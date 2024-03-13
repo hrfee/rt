@@ -1,0 +1,6 @@
+sphere center 1.2 .95 0.2 radius 0.12 thickness 1 color 1 1 1 opacity 0.05 reflectiveness 0.2 specular 1 shininess 10
+sphere center 0 .9 0.1 radius 0.08 thickness 0.05 color 1 0 0 opacity 0.1 reflectiveness 0.2 specular 1 shininess 10
+sphere center -2 .9 -0.8 radius 0.08 thickness 0.05 color 1 0 0 opacity 1 reflectiveness 0.3 specular 1 shininess 20
+sphere center -3 .9 1.2 radius 0.08 thickness 0.05 color 0.1 0.6 0 opacity 1 reflectiveness 0.3 specular 1 shininess 20
+sphere center 2 .9 -0.6 radius 0.08 thickness 0.05 color 0.1 0.6 0.8 opacity 1 reflectiveness 0.3 specular 1 shininess 20
+include table.obj

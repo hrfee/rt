@@ -765,7 +765,7 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
             std::filesystem::path inc(token);
             std::filesystem::path eval = base / inc;
 
-            Mat4 trans = mat44Identity;
+            Mat4 trans = transform;
             for (int j = 0; j < 3; j++) {
                 lstream >> token;
                 if (token == w_translate) {

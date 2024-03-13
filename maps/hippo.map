@@ -1,0 +1,8 @@
+map dimensions 50 50 50 brightness 0.0 shininess 5
+
+plight center 0 4.9 0 color #ffa3d7 brightness 15 specular 0.2 color #ffffff
+plight center 5 2 1 color #b5d5ff brightness 10 specular 0.2 color #ffffff
+
+include mattewall.obj
+include plainfloor.obj
+include hippo.obj translate 4 -0.3 0 rotate 0 -1.385398 0 scale 0.05
