@@ -405,6 +405,14 @@ int clearContainer(Container *c, bool clearChildShapes) {
     int boundLimit = c->voxelSubdiv*c->voxelSubdiv*c->voxelSubdiv;
     while (bo != end) {
         Shape *current = bo->s;
+        bool isContainer = current->c != NULL;
+        if (isContainer) {
+            freeCounter += clearContainer(current->c, clearChildShapes);
+            free(current->c);
+            current->c = NULL;
+            freeCounter++;
+        }
+
         if (clearChildShapes || current->debug) {
             if (current->s != NULL) {
                 free(current->s);
@@ -416,12 +424,8 @@ int clearContainer(Container *c, bool clearChildShapes) {
                 current->t = NULL;
                 freeCounter++;
             }
-            if (current->c != NULL) {
-                freeCounter += clearContainer(current->c);
-                free(current->c);
-                current->c = NULL;
-                freeCounter++;
-            }
+        }
+        if (isContainer || clearChildShapes || current->debug) {
             free(current);
             freeCounter++;
         }

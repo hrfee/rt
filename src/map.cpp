@@ -599,19 +599,14 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int splitterIdx) 
         flattenRootContainer(flatObj, &unoptimizedObj);
     }
     lastOptimizeTime = getTime();
-    switch (splitterIndex) {
-        case 0:
-            optimizedObj = generateHierarchy(flatObj, splitEqually, bvh, level);
-            break;
-        case 1:
-            optimizedObj = generateHierarchy(flatObj, splitSAH, bvh, level);
-            break;
-        case 2:
-            optimizedObj = splitVoxels(flatObj, level);
-            break;
-        case 3:
-            optimizedObj = generateHierarchy(flatObj, splitOctree, false, level, 0, -1, 0, splitterParam);
-            break;
+    if (splitterIndex == 2) {
+        optimizedObj = splitVoxels(flatObj, level);
+    } else if (splitterIndex == 3) {
+        optimizedObj = generateHierarchy(flatObj, splitterIndex, false, level, 0, -1, 0, splitterParam);
+    } else if (splitterIndex == 4) {
+        optimizedObj = generateOctreeHierarchy(flatObj, level, 0, 0, splitterParam);
+    } else {
+        optimizedObj = generateHierarchy(flatObj, splitterIndex, bvh, level);
     }
     lastOptimizeTime = getTime() - lastOptimizeTime;
     currentlyOptimizing = false;

@@ -9,7 +9,7 @@
 #include "vec.hpp"
 #include "ray.hpp"
 
-const char *splitters[4] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Glassner/Octree (Disables BVH)"};
+const char *splitters[5] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Bi- tree (Disables BVH)", "Glassner/Octree (Disables BVH)"};
 
 bool sortByX(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
@@ -139,6 +139,33 @@ int whichSideCentroid(float centroid, float mid) {
     return centroid <= mid ? 0 : 1;
 }
 
+constexpr inline bool left(int v) {
+    return v == 1 || v == 4;
+}
+constexpr inline bool right(int v) {
+    return v == 3 || v == 4;
+}
+
+void whichOctants(bool *octants, Vec3 bMin, Vec3 bMax, Vec3 midPoint) {
+    float side[3] = {0, 0, 0};
+    for (int i = 0; i < 3;  i++) {
+        if (bMin(i) < midPoint(i) || bMax(i) < midPoint(i)) {
+            side[i] += 1;
+        }
+        if (bMin(i) >= midPoint(i) || bMax(i) >= midPoint(i)) {
+            side[i] += 3;
+        }
+    }
+    octants[0] = left(side[0]) && left(side[1]) && left(side[2]);
+    octants[1] = right(side[0]) && left(side[1]) && left(side[2]);
+    octants[2] = left(side[0]) && right(side[1]) && left(side[2]);
+    octants[3] = right(side[0]) && right(side[1]) && left(side[2]);
+    octants[4] = left(side[0]) && left(side[1]) && right(side[2]);
+    octants[5] = right(side[0]) && left(side[1]) && right(side[2]);
+    octants[6] = left(side[0]) && right(side[1]) && right(side[2]);
+    octants[7] = right(side[0]) && right(side[1]) && right(side[2]);
+}
+
 void growBound(Bound *dst, Bound *src) {
     for (int i = 0; i < 3; i++) {
         dst->min(i) = std::min(dst->min(i), src->min(i));
@@ -152,12 +179,15 @@ float aabbSA(Vec3 a, Vec3 b) {
 }
 
 // splitOctree: 
+
+
+// splitBitree: A bit like octree, except splits are just halving a node.
 // "GLASSNER: Space Subdivision for Fast Ray Tracing"
 // Set a fixed max number of objects per node/AABB.
 // Recursively subdivide scene until this number of objects is reached.
 // Makes things very simple, all we do here is tell the caller to split halfway along a cycling axis.
 // Ignores the bvh param.
-int splitOctree(Container *o, float *split, Bound *, Bound *, int *splitAxis, bool, int lastAxis, int maxNodesPerVox) {
+int splitBitree(Container *o, float *split, Bound *, Bound *, int *splitAxis, bool, int lastAxis, int maxNodesPerVox) {
     if (maxNodesPerVox < 1) return 1;
     if (o->size <= maxNodesPerVox) return 1;
 
@@ -406,9 +436,102 @@ int splitEqually(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxi
     return 0;
 }
 
+Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount, int colorIndex, int maxNodesPerVox) {
+    if (splitCount >= splitLimit || o->size <= maxNodesPerVox || maxNodesPerVox < 1) return NULL;
+    Container *out = emptyContainer();
+    out->a = o->a; // {1e30, 1e30, 1e30};
+    out->b = o->b; // {-1e30, -1e30, -1e30};
 
-// Not really either, as space is partitioned on a plane (like KD-trees), but splits are constrained to the boundaries of their contents, like BVHs.
-Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
+    Vec3 voxDim = (o->b - o->a) / 2.f;
+
+    Bound b[8];
+    
+    // x = l/r, y = u/d
+    // z=0          z=1
+    // -----        -----
+    // |3|4|        |7|8|
+    // -----        -----
+    // |1|2|        |5|6|
+    // -----        -----
+    for (int z = 0; z < 2; z++) {
+        for (int y = 0; y < 2; y++) {
+            for (int x = 0; x < 2; x++) {
+                int i = (z * 4) + (y * 2) + x;
+                b[i].next = NULL;
+                b[i].min = {o->a.x + (x*(voxDim.x)), o->a.y + (y*(voxDim.y)), o->a.z + (z*(voxDim.z))};
+                b[i].max = b[i].min + voxDim;
+                b[i].s = emptyShape();
+                b[i].s->c = emptyContainer();
+                b[i].s->c->a = b[i].min;
+                b[i].s->c->b = b[i].max;
+            }
+        }
+    }
+
+    Vec3 midPoint = o->a + voxDim;
+
+    Bound *bo = o->start;
+    bool octantsOccupied[8];
+    while (bo != o->end->next) {
+        bool added = false;
+        whichOctants((bool*)&octantsOccupied, bo->min, bo->max, midPoint);
+        // std::printf("octantMap: ");
+        for (int i = 0; i < 8; i++) {
+            // std::printf("%d ", octantsOccupied[i]);
+            if (octantsOccupied[i] == 0) continue;
+            bool fullyContained = false;
+            if (bo->s->s != NULL) {
+                // Check if node is fully contained within sphere, by checking sphere center -> node corner is < radius for min/max corners
+                float minDistance = mag(b[i].min - bo->s->s->center);
+                float maxDistance = mag(b[i].max - bo->s->s->center);
+                fullyContained = (minDistance <= bo->s->s->radius && maxDistance <= bo->s->s->radius);
+            }
+            if (!fullyContained) {
+                appendToContainer(b[i].s->c, *bo);
+                added = true;
+            }
+        }
+        // std::printf("\n");
+        if (!added) std::printf("skipped!\n");
+        bo = bo->next;
+    }
+
+    for (int i = 0; i < 8; i++) {
+        Container *c = b[i].s->c;
+        if (c->size == 0) {
+            free(b[i].s->c);
+            free(b[i].s);
+            continue;
+        }
+
+        Container *splitAgain = generateOctreeHierarchy(c, splitLimit, splitCount+1, colorIndex, maxNodesPerVox);
+        colorIndex += (splitLimit - splitCount)*8;
+        if (splitAgain != NULL) {
+            clearContainer(c, false);
+            free(c);
+            c = splitAgain;
+            b[i].s->c = c;
+        }
+        // DEBUG SPHERES
+        // containerSphereCorners(c);
+        containerCube(c, distinctColors[colorIndex % 16]);
+        colorIndex++;
+       
+        appendToContainer(out, b[i]);
+    }
+
+    // Uncomment to render hierarchy in detail in console.
+    /* if (splitCount == 0) {
+        // std::printf("------INITIAL------\n");
+        // printShapes(o);
+        std::printf("------HIERARCHY (%d leaves)------\n", o->size);
+        printShapes(out);
+    } */
+    return out;
+}
+
+
+Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
     out->a = o->a; // {1e30, 1e30, 1e30};
@@ -418,8 +541,17 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
 
     float splA = -1.f;
     Bound b[2];
-    int stopSplitting = split(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
-    if (stopSplitting) {
+
+    int stopSplitting = 0;
+    if (splitterIndex == 0) {
+        stopSplitting = splitEqually(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
+    } else if (splitterIndex == 1) {
+        stopSplitting = splitSAH(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
+    } else if (splitterIndex == 3) {
+        stopSplitting = splitBitree(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
+    }
+
+    if (stopSplitting == 1) {
         std::printf("stopped splitting @ %d\n", splitCount);
         free(out);
         return NULL;
@@ -427,6 +559,24 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
     
     Container *containers[2] = {emptyContainer(), emptyContainer()};
 
+    if (splitterIndex == 3) {
+        for (int i = 0; i < 2;  i++) {
+            Container *c = containers[i];
+            /*if (c->size == 1) {
+                std::memcpy(sections[i], c->start, sizeof(Shape));
+                free(c);
+
+            } else */
+            c->a = out->a;
+            c->b = out->b;
+            c->splitAxis = bestAxis;
+
+            Vec3 *boundary = &(c->b);
+            if (i == 1) boundary = &(c->a);
+
+            boundary->idx(bestAxis) = splA;
+        }
+    }
 
     Bound *bo = o->start;
     while (bo != o->end->next) {
@@ -438,15 +588,36 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
             side = whichSide(bo->min(bestAxis), bo->max(bestAxis), o->a(bestAxis), splA, o->b(bestAxis));
         }
         if (side == 0 || side == 2) {
-            appendToContainer(containers[0], *bo); // Make copy rather than appending existing pointer
-            added = true;
+            // For an octree, check if any of the faces (estimated) are actually in the node.
+            // A tri has no volume, hence one cannot be "inside" and not on a surface. Therefore we can assume a face is found within the node.
+            // A sphere is a different case, however.
+            bool fullyContained = false;
+            if (splitterIndex == 3 && bo->s->s != NULL) {
+                // Check if node is fully contained within sphere, by checking sphere center -> node corner is < radius for min/max corners
+                float minDistance = mag(containers[0]->a - bo->s->s->center);
+                float maxDistance = mag(containers[0]->b - bo->s->s->center);
+                fullyContained = (minDistance < bo->s->s->radius && maxDistance < bo->s->s->radius);
+            }
+            if (!fullyContained) {
+                appendToContainer(containers[0], *bo); // Make copy rather than appending existing pointer
+                added = true;
+            }
             /* if (bvh) {
                 bbEdges[0] = std::max(bbEdges[0], bo->max(bestAxis));
             } */
         }
         if (side == 1 || side == 2) {
-            appendToContainer(containers[1], *bo); // Make copy rather than appending existing pointer
-            added = true;
+            bool fullyContained = false;
+            if (splitterIndex == 3 && bo->s->s != NULL) {
+                // Check if node is fully contained within sphere, by checking sphere center -> node corner is < radius for min/max corners
+                float minDistance = mag(containers[0]->a - bo->s->s->center);
+                float maxDistance = mag(containers[0]->b - bo->s->s->center);
+                fullyContained = (minDistance < bo->s->s->radius && maxDistance < bo->s->s->radius);
+            }
+            if (!fullyContained) {
+                appendToContainer(containers[1], *bo); // Make copy rather than appending existing pointer
+                added = true;
+            }
             /* if (bvh) {
                 bbEdges[1] = std::min(bbEdges[1], bo->min(bestAxis));
             } */
@@ -478,8 +649,7 @@ Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int spli
 
                 boundary->idx(bestAxis) = splA;
             }
-
-            Container *splitAgain = generateHierarchy(c, split, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
+            Container *splitAgain = generateHierarchy(c, splitterIndex, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
             colorIndex += (splitLimit - splitCount)*2;
             if (splitAgain != NULL) {
                 free(c);

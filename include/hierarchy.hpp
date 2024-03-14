@@ -3,19 +3,22 @@
 
 #include "shape.hpp"
 #include "vec.hpp"
-#include <vector>
 
-extern const char *splitters[4];
+extern const char *splitters[5];
+
+
 
 // A bvhSplitter returns 1 if it believes a split should not occur.
 typedef int (&bvhSplitter)(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int);
 
 int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int);
 int splitEqually(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int);
-int splitOctree(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int maxNodesPerVox = 2);
+int splitBitree(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int lastAxis, int maxNodesPerVox = 2);
 
-Container* generateHierarchy(Container *o, bvhSplitter split, bool bvh, int splitLimit, int splitCount = 0, int lastAxis = -1, int colorIndex = 0, int extra = 0);
-void printShapes(Container *c, int tabIndex = 0);
+Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int splitLimit, int splitCount = 0, int lastAxis = -1, int colorIndex = 0, int extra = 0);
+Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount, int colorIndex, int maxNodesPerVox);
+
+    void printShapes(Container *c, int tabIndex = 0);
 
 float containerSA(Container *o);
 float shapeSA(Shape *sh);

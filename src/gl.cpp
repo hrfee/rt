@@ -359,7 +359,7 @@ void GLWindow::addUI() {
                 renderTree(state.optimizedMap);
             }
             state.rc.renderNow = ImGui::Combo("BVH Splitter", &(state.hierarchySplitterIndex), splitters, IM_ARRAYSIZE(splitters));
-            if (state.hierarchySplitterIndex == 3) {
+            if (state.hierarchySplitterIndex == 3 || state.hierarchySplitterIndex == 4) {
                 state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.hierarchyExtraParam), 1, 100) ? true : state.rc.renderNow;
             }
             if (state.lastOptimizeTime != 0.f) {
