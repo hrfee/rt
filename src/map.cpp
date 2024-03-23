@@ -234,7 +234,6 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
     res->refractColor = r.color;
 }
 
-// FIXME: If a view vector to a voxel is negative, we see black.
 void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
     delta = norm(delta);
     int x = 0, y = 0, z = 0;
@@ -266,8 +265,13 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
     // tMaxX/Y/Z: How far we need to travel to hit our home voxel's x/y/z boundaries.
     Vec3 tMax = {0,0,0};
     for (int i = 0; i < 3; i++) {
-        float boundary = step[i] == 1 ? cVoxMax(i) : cVoxMin(i);
-        tMax(i) = (boundary - p0(i)) / delta(i);
+        if (step[i] == 0) {
+            // Makes sure it's never the smallest, and so never gets incremented.
+            tMax(i) = 1e10f;
+        } else {
+            float boundary = step[i] == 1 ? cVoxMax(i) : cVoxMin(i);
+            tMax(i) = (boundary - p0(i)) / delta(i);
+        }
     }
 
     // tDeltaX/Y/Z: How far to travel until we've gone a distance equal to the depth/height/width of a voxel.
