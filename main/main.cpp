@@ -2,7 +2,7 @@
 #include "img.hpp"
 #include "gl.hpp"
 #include "cam.hpp"
-#include "hierarchy.hpp"
+#include "accel.hpp"
 #include <cstdio>
 #include <getopt.h>
 #include <thread>
@@ -40,11 +40,11 @@ std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
     out << window->state.lastRenderW << "," << window->state.lastRenderH << ",";
     out << window->state.rc.nthreads << ",";
     // Hierarchy Info
-    if (window->state.staleHierarchyConfig || !(window->state.useOptimizedMap)) {
+    if (window->state.staleAccelConfig || !(window->state.useOptimizedMap)) {
         out << ",,,";
     } else {
-        out << splitters[window->state.hierarchySplitterIndex] << ",";
-        out << window->state.hierarchyDepth << ",";
+        out << accelerators[window->state.accelIndex] << ",";
+        out << window->state.accelDepth << ",";
         out << int(window->state.lastOptimizeTime * 1000.f) << ",";
     }
     
@@ -58,7 +58,7 @@ Image *mainLoop(RenderConfig *rc) {
         map->loadFile(window->state.mapPath.c_str());
         window->state.reloadMap = false;
         window->state.useOptimizedMap = false;
-        window->state.staleHierarchyConfig = true;
+        window->state.staleAccelConfig = true;
         change = true;
         window->state.camPresets = &(map->camPresets);
         window->state.camPresetNames = map->camPresetNames;
@@ -68,25 +68,25 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.useOptimizedMap) {
 
         bool hierarchyChanged = 
-            (window->state.hierarchyDepth != map->optimizeLevel ||
-            window->state.hierarchySplitterIndex != map->splitterIndex ||
+            (window->state.accelDepth != map->optimizeLevel ||
+            window->state.accelIndex != map->accelIndex ||
             window->state.useBVH != map->bvh ||
-            window->state.hierarchyExtraParam != map->splitterParam ||
-            window->state.staleHierarchyConfig);
+            window->state.accelParam != map->accelParam ||
+            window->state.staleAccelConfig);
 
-        if (hierarchyChanged && !change) { window->state.staleHierarchyConfig = true; }
+        if (hierarchyChanged && !change) { window->state.staleAccelConfig = true; }
 
         if (
             // map->optimizedObj == NULL ||
             (change && hierarchyChanged && !map->currentlyOptimizing)
         ) {
-            map->splitterIndex = window->state.hierarchySplitterIndex;
+            map->accelIndex = window->state.accelIndex;
             map->bvh = window->state.useBVH;
-            map->splitterParam = window->state.hierarchyExtraParam;
+            map->accelParam = window->state.accelParam;
             window->state.currentlyOptimizing = true;
-            std::thread opt(&WorldMap::optimizeMap, map, glfwGetTime, window->state.hierarchyDepth, map->splitterIndex);
+            std::thread opt(&WorldMap::optimizeMap, map, glfwGetTime, window->state.accelDepth, map->accelIndex);
             opt.detach();
-            window->state.staleHierarchyConfig = false;
+            window->state.staleAccelConfig = false;
         } else if (!map->currentlyOptimizing) {
             window->state.lastOptimizeTime = map->lastOptimizeTime;
             window->state.optimizedMap = map->optimizedObj;

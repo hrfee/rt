@@ -41,11 +41,11 @@ struct GLWindowState {
     bool renderOptimizedHierarchy;
     Container *optimizedMap;
     double lastOptimizeTime;
-    int hierarchySplitterIndex;
-    int hierarchyDepth;
-    int hierarchyExtraParam;
+    int accelIndex;
+    int accelDepth;
+    int accelParam;
     bool useBVH;
-    bool staleHierarchyConfig;
+    bool staleAccelConfig;
     int threadCount;
     int maxThreadCount;
     std::vector<CamPreset> *camPresets;
@@ -86,7 +86,7 @@ class GLWindow {
         void reloadScaledResolution();
         void loadRequestedWindowResolution();
         std::string frameInfo();
-        std::string hierarchyInfo();
+        std::string acceleratorInfo();
         std::string threadInfo();
         void generateFrameVertices();
         void toggleUI() { ui.hide = !ui.hide; };

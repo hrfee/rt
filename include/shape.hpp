@@ -45,6 +45,7 @@ struct Container {
     int splitAxis;
     bool voxelSubdiv;
     int size;
+    int id;
 };
 
 struct Sphere {

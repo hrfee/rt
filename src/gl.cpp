@@ -7,7 +7,7 @@
 #include <sstream>
 #include <cmath>
 
-#include "hierarchy.hpp"
+#include "accel.hpp"
 #include "shape.hpp"
 #include "tga.hpp"
 #include "imgui_stdlib.h"
@@ -171,9 +171,9 @@ void GLWindow::loadUI() {
     state.rc.planeOptimisation = true;
     state.useOptimizedMap = false;
     state.rc.showDebugObjects = false;
-    state.hierarchyDepth = 1;
-    state.hierarchySplitterIndex = 1; // SAH
-    state.hierarchyExtraParam = 2;
+    state.accelDepth = 1;
+    state.accelIndex = 1; // SAH
+    state.accelParam = 2;
     state.useBVH = false;
     state.renderOptimizedHierarchy = false;
 
@@ -267,11 +267,11 @@ std::string GLWindow::frameInfo() {
     return out.str();
 }
 
-std::string GLWindow::hierarchyInfo() {
+std::string GLWindow::acceleratorInfo() {
     std::ostringstream out;
-    if (state.staleHierarchyConfig) return out.str();
+    if (state.staleAccelConfig) return out.str();
     out.precision(5);
-    out << "Generation with \"" << splitters[state.hierarchySplitterIndex] << "\" ";
+    out << "Generation with \"" << accelerators[state.accelIndex] << "\" ";
     if (state.useBVH) {
         out << "(BVH) ";
     }
@@ -284,7 +284,7 @@ std::string GLWindow::hierarchyInfo() {
     if (state.lastOptimizeTime > 1.f) {
         out << "(" << state.lastOptimizeTime << "s) ";
     }
-    out << "at max depth " << state.hierarchyDepth << ".";
+    out << "at max depth " << state.accelDepth << ".";
     return out.str();
 }
 
@@ -352,18 +352,18 @@ void GLWindow::addUI() {
         state.rc.renderNow = ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
         if (state.useOptimizedMap) {
             state.rc.renderNow = ImGui::Checkbox("Use proper BVH", &(state.useBVH)) ? true : state.rc.renderNow;
-            state.rc.renderNow = ImGui::SliderInt("Max hierarchy depth", &(state.hierarchyDepth), 1, 100);
+            state.rc.renderNow = ImGui::SliderInt("Max hierarchy depth", &(state.accelDepth), 1, 100);
             state.rc.renderNow = ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
             ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
             if (state.renderOptimizedHierarchy) {
                 renderTree(state.optimizedMap);
             }
-            state.rc.renderNow = ImGui::Combo("BVH Splitter", &(state.hierarchySplitterIndex), splitters, IM_ARRAYSIZE(splitters));
-            if (state.hierarchySplitterIndex == 3 || state.hierarchySplitterIndex == 4) {
-                state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.hierarchyExtraParam), 1, 100) ? true : state.rc.renderNow;
+            state.rc.renderNow = ImGui::Combo("Acceleration method", &(state.accelIndex), accelerators, IM_ARRAYSIZE(accelerators));
+            if (state.accelIndex == Accel::BiTree || state.accelIndex == Accel::FalseOctree) {
+                state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.accelParam), 1, 100) ? true : state.rc.renderNow;
             }
             if (state.lastOptimizeTime != 0.f) {
-                ImGui::Text(hierarchyInfo().c_str());
+                ImGui::Text(acceleratorInfo().c_str());
             }
         } else {
             state.renderOptimizedHierarchy = false;
@@ -397,7 +397,7 @@ void GLWindow::addUI() {
         }
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
         if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button(
-                (state.useOptimizedMap && state.staleHierarchyConfig) ? "Optimize" : "Render",
+                (state.useOptimizedMap && state.staleAccelConfig) ? "Optimize" : "Render",
                 ImVec2(120, 40)
         );
         enable();
@@ -631,10 +631,18 @@ GLWindow::~GLWindow() {
 
 void GLWindow::renderTree(Container *c, int tabIndex) {
     ImVec4 containerColor(1.f, 1.f, 1.f, 1.f);
+    Bound *end = c->end->next;
+    int size = c->size;
+    if (c->voxelSubdiv != 0) {
+        size = c->voxelSubdiv * c->voxelSubdiv * c->voxelSubdiv;
+        end = c->start + (c->voxelSubdiv*c->voxelSubdiv*c->voxelSubdiv) + 1;
+    }
+
+
     if (tabIndex == 0) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, 1.f));
         ImGui::Text("root(%d, (%.3f, %.3f %.3f), (%.3f, %.3f, %.3f));\n",
-                c->size,
+                size,
                 c->a.x, c->a.y, c->a.z,
                 c->b.x, c->b.y, c->b.z
         );
@@ -642,21 +650,24 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
     } else {
         auto prefix = std::string(tabIndex*2, ' ');
         Bound *bo = c->start;
-
-        while (bo != c->end->next) {
+        while (bo != end) {
             Shape *current = bo->s;
             if (current->t != NULL && current->debug) {
                 containerColor = ImVec4(current->color.x, current->color.y, current->color.z, 1.f);
                 break;
             }
-            bo = bo->next;
+            if (c->voxelSubdiv != 0) {
+                bo++;
+            } else {
+                bo = bo->next;
+            }
         }
         char splitAxis = 'x';
         if (c->splitAxis == 1) splitAxis = 'y';
         else if (c->splitAxis == 2) splitAxis = 'z';
         ImGui::PushStyleColor(ImGuiCol_Text, containerColor);
         ImGui::Text("%s node(%d%c, (%.3f, %.3f %.3f), (%.3f, %.3f, %.3f));\n",
-                prefix.c_str(), c->size, splitAxis,
+                prefix.c_str(), size, splitAxis,
                 c->a.x, c->a.y, c->a.z,
                 c->b.x, c->b.y, c->b.z
         );
@@ -665,14 +676,18 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
     Bound *bo = c->start;
 
     int children = 0;
-    while (bo != c->end->next) {
+    while (bo != end) {
         Shape *current = bo->s;
         if (current->c != NULL) {
             renderTree(current->c, tabIndex+1);
         } else if (!(current->debug)) {
             children++;
         }
-        bo = bo->next;
+        if (c->voxelSubdiv != 0) {
+            bo++;
+        } else {
+            bo = bo->next;
+        }
     }
     auto prefix2 = std::string((tabIndex+1)*2, ' ');
     if (children != 0) {

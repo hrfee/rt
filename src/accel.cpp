@@ -1,4 +1,4 @@
-#include "hierarchy.hpp"
+#include "accel.hpp"
 
 #include <cstring>
 #include <cstdlib>
@@ -9,7 +9,7 @@
 #include "vec.hpp"
 #include "ray.hpp"
 
-const char *splitters[5] = {"Equal Split", "Surface area heuristic (SAH)", "Voxel (BROKEN)", "Bi- tree (Disables BVH)", "Glassner/Octree (Disables BVH)"};
+const char *accelerators[5] = {"Divide objects evenly", "Surface area heuristic (SAH)", "Voxel Grid", "Bi-tree (Disables BVH)", "Nothing like Glassner/Octree (Disables BVH)"};
 
 bool sortByX(Bound a, Bound b) {
     Bound *bo[2] = {&a, &b};
@@ -436,7 +436,7 @@ int splitEqually(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxi
     return 0;
 }
 
-Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount, int colorIndex, int maxNodesPerVox) {
+Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount, int colorIndex, int maxNodesPerVox, int parentId) {
     if (splitCount >= splitLimit || o->size <= maxNodesPerVox || maxNodesPerVox < 1) return NULL;
     Container *out = emptyContainer();
     out->a = o->a; // {1e30, 1e30, 1e30};
@@ -464,6 +464,7 @@ Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount,
                 b[i].s->c = emptyContainer();
                 b[i].s->c->a = b[i].min;
                 b[i].s->c->b = b[i].max;
+                b[i].s->c->id = (parentId*10)+i+1;
             }
         }
     }
@@ -531,7 +532,7 @@ Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount,
 }
 
 
-Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
+Container* generateHierarchy(Container *o, int accel, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
     out->a = o->a; // {1e30, 1e30, 1e30};
@@ -543,11 +544,11 @@ Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int spli
     Bound b[2];
 
     int stopSplitting = 0;
-    if (splitterIndex == 0) {
+    if (accel == Accel::DivideObjectsEqually) {
         stopSplitting = splitEqually(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
-    } else if (splitterIndex == 1) {
+    } else if (accel == Accel::SAH) {
         stopSplitting = splitSAH(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
-    } else if (splitterIndex == 3) {
+    } else if (accel == Accel::BiTree) {
         stopSplitting = splitBitree(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
     }
 
@@ -559,7 +560,7 @@ Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int spli
     
     Container *containers[2] = {emptyContainer(), emptyContainer()};
 
-    if (splitterIndex == 3) {
+    if (accel == Accel::BiTree) {
         for (int i = 0; i < 2;  i++) {
             Container *c = containers[i];
             /*if (c->size == 1) {
@@ -592,7 +593,7 @@ Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int spli
             // A tri has no volume, hence one cannot be "inside" and not on a surface. Therefore we can assume a face is found within the node.
             // A sphere is a different case, however.
             bool fullyContained = false;
-            if (splitterIndex == 3 && bo->s->s != NULL) {
+            if (accel == Accel::BiTree && bo->s->s != NULL) {
                 // Check if node is fully contained within sphere, by checking sphere center -> node corner is < radius for min/max corners
                 float minDistance = mag(containers[0]->a - bo->s->s->center);
                 float maxDistance = mag(containers[0]->b - bo->s->s->center);
@@ -608,7 +609,7 @@ Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int spli
         }
         if (side == 1 || side == 2) {
             bool fullyContained = false;
-            if (splitterIndex == 3 && bo->s->s != NULL) {
+            if (accel == Accel::BiTree && bo->s->s != NULL) {
                 // Check if node is fully contained within sphere, by checking sphere center -> node corner is < radius for min/max corners
                 float minDistance = mag(containers[0]->a - bo->s->s->center);
                 float maxDistance = mag(containers[0]->b - bo->s->s->center);
@@ -649,7 +650,7 @@ Container* generateHierarchy(Container *o, int splitterIndex, bool bvh, int spli
 
                 boundary->idx(bestAxis) = splA;
             }
-            Container *splitAgain = generateHierarchy(c, splitterIndex, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
+            Container *splitAgain = generateHierarchy(c, accel, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
             colorIndex += (splitLimit - splitCount)*2;
             if (splitAgain != NULL) {
                 free(c);
@@ -800,33 +801,53 @@ void containerSphereCorners(Container *c, Vec3 color) {
     }
 }
 
-// Unused/Broken Voxel stuff.
-
 void getVoxelIndex(Container *c, int subdivision, Vec3 p, Vec3 delta, int *x, int *y, int *z, float *t) {
-    Vec3 dims = {c->b.x-c->a.x, c->b.y-c->a.y, c->b.z-c->a.z};
+    Vec3 dims = c->b - c->a;
     Vec3 vox = dims / subdivision;
     // std::printf("got vox(%f %f %f\n", vox.x, vox.y, vox.z);
     Vec3 ap = (p - c->a);
-    if (!(ap.x < 0 || ap.x > dims.x || ap.y < 0 || ap.y > dims.y || ap.z < 0 || ap.z > dims.z)) {
+    bool originWithinVoxel = true;
+    for (int i = 0; i < 3; i++) {
+        if (ap(i) < 0 || ap(i) > dims(i)) {
+            originWithinVoxel = false;
+            break;
+        }
+    }
+    if (originWithinVoxel) {
         Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
         *x = apVox.x;
         *y = apVox.y;
         *z = apVox.z;
+        *t = 0;
         return;
     }
+    // If our origin "p" isn't in a voxel already (i.e. out the scene), find the point along the ray where it hits one.
     *t = meetAABB(ap, delta, {0.f, 0.f, 0.f}, dims);
     if (*t < -9990.f) {
         *x = -1;
         *y = -1;
         *z = -1;
+        *t = -1.f;
         return;
     }
-    ap = p + (*t * delta) - c->a;
-    Vec3 apVox = {ap.x/vox.x, ap.y/vox.y, ap.z/vox.z};
-    // std::printf("got t=%f, %f %f %f\n", t, apVox.x, apVox.y, apVox.z);
+    ap = ap + (*t * delta);
+    Vec3 apVox;
+    for (int i = 0; i < 3; i++) {
+        apVox(i) = ap(i)/vox(i);
+    }
+   
+    /* Cubes are back-to-back, and so in grid-coordinates,
+     * one might span the space 0-0.99999 and their neighor 1-1.99999.
+     * If we look at the back (i.e. the maximum edge) of a cube on
+     * the edge of our grid, the coordinate will land on a clean .0 value,
+     * which is actually out of bounds.
+     * Therefore, we just cap the integer-ized coordinates at (subdivision-1). */
     *x = apVox.x;
+    if (*x == subdivision) *x -=1;
     *y = apVox.y;
+    if (*y == subdivision) *y -=1;
     *z = apVox.z;
+    if (*z == subdivision) *z -=1;
 }
 
 // Split container into subcontainer "voxel" grid of dimensions subdivision^3.
@@ -836,8 +857,9 @@ Container* splitVoxels(Container *o, int subdivision) {
     out->a = {1e30, 1e30, 1e30};
     out->b = {-1e30, -1e30, -1e30};
     out->voxelSubdiv = subdivision;
-    determineBounds(o, &(out->a), &(out->b));
-    Vec3 dims = {out->b.x-out->a.x, out->b.y-out->a.y, out->b.z-out->a.z};
+    out->a = o->a;
+    out->b = o->b;
+    Vec3 dims = o->b - o->a;
     Vec3 vox = dims / subdivision;
     std::printf("global dim(%f %f %f), vox(%f %f %f)\n", dims.x, dims.y, dims.z, vox.x, vox.y, vox.z);
     size_t totalSize = subdivision*subdivision*subdivision;
@@ -852,22 +874,18 @@ Container* splitVoxels(Container *o, int subdivision) {
                 b->s = emptyShape();
                 b->s->c = emptyContainer();
                 Container *c = b->s->c;
-                c->a = {vox.x * x, vox.y * y, vox.z * z};
+                c->a = o->a + Vec3{vox.x * x, vox.y * y, vox.z * z};
                 c->b = c->a + vox;
                 b->min = c->a;
                 b->max = c->b;
-                float min[3] = {c->a.x, c->a.y, c->a.z};
-                float max[3] = {c->b.x, c->b.y, c->b.z};
                 c->splitAxis = -1;
                 Bound *bo = o->start;
                 while (bo != o->end->next) {
-                    float bmin[3] = {bo->min.x, bo->min.y, bo->min.z}; 
-                    float bmax[3] = {bo->max.x, bo->max.y, bo->max.z};
                     bool added = true;
                     for (int d = 0; d < 3; d++) {
                         if (!(
-                            ((bmin[d] >= min[d]) || (bmax[d] >= min[d])) &&
-                            ((bmin[d] <= max[d]) || (bmax[d] <= max[d]))
+                            ((bo->min(d) >= c->a(d)) || (bo->max(d) >= c->a(d))) &&
+                            ((bo->min(d) <= c->b(d)) || (bo->max(d) <= c->b(d)))
                            )) {
                             added = false;
                             break;

@@ -349,6 +349,7 @@ Container *emptyContainer(bool plane) {
     c->end = NULL;
     c->size = 0;
     c->splitAxis = -1;
+    c->id = 0;
     return c;
 }
 

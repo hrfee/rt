@@ -16,6 +16,9 @@ plight center 0 4.9 0 color #ffffff brightness 10 specular 0.2 color #ffffff
 plight center 5 2 1 color #ffffff brightness 1.0 specular 0.2 color #ffffff
 
 campreset birds_eye pos -3.19468 2.41251 -13.4276 phi -1.08917 theta -0.0904921 fov 60
+campreset side_view pos -13.1084 2.39844 -4.19527 phi -0.380801 theta -0.134883 fov 60
+campreset behind_wall pos -16.3428 7.41703 6.65733 phi 0.224829 theta -0.415477 fov 60
+campreset broken_boundary pos -0.860128 0.752319 5.03115 phi 1.05829 theta -0.979058 fov 30.968
 
 plight center 3 4.9 1 color #ff9f9f brightness 15 specular 0.05 color #00ff00
 

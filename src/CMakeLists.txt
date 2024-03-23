@@ -21,16 +21,16 @@ set_target_properties(ray PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(ray PUBLIC ../include)
 target_link_libraries(ray PUBLIC shape vec)
 
-add_library(hierarchy STATIC hierarchy.cpp ${HEADER_LIST})
-set_target_properties(hierarchy PROPERTIES LINKER_LANGUAGE CXX)
-target_include_directories(hierarchy PUBLIC ../include)
-target_link_libraries(hierarchy PUBLIC shape)
-target_link_libraries(hierarchy PRIVATE vec ray)
+add_library(accel STATIC accel.cpp ${HEADER_LIST})
+set_target_properties(accel PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(accel PUBLIC ../include)
+target_link_libraries(accel PUBLIC shape)
+target_link_libraries(accel PRIVATE vec ray)
 
 add_library(map STATIC map.cpp ${HEADER_LIST})
 set_target_properties(map PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(map PUBLIC ../include)
-target_link_libraries(map PUBLIC shape cam img hierarchy vec)
+target_link_libraries(map PUBLIC shape cam img accel vec)
 target_link_libraries(map PRIVATE util ray)
 
 add_library(img STATIC img.cpp ${HEADER_LIST})
@@ -57,7 +57,7 @@ add_library(render_gl STATIC gl.cpp ${HEADER_LIST})
 set_target_properties(render_gl PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(render_gl PUBLIC ../include "../third_party/imgui/" "../third_party/imgui/misc/cpp/" "../third_party/imgui/backends/" "../third_party/glad/include/")
 target_link_libraries(render_gl PUBLIC img map)
-target_link_libraries(render_gl PRIVATE render_tga glfw glad imgui hierarchy)
+target_link_libraries(render_gl PRIVATE render_tga glfw glad imgui accel)
 
 source_group(
     TREE "${PROJECT_SOURCE_DIR}/include"

@@ -66,18 +66,18 @@ struct MapStats {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), splitterIndex(-1), bvh(false), splitterParam(-1), obj(NULL), flatObj(NULL), optimizedObj(NULL), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f), lastOptimizeTime(0.f) { obj = &unoptimizedObj; }
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), accelIndex(-1), bvh(false), accelParam(-1), obj(NULL), flatObj(NULL), optimizedObj(NULL), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f), lastOptimizeTime(0.f) { obj = &unoptimizedObj; }
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
         float baseBrightness, globalShininess;
         void loadFile(char const* path);
         int loadObjFile(char const* path, Mat4 transform = mat44Identity);
-        void optimizeMap(double (*getTime)(void), int level = 1, int splitterIndex = 1);
+        void optimizeMap(double (*getTime)(void), int level = 1, int accelIdx = 1);
         int optimizeLevel;
-        int splitterIndex;
+        int accelIndex;
         bool bvh;
-        int splitterParam;
+        int accelParam;
         std::vector<PointLight> pointLights;
         std::vector<CamPreset> camPresets;
         const char **camPresetNames;
