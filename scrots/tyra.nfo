@@ -1,3 +1,0 @@
-Map Name,# Tris,# Spheres,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms),
-maps/tyra.map,200012,0,2,15,Lighting w/ Phong Specular,0,0,40,0 0 0,89989,8192,8192,512,Surface area heuristic (SAH),32,1400087,
-

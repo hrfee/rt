@@ -66,7 +66,7 @@ struct MapStats {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), accelIndex(-1), bvh(false), accelParam(-1), obj(NULL), flatObj(NULL), optimizedObj(NULL), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f), lastOptimizeTime(0.f) { obj = &unoptimizedObj; }
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), accelIndex(-1), bvh(false), accelParam(-1), accelFloatParam(1.5f), obj(NULL), flatObj(NULL), optimizedObj(NULL), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f), lastOptimizeTime(0.f) { obj = &unoptimizedObj; }
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
@@ -78,6 +78,7 @@ class WorldMap {
         int accelIndex;
         bool bvh;
         int accelParam;
+        float accelFloatParam;
         std::vector<PointLight> pointLights;
         std::vector<CamPreset> camPresets;
         const char **camPresetNames;

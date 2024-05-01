@@ -81,9 +81,9 @@ float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere, float *t1) {
     // substituted values for the camera position (x/y/z_0),
     // pixel vec from camera (delta x/y/z),
     // and normalized distance along pixel vector (t).
-    Vec3 originToSphere = {p0.x - sphere->center.x, p0.y - sphere->center.y, p0.z - sphere->center.z};
+    Vec3 originToSphere = p0 - sphere->center;
     float a = dot(delta, delta);
-    float b = 2.f * (delta.x*originToSphere.x + delta.y*originToSphere.y + delta.z*originToSphere.z);
+    float b = 2.f * dot(delta, originToSphere);
     float c = dot(originToSphere, originToSphere) - sphere->radius*sphere->radius;
     float discrim = b*b - 4.f*a*c;
     if (discrim < 0) return -1;
@@ -107,18 +107,14 @@ float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere, float *t1) {
 float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle *tri) {
     // dot product of a line on the plane with the normal is zero, hence (p - t.a) \dot norm = 0, where p is a random point (x, y, z)
     // p \dot norm = t.a \dot norm
-    // compute the right side, expand the left side and subtract it:
-    // (norm.x)x + (norm.y)y + (norm.z)z - (t.a \dot norm) = 0
-    // Take values in equation of a plane (CGPaP in C p. 703 eq. 15.18): Ax + By + Cz + D = 0
-    // where A = norm.x, B = norm.y, C = norm.z
-    float d = -dot(tri->a, normal);
-    // CGPaP in C p.703 eq. 15.21, using dot products to make more readable
-    float t = -(dot(normal, p0) + d);
+    // (p0 + t(delta)) \dot norm = t.a \dot norm
+    // t(delta \dot norm) = (t.a - p0) \dot norm
+    // divide and get t!
     float denom = dot(normal, delta);
     if (denom == 0) { // Plane parallel to ray, ignore
         return -1;
     }
-    return t / denom;
+    return dot((tri->a - p0), normal) / denom;
 }
 
 bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
@@ -149,6 +145,7 @@ bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
     return pointInTriangle(po, ao, bo, co);
 }
 
+// FIXME: My own derivation better explains this implementation, variable names should be adjusted.
 Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir) {
     // Based on CGPaP in C p.757-758 Sect. 16.5.2 "Calculating the refraction vector":
     // \vec{I} = a_,

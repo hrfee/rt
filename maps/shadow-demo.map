@@ -1,0 +1,8 @@
+map dimensions 50 50 50 brightness 0.0 shininess 5
+
+plight center 4 3 1 color #b5d5ff brightness 10 specular 0.2 color #ffffff
+
+include mattewall.obj
+triangle a -1 -1 -5 b -1 -1 4 c 8 -1 -5 color #fdfdfd reflectiveness 0 specular 0.1
+triangle a 8 -1 -5 b 8 -1 4 c -1 -1 4 color #fdaaaa reflectiveness 0 specular 0.1
+include teapot.obj translate 4 0 0 rotate 0 0.985398 0 scale .5

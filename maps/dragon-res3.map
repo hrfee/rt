@@ -1,8 +1,11 @@
-map dimensions 50 50 50 brightness 0.0 shininess 5
+map dimensions 50 50 50 brightness 0.0 shininess 80
 
-plight center 0 4.9 0 color #ffa3d7 brightness 15 specular 0.2 color #ffffff
-plight center 5 2 1 color #b5d5ff brightness 10 specular 0.2 color #ffffff
+plight center 0 4.9 0 color #ffa3d7 brightness 4 specular 0.2 color #ffffff
+plight center 5 4 1 color #b5d5ff brightness 4 specular 0.2 color #ffffff
+plight center 1 2 -0.5 color #ffaaaa brightness 4 specular 0.7 color #ffffff
+
+sphere center 2 0.2 -0.1 radius 0.4 color #ffffff reflectiveness 0.2 specular 0.5 opacity 0.2 thickness 0.08
 
 include mattewall.obj
 include plainfloor.obj
-include dragon-res3.obj translate 4 -1.2 0 rotate 0 0.985398 0 scale 10
+include dragon-res3.obj translate 4 -1.2 0 rotate 0 0.985398 0 scale 12

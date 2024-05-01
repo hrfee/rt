@@ -44,6 +44,7 @@ struct GLWindowState {
     int accelIndex;
     int accelDepth;
     int accelParam;
+    float accelFloatParam;
     bool useBVH;
     bool staleAccelConfig;
     int threadCount;

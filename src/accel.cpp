@@ -81,7 +81,7 @@ void determineBounds(Container *o, Vec3 *min, Vec3 *max) {
 }
 
 namespace {
-    // Line generated with distincColors.py
+    // Line generated with distinctColors.py
     Vec3 distinctColors[16] = {{0.545, 0.271, 0.075}, {0.098, 0.098, 0.439}, {0.000, 0.502, 0.000}, {0.741, 0.718, 0.420}, {0.690, 0.188, 0.376}, {1.000, 0.000, 0.000}, {1.000, 0.647, 0.000}, {1.000, 1.000, 0.000}, {0.486, 0.988, 0.000}, {0.000, 0.980, 0.604}, {0.000, 1.000, 1.000}, {0.000, 0.000, 1.000}, {1.000, 0.000, 1.000}, {0.392, 0.584, 0.929}, {0.933, 0.510, 0.933}, {0.902, 0.902, 0.980}};
 
 }
@@ -213,13 +213,14 @@ int splitBitree(Container *o, float *split, Bound *, Bound *, int *splitAxis, bo
 
 namespace {
     // Assumed cost values (C_o)
-    const float cSphere = 1.f;
-    const float cTri = 1.5f;
     // Assumed added cost of traversing the extra nodes added when splitting (C_i)
     const float cTraverse = 1.f;
 }
 
-void sahAxisSplits(int i, Container *o, float *spl, int *bestIndex, float *bestCost, Bound *bestBound, bool bvh, int *shapeCount) {
+void sahAxisSplits(int i, Container *o, float *spl, int *bestIndex, float *bestCost, Bound *bestBound, bool bvh, int *shapeCount, float costTriSphereRatio) {
+    float cSphere = 1.f;
+    float cTri = costTriSphereRatio;
+
     int splitIndex = 0;
     bool countComplete = false;
     Bound *bsplit = o->start;
@@ -293,11 +294,14 @@ void sahAxisSplits(int i, Container *o, float *spl, int *bestIndex, float *bestC
 // "M. HAPALA, V. HAVRAN: Review: Kd-tree Traversal Algorithms for Ray Tracing"
 // Based on the idea that rays intersecting an object is ~proportional to it's surface area.
 // In it's current state, this is roughly O(3n^2).
-int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int, int) {
+int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, bool bvh, int, float costTriSphereRatio) {
     // NOTES
     // Cost function given in paper IS suitable for now, as we do not yet cache intersections per ray (i.e. if leaf is in two AABBs, we currently test it twice).
     // Also see notes in sah.md
-    
+   
+    float cSphere = 1.f;
+    float cTri = costTriSphereRatio;
+
     Vec3 spl;
 
     int bestIndices[3] = {0, 0, 0};
@@ -311,7 +315,7 @@ int splitSAH(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis, b
     std::thread *axisThreads = new std::thread[3];
 
     for (int i = 0; i < 3; i++) {
-        axisThreads[i] = std::thread(&sahAxisSplits, i, o, &(spl(i)), &(bestIndices[i]), &(bestCosts[i]), &(bestBounds[i][0]), bvh, i == 0 ? &shapeCount[0] : NULL);
+        axisThreads[i] = std::thread(&sahAxisSplits, i, o, &(spl(i)), &(bestIndices[i]), &(bestCosts[i]), &(bestBounds[i][0]), bvh, i == 0 ? &shapeCount[0] : NULL, costTriSphereRatio);
         // sahAxisSplits(i, o, &(spl(i)), &(bestIndices[i]), &(bestCosts[i]), &(bestBounds[i][0]), bvh, i == 0 ? &shapeCount[0] : NULL);
         /*axisThreads[i] = std::thread([&, i]() {
         });
@@ -532,7 +536,7 @@ Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount,
 }
 
 
-Container* generateHierarchy(Container *o, int accel, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra) {
+Container* generateHierarchy(Container *o, int accel, bool bvh, int splitLimit, int splitCount, int lastAxis, int colorIndex, int extra, float fextra) {
     if (splitCount >= splitLimit) return NULL;
     Container *out = emptyContainer();
     out->a = o->a; // {1e30, 1e30, 1e30};
@@ -547,7 +551,7 @@ Container* generateHierarchy(Container *o, int accel, bool bvh, int splitLimit, 
     if (accel == Accel::DivideObjectsEqually) {
         stopSplitting = splitEqually(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
     } else if (accel == Accel::SAH) {
-        stopSplitting = splitSAH(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
+        stopSplitting = splitSAH(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, fextra);
     } else if (accel == Accel::BiTree) {
         stopSplitting = splitBitree(o, &splA, &(b[0]), &(b[1]), &bestAxis, bvh, lastAxis, extra);
     }
@@ -650,7 +654,7 @@ Container* generateHierarchy(Container *o, int accel, bool bvh, int splitLimit, 
 
                 boundary->idx(bestAxis) = splA;
             }
-            Container *splitAgain = generateHierarchy(c, accel, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra);
+            Container *splitAgain = generateHierarchy(c, accel, bvh, splitLimit, splitCount+1, bestAxis, colorIndex, extra, fextra);
             colorIndex += (splitLimit - splitCount)*2;
             if (splitAgain != NULL) {
                 free(c);

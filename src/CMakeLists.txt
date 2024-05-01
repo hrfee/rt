@@ -59,6 +59,12 @@ target_include_directories(render_gl PUBLIC ../include "../third_party/imgui/" "
 target_link_libraries(render_gl PUBLIC img map)
 target_link_libraries(render_gl PRIVATE render_tga glfw glad imgui accel)
 
+add_library(test STATIC test.cpp ${HEADER_LIST})
+set_target_properties(test PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(test PUBLIC ../include)
+target_link_libraries(test PUBLIC shape)
+target_link_libraries(test PRIVATE util ray vec)
+
 source_group(
     TREE "${PROJECT_SOURCE_DIR}/include"
     PREFIX "Header Files"

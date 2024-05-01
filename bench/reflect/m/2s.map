@@ -1,0 +1,27 @@
+map dimensions 50 50 50 brightness 0.3 shininess 5
+// Nice shiny spheres
+sphere center 5 0 2 radius 1 color #ff0000 reflectiveness 1 specular 1 shininess 40
+sphere center 5 0 -2 radius 1 color #ff0000 reflectiveness 1 specular 1 shininess 40
+plight center 4 1 0 color #ff9f9f brightness 15 specular 0.05 color #00ff00
+
+triangle a 10 -10 -10 b 10 -10 10 c 10 10 10 color #ffffff reflectiveness 0.00 specular 1 shininess 20
+triangle a 10 10 10   b 10 10 -10 c 10 -10 -10 color #ffffff reflectiveness 0.00 specular 1 shininess 20
+
+triangle a -10 -10 -10 b -10 -10 10 c -10 10 10 color #ffffff reflectiveness 0.00 specular 1 shininess 20
+triangle a -10 10 10   b -10 10 -10 c -10 -10 -10 color #ffffff reflectiveness 0.00 specular 1 shininess 20
+
+
+triangle a -10 -10 -10 b 10 -10 -10 c 10 10 -10 color #ffffff reflectiveness 0 specular 1 shininess 20
+triangle a 10 10 -10 b -10 10 -10 c -10 -10 -10 color #ffffff reflectiveness 0 specular 1 shininess 20
+
+triangle a -10 -10 10 b 10 -10 10 c 10 10 10 color #ffffff reflectiveness 0 specular 1 shininess 20
+triangle a 10 10 10 b -10 10 10 c -10 -10 10 color #ffffff reflectiveness 0 specular 1 shininess 20
+
+
+triangle a -10 -10 -10 b -10 -10 10 c 10 -10 10 color #ff2200 reflectiveness 0 specular 1 shininess 20
+triangle a 10 -10 10 b 10 -10 -10 c -10 -10 -10 color #ff2200 reflectiveness 0 specular 1 shininess 20
+
+triangle a -10 10 -10 b -10 10 10 c 10 10 10 color #00ffaa reflectiveness 0 specular 1 shininess 20
+triangle a 10 10 10 b 10 10 -10 c -10 10 -10 color #00ffaa reflectiveness 0 specular 1 shininess 20
+
+include preset.map

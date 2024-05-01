@@ -174,6 +174,7 @@ void GLWindow::loadUI() {
     state.accelDepth = 1;
     state.accelIndex = 1; // SAH
     state.accelParam = 2;
+    state.accelFloatParam = 1.5f; // For now, SAH tri/sphere cost ratio
     state.useBVH = false;
     state.renderOptimizedHierarchy = false;
 
@@ -315,6 +316,10 @@ void GLWindow::addUI() {
             ImGui::Text(state.csvStats.str().c_str());
             if (ImGui::Button("Copy to clipboard")) {
                 glfwSetClipboardString(window, state.csvStats.str().c_str());
+                std::printf("copied %s\n", state.csvStats.str().c_str());
+            }
+            if (ImGui::Button("Clear")) {
+                state.csvStats.str("");
             }
         }
         ImGui::End();
@@ -361,6 +366,8 @@ void GLWindow::addUI() {
             state.rc.renderNow = ImGui::Combo("Acceleration method", &(state.accelIndex), accelerators, IM_ARRAYSIZE(accelerators));
             if (state.accelIndex == Accel::BiTree || state.accelIndex == Accel::FalseOctree) {
                 state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.accelParam), 1, 100) ? true : state.rc.renderNow;
+            } else if (state.accelIndex == Accel::SAH) {
+                state.rc.renderNow = ImGui::SliderFloat("SAH Triangle/Sphere cost ratio", &(state.accelFloatParam), 0.1f, 100.f) ? true : state.rc.renderNow;
             }
             if (state.lastOptimizeTime != 0.f) {
                 ImGui::Text(acceleratorInfo().c_str());

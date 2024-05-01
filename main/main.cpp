@@ -26,7 +26,7 @@ namespace {
 std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
     std::ostringstream out;
     if (header) {
-        out << "Map Name,# Tris,# Spheres,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms)" << ",";
+        out << "Map Name,# Tris,# Spheres,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms),Accel Int Param,Accel Float Param," << ",";
         out << std::endl;
     }
     // Map & Cam info
@@ -41,12 +41,15 @@ std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
     out << window->state.rc.nthreads << ",";
     // Hierarchy Info
     if (window->state.staleAccelConfig || !(window->state.useOptimizedMap)) {
-        out << ",,,";
+        out << ",,,,,";
     } else {
         out << accelerators[window->state.accelIndex] << ",";
         out << window->state.accelDepth << ",";
         out << int(window->state.lastOptimizeTime * 1000.f) << ",";
+        out << map->accelParam << ",";
+        out << map->accelFloatParam << ",";
     }
+
     
     out << std::endl;
     return out.str();
@@ -72,6 +75,7 @@ Image *mainLoop(RenderConfig *rc) {
             window->state.accelIndex != map->accelIndex ||
             window->state.useBVH != map->bvh ||
             window->state.accelParam != map->accelParam ||
+            window->state.accelFloatParam != map->accelFloatParam ||
             window->state.staleAccelConfig);
 
         if (hierarchyChanged && !change) { window->state.staleAccelConfig = true; }
@@ -83,6 +87,7 @@ Image *mainLoop(RenderConfig *rc) {
             map->accelIndex = window->state.accelIndex;
             map->bvh = window->state.useBVH;
             map->accelParam = window->state.accelParam;
+            map->accelFloatParam = window->state.accelFloatParam;
             window->state.currentlyOptimizing = true;
             std::thread opt(&WorldMap::optimizeMap, map, glfwGetTime, window->state.accelDepth, map->accelIndex);
             opt.detach();

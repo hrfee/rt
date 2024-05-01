@@ -64,8 +64,8 @@ struct PointLight {
     Vec3 center;
     Vec3 color;
     float brightness;
-    float specular;
     Vec3 specularColor;
+    float specular;
 };
 
 struct CamPreset {

@@ -118,11 +118,12 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     simpleConfig.spheres = rc->spheres;
     simpleConfig.maxBounce = rc->maxBounce;
     simpleConfig.showDebugObjects = rc->showDebugObjects;
+    RayResult r = RayResult();
     for (PointLight light: pointLights) {
         Vec3 distance = light.center - p0;
         float tLight = mag(distance);
         Vec3 normDistance = distance / tLight;
-        RayResult r = RayResult();
+        r.resetObj();
         ray(&r, obj, p0, normDistance, &simpleConfig);
         bool noHit = r.collisions == 0 || r.t > tLight;
         if (!noHit) continue;
@@ -193,47 +194,62 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
     if (thickness == 1.f) {
         castThroughSolidSphere(RI_AIR, ri, res->p0, delta, res->obj->s, &pb, &refract);
     } else {
+        // Into outer sphere (RI_AIR -> RI_SPHERE)
         Vec3 normal = pb - center;
         bool tir = true;
         Vec3 r = Refract(RI_AIR, ri, delta, normal, &tir);
         if (tir) {
+            // Reflect off the sphere.
             refract = delta - 2.f*dot(delta, normal) * normal;
         } else {
             bool escaped = false;
             refract = r;
+            // Our smaller, inner sphere, filled with RI_AIR.
             Sphere innerSphere = {center, res->obj->s->radius*(1.f - res->obj->s->thickness), 1.f};
             while (!escaped) {
+                // Hit the inner sphere
                 float t = meetsSphere(pb, refract, &innerSphere, NULL);
                 if (t >= 0) {
                     pb = pb + (t * refract);
                     Vec3 p2;
+                    // Refract in and out of the inner sphere (RI_SPHERE -> RI_AIR -> RI_SPHERE)
                     castThroughSolidSphere(ri, RI_AIR, pb, refract, &innerSphere, &p2, &r);
                     pb = p2;
                     refract = r;
+                    // Hit the outer sphere
                     t = meetsSphere(pb, refract, res->obj->s, NULL);
                     pb = pb + (t * refract);
                     normal = -1.f * (pb - center);
+                    // Out of the outer sphere (RI_SPHERE -> RI_AIR)
                     r = Refract(ri, RI_AIR, refract, normal, &tir);
                     if (tir) {
+                        // If we have TIR, reflect back into the sphere, and loop this process again.
                         refract = refract - 2.f*dot(refract, normal) * normal;
                     } else {
+                        // If we escape the outer sphere, the loop ends.
                         refract = r;
                         escaped = true;
                     }
-                } else { // Missing the internal sphere means we can pretend its not there.
+                } else { // Missing the internal sphere means we can ignore its existence.
                     castThroughSolidSphere(RI_AIR, ri, res->p0, delta, res->obj->s, &pb, &refract);
                     escaped = true;
                 }
             }
         }
     }
-    
+   
+    // Finally, cast a ray out from the sphere.
     pb = pb + (0.001f * refract);
     RayResult r = RayResult();
     castRay(&r, obj, pb, refract, rc, callCount+1);
     res->refractColor = r.color;
 }
 
+// FIXME?:
+// An object can span multiple voxels, so to avoid intersecting twice,
+// tag an object with the ID of the ray on intersection.
+// Then before intersecting an object, check if the object has been intersected by this rayID.
+// HOWEVER, unless we used a map per-ray to store intersections or something, this wouldn't work with multiple threads.
 void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
     delta = norm(delta);
     int x = 0, y = 0, z = 0;
@@ -425,7 +441,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
 }
 
 void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
-    if (accelIndex == Accel::Voxel) {
+    if (accelIndex == Accel::Voxel && obj == optimizedObj) {
         voxelRay(res, c, p0, delta, rc);
     } else {
         traversalRay(res, c, p0, delta, rc);
@@ -584,7 +600,7 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     currentlyOptimizing = true;
     optimizeLevel = level;
     accelIndex = accelIdx;
-    std::printf("Optimizing map with accelerator %d, depth %d\n", accelIndex, level);
+    std::printf("Optimizing map with accelerator %d, depth %d, extra params %d, %f\n", accelIndex, level, accelParam, accelFloatParam);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
     optimizedObj = NULL;
@@ -600,7 +616,7 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     } else if (accelIndex == Accel::FalseOctree) {
         optimizedObj = generateOctreeHierarchy(flatObj, level, 0, 0, accelParam);
     } else {
-        optimizedObj = generateHierarchy(flatObj, accelIndex, bvh, level);
+        optimizedObj = generateHierarchy(flatObj, accelIndex, bvh, level, 0, -1, 0, accelParam, accelFloatParam);
     }
     lastOptimizeTime = getTime() - lastOptimizeTime;
     currentlyOptimizing = false;
