@@ -23,5 +23,5 @@ $ cmake --build build --target clean # clean
 ```
 # Targets
 
-`main/main`: Main ray-tracer application.
-`timings/timings`: Program to comparing triangle/sphere intersection performance.
+* `main/main`: Main ray-tracer application.
+* `timings/timings`: Program to comparing triangle/sphere intersection performance.
