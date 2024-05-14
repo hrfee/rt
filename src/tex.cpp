@@ -24,7 +24,10 @@ void closeTexture(Texture *tex) {
 }
 
 Vec3 Texture::at(float u, float v) {
-    return getPixel(img, int(u*float(img->w)), img->h-int(v*float(img->h)));
+    int x = std::clamp(int(u*float(img->w)), 0, img->w-1);
+    int y = std::clamp(img->h-int(v*float(img->h)), 0, img->h-1);
+    Vec3 c = getPixel(img, x, y);
+    return c;
 }
 
 int TexStore::id(std::string fname) {

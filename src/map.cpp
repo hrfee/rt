@@ -150,6 +150,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         specularColor = specularColor + (res->obj->specular * (light.specular * light.specularColor) * rDotV);
     }
     res->specularColor = specularColor;
+    // std::printf("%f,%f,%f * %f,%f,%f\n", res->color.x, res->color.y, res->color.z, lightColor.x, lightColor.y, lightColor.z);
     res->color = (res->color * lightColor);
 }
 
@@ -496,7 +497,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         res->color = ((1.f - res->obj->reflectiveness)*res->color);
     }
 
-    if (rc->lighting) {//  && res->obj->reflectiveness != 0) {
+    if (rc->lighting && !(res->obj->noLighting)) {//  && res->obj->reflectiveness != 0) {
         castShadowRays(-1.f*delta, p0PlusABit, rc, res);
     }
 

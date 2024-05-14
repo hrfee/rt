@@ -40,7 +40,10 @@ void writePixel(Image *img, int x, int y, Vec3 color) {
 }
 
 void writePixel(Image *img, int offset, Vec3c color) {
-    Vec3 cf = {float(color.x)/255.f, float(color.y)/255.f, float(color.z)/255.f};
+    Vec3 cf = {float(255 & color.x)/255.f, float(255 & color.y)/255.f, float(255 & color.z)/255.f};
+    if (cf.x < 0 || cf.x > 1 || cf.y < 0 || cf.y > 1 || cf.z < 0 || cf.z > 1) {
+        std::printf("Warning: (%u,%u,%u) => (%f,%f,%f) is out of range\n", color.x, color.y, color.z, cf.x, cf.y, cf.z);
+    }
     img->img[offset] = cf;
     int idx = offset * 4;
     img->rgbxImg[idx + 0] = color.x;

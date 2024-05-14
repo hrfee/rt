@@ -14,6 +14,7 @@ namespace {
     const char w_color_hex = '#';
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
+    const char* w_nolighting = "nolighting";
     const char* w_opacity = "opacity";
     const char* w_reflectiveness = "reflectiveness";
     const char* w_specular = "specular";
@@ -124,6 +125,8 @@ Shape *decodeShape(std::string in) {
         } else if (w == w_shininess) {
             stream >> w;
             sh->shininess = std::stof(w);
+        } else if (w == w_nolighting) {
+            sh->noLighting = true;
         }
     } while (stream);
     return sh;

@@ -18,6 +18,7 @@ struct Shape {
     Container *c;
     Vec3 color;
     int texId;
+    bool noLighting;
     float opacity;
     float reflectiveness; // 0-1
     float specular; // 1-inf
