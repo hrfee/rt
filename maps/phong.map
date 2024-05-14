@@ -1,6 +1,9 @@
 map dimensions 50 50 50 brightness 0.3 shininess 5
 // Nice shiny spheres
-sphere center 4 0 0 radius 1 thickness 1 color 0.02 0.25 0.82 opacity 1 reflectiveness 0 specular 1 shininess -1
+sphere center 4 0 0 radius 1 thickness 1 color 0.02 0.25 0.82 opacity 1 reflectiveness 0 specular 1 shininess -1 tex /tmp/spheretest.tga
+
+sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga
+
 plight center -1 5 6 color #ff9f9f brightness 20 specular 0.5 color #ffffff
 
 campreset centered pos 3.2266 2.76751 0.929381 phi 0.876473 theta -1.15349 fov 43.226

@@ -477,9 +477,11 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Shading
     res->color = res->obj->color;
 
-    if (res->obj->s != NULL) {
+    if (res->obj->s != NULL && res->obj->texId != -1) {
         Vec2 uv = sphereUV(res->obj->s, res->p0);
-        res->color = Vec3{uv.x, uv.y, 0.5f};
+        // res->color = Vec3{uv.x, uv.y, 0.5f};
+        Texture *tx = tex.at(res->obj->texId);
+        if (tx != NULL) res->color = tx->at(uv.x, uv.y);
     }
 
     // std::printf("looped over %d objects\n", size);
@@ -657,6 +659,8 @@ void WorldMap::loadFile(char const* path) {
     mapStats.name.clear();
     mapStats.name = std::string(path);
 
+    tex.clear();
+
     std::printf("Allocations: %d\n", loadObjFile(path));
     camPresetNames = (const char**)malloc(sizeof(char*)*camPresets.size());
     for (size_t i = 0; i < camPresets.size(); i++) {
@@ -748,7 +752,7 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
             c = NULL;
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
-                Shape *sphere = decodeSphere(line);
+                Shape *sphere = decodeSphere(line, &tex);
                 sphere->s->center = sphere->s->center * transform;
                 if (c == NULL) {
                     appendToContainer(&unoptimizedObj, sphere);

@@ -2,6 +2,7 @@
 #define SHAPE
 
 #include "vec.hpp"
+#include "tex.hpp"
 #include <vector>
 #include <string>
 #include <iostream>
@@ -16,6 +17,7 @@ struct Shape {
     Triangle *t;
     Container *c;
     Vec3 color;
+    int texId;
     float opacity;
     float reflectiveness; // 0-1
     float specular; // 1-inf
@@ -88,7 +90,7 @@ PointLight decodePointLight(std::string in);
 
 std::string encodeSphere(Shape *sh);
 
-Shape *decodeSphere(std::string in);
+Shape *decodeSphere(std::string in, TexStore *tex = NULL);
 
 std::string encodeTriangle(Shape *sh);
 

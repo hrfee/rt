@@ -6,6 +6,7 @@
 #include "cam.hpp"
 #include "img.hpp"
 #include "mat.hpp"
+#include "tex.hpp"
 
 extern const char *modes[3];
 
@@ -87,6 +88,7 @@ class WorldMap {
         Container *obj;
         Container *flatObj;
         Container *optimizedObj;
+        TexStore tex;
         MapStats mapStats;
         Camera *cam;
         bool currentlyRendering;
