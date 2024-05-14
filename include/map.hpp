@@ -24,6 +24,7 @@ struct RenderConfig {
     float baseBrightness;
     float globalShininess;
     bool triangles, spheres;
+    bool mtTriangleCollision;
     Vec3 manualPosition;
     bool planeOptimisation;
     bool showDebugObjects;

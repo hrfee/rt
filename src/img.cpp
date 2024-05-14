@@ -39,6 +39,16 @@ void writePixel(Image *img, int x, int y, Vec3 color) {
     img->rgbxImg[idx + 3] = 0;
 }
 
+void writePixel(Image *img, int offset, Vec3c color) {
+    Vec3 cf = {float(color.x)/255.f, float(color.y)/255.f, float(color.z)/255.f};
+    img->img[offset] = cf;
+    int idx = offset * 4;
+    img->rgbxImg[idx + 0] = color.x;
+    img->rgbxImg[idx + 1] = color.y;
+    img->rgbxImg[idx + 2] = color.z;
+    img->rgbxImg[idx + 3] = 0;
+}
+
 Vec3 getPixel(Image *img, int x, int y) {
     return img->img[(img->w * y) + x];
 }

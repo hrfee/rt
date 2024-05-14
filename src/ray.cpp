@@ -117,6 +117,33 @@ float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle *tri) {
     return dot((tri->a - p0), normal) / denom;
 }
 
+// Faster triangle collision algorithm which calculates barycentric coordinates to determine t.
+// https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+float meetsTriangleMT(Vec3 p0, Vec3 delta, Triangle *tri) {
+    Vec3 e1 = tri->b - tri->a;
+    Vec3 e2 = tri->c - tri->a;
+    Vec3 rayEdge = cross(delta, e2);
+    float det = dot(e1, rayEdge);
+
+    // Uncomment for sided-ness
+    // if (det <= 0.f) return -1.f;
+
+    float invDet = 1.f / det;
+    Vec3 ap0 = p0 - tri->a;
+    float u = invDet * dot(ap0, rayEdge);
+
+    if (u < 0.f || u > 1.f) return -1.f;
+
+    Vec3 ap0Edge = cross(ap0, e1);
+    float v = invDet * dot(delta, ap0Edge);
+
+    if (v < 0.f || u + v > 1.f) return -1.f;
+
+    float t = invDet * dot(e2, ap0Edge);
+
+    return t;
+}
+
 bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
     // Sign doesn't matter here as our triangles aren't single-faced.
     Vec3 absNormal = {std::abs(normal.x), std::abs(normal.y), std::abs(normal.z)};
@@ -214,4 +241,20 @@ float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
     if (tmax < 0) return -9999.f;
     if (tmin > tmax) return -9998.f;
     return tmin;
+}
+
+Vec2 sphereUV(Sphere *s, Vec3 p) {
+    // "Move" the sphere (and the point on it) to center O.
+    p = p - s->center;
+    // Get polar angles from O
+    float theta = std::atan2(p.x, p.z);
+    float phi = std::acos(p.y / s->radius);
+
+    // Divide by 360deg so range is 1,
+    float rU = theta / (2.f*M_PI);
+
+    return Vec2{
+        1.f - (rU + 0.5f), // and shift upwards so between 0 & 1.
+        1.f - (phi / float(M_PI))
+    };
 }

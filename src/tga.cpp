@@ -1,8 +1,10 @@
 #include "tga.hpp"
 
+#include <iostream>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
+#include <bitset>
 
 // Rough implementation of TGA v1.0
 // Source used for header format: https://en.wikipedia.org/wiki/Truevision_TGA
@@ -57,4 +59,35 @@ void writeTGA(Image *img, std::string fname, std::string id) {
     }
 
     f.close();
+}
+
+Image *readTGA(std::string fname) {
+    std::ifstream f(fname, std::ios_base::binary);
+    TGAHeader header;
+    f.read(&(header.idLength), 1);
+    char *id = (char*)malloc(sizeof(char)*header.idLength);
+    f.read(&(header.colorMapType), 1);
+    f.read(&(header.imageType), 1);
+    f.seekg(5, std::ios_base::cur); // Skip of cmapSpec space
+    f.read(&(header.imageSpec[0]), 10);
+    f.read(id, header.idLength);
+
+    uint w = (uint(header.imageSpec[5]) << 8) + (255 & uint(header.imageSpec[4]));
+    uint h = (uint(header.imageSpec[7]) << 8) + (255 & uint(header.imageSpec[6]));
+    /*std::printf("got comment: \"%s\"\n", id);
+    std::printf("Got width and height %dx%d\n", w, h);
+    std::printf("Got bitdepth %d\n", header.imageSpec[8]);*/
+    Image *img = newImage(w, h);
+
+    int pxCount = w*h;
+    for (int i = 0; i < pxCount; i++) {
+        // BGR, not RGB!
+        Vec3c pxBGR = {0,0,0};
+        f.read((char*)(&pxBGR), 3);
+        Vec3c px = {pxBGR.z, pxBGR.y, pxBGR.x};
+        writePixel(img, i, px);
+    }
+
+    f.close();
+    return img;
 }

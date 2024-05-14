@@ -19,6 +19,8 @@ void resizeImage(Image *img, int w, int h);
 
 void writePixel(Image *img, int x, int y, Vec3 color);
 
+void writePixel(Image *img, int offset, Vec3c color);
+
 Vec3 getPixel(Image *img, int x, int y);
 
 std::uint8_t *getPixelRGBx(Image *img, int x, int y);

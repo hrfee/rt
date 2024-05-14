@@ -115,6 +115,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     RenderConfig simpleConfig;
     simpleConfig.collisionsOnly = true;
     simpleConfig.triangles = rc->triangles;
+    simpleConfig.mtTriangleCollision = rc->mtTriangleCollision;
     simpleConfig.spheres = rc->spheres;
     simpleConfig.maxBounce = rc->maxBounce;
     simpleConfig.showDebugObjects = rc->showDebugObjects;
@@ -383,20 +384,33 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
         } else if (current->t != NULL && rc->triangles) {
             Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
             Vec3 nNormal = norm(normal);
-            float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
-            if (t >= 0) {
-                res->potentialCollisions++;
-                if (t < res->t) {
-                    Vec3 cPoint = p0 + (t * delta);
-                    if (meetsTriangle(nNormal, cPoint, current->t)) {
-                        res->collisions++;
-                        res->obj = current;
-                        res->t = t;
-                        res->p0 = cPoint;
-                        res->normal = normal;
-                        res->norm = nNormal;
-                    } else {
-                        res->potentialCollisions--;
+            if (rc->mtTriangleCollision) {
+                float t = meetsTriangleMT(p0, delta, current->t);
+                if (t >= 0 && t < res->t) {
+                    res->potentialCollisions++;
+                    res->collisions++;
+                    res->obj = current;
+                    res->t = t;
+                    res->p0 = p0 + (t *delta);
+                    res->normal = normal;
+                    res->norm = nNormal;
+                }
+            } else {
+                float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
+                if (t >= 0) {
+                    res->potentialCollisions++;
+                    if (t < res->t) {
+                        Vec3 cPoint = p0 + (t * delta);
+                        if (meetsTriangle(nNormal, cPoint, current->t)) {
+                            res->collisions++;
+                            res->obj = current;
+                            res->t = t;
+                            res->p0 = cPoint;
+                            res->normal = normal;
+                            res->norm = nNormal;
+                        } else {
+                            res->potentialCollisions--;
+                        }
                     }
                 }
             }
@@ -462,6 +476,11 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
 
     // Shading
     res->color = res->obj->color;
+
+    if (res->obj->s != NULL) {
+        Vec2 uv = sphereUV(res->obj->s, res->p0);
+        res->color = Vec3{uv.x, uv.y, 0.5f};
+    }
 
     // std::printf("looped over %d objects\n", size);
     if (rc->collisionsOnly) return;

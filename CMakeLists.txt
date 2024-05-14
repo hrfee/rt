@@ -39,3 +39,5 @@ add_subdirectory(src)
 add_subdirectory(main)
 
 add_subdirectory(timings)
+
+add_subdirectory(tgareader)

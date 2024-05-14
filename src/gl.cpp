@@ -168,6 +168,7 @@ void GLWindow::loadUI() {
     state.rc.maxBounce = 15;
     state.rc.triangles = true;
     state.rc.spheres = true;
+    state.rc.mtTriangleCollision = false;
     state.rc.planeOptimisation = true;
     state.useOptimizedMap = false;
     state.rc.showDebugObjects = false;
@@ -351,6 +352,8 @@ void GLWindow::addUI() {
         };
         state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
+        state.rc.renderNow = ImGui::Checkbox("Möller-Trumbore tri collision (faster)", &(state.rc.mtTriangleCollision)) ? true : state.rc.renderNow;
+
         state.rc.renderNow = ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount);
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
         
