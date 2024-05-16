@@ -41,5 +41,5 @@ void generateOffsets(Vec2* offsets, int gridSize, int sampleMode) {
 }
 
 void visualizeOffsets(Vec2 *offsets, int gridSize, Image *img) {
-    clearImage(img);
+    img->clear();
 }

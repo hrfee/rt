@@ -81,7 +81,7 @@ Image *readTGA(std::string fname) {
     // Naively, assume we only need 3 bytes of colour for rgb, and that anything further is junk
     int bytesToIgnore = (header.imageSpec[8] - 3*8)/8;
 
-    Image *img = newImage(w, h);
+    Image *img = new Image(w, h);
 
     int pxCount = w*h;
     for (int i = 0; i < pxCount; i++) {
@@ -89,7 +89,7 @@ Image *readTGA(std::string fname) {
         Vec3c pxBGR = {0,0,0};
         f.read((char*)(&pxBGR), 3);
         Vec3c px = {pxBGR.z, pxBGR.y, pxBGR.x};
-        writePixel(img, i, px);
+        img->write(i, px);
         if (bytesToIgnore > 0) {
             f.seekg(bytesToIgnore, std::ios_base::cur);
         }

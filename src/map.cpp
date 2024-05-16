@@ -589,7 +589,7 @@ void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0,
             }
 
             if (collision) {
-                writePixel(img, x, y, accumulatedColor/nOffsets);
+                img->write(x, y, accumulatedColor/nOffsets);
             }
             accumulatedColor = {0,0,0};
             

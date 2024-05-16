@@ -26,7 +26,7 @@ void closeTexture(Texture *tex) {
 Vec3 Texture::at(float u, float v) {
     int x = std::clamp(int(u*float(img->w)), 0, img->w-1);
     int y = std::clamp(img->h-int(v*float(img->h)), 0, img->h-1);
-    Vec3 c = getPixel(img, x, y);
+    Vec3 c = img->get(x, y);
     return c;
 }
 

@@ -107,10 +107,10 @@ Image *mainLoop(RenderConfig *rc) {
     // If the requested render res has changed
     if (window->state.rDim.dirty()) {
         map->cam->setDimensions(window->state.rDim.w, window->state.rDim.h);
-        resizeImage(img, window->state.rDim.w, window->state.rDim.h);
+        img->resize(window->state.rDim.w, window->state.rDim.h);
         window->state.texDim.w = window->state.rDim.w;
         window->state.texDim.h = window->state.rDim.h;
-        clearImage(img);
+        img->clear();
         if (rc->renderOnChange) change = true;
         window->state.rDim.update();
     }
@@ -145,7 +145,7 @@ Image *mainLoop(RenderConfig *rc) {
     }
 
     if (change && !map->currentlyRendering && !window->state.currentlyOptimizing) {
-        clearImage(img);
+        img->clear();
         // map->castRays(img, rc, glfwGetTime);
         window->state.csvDirty = true;
         window->state.currentlyRendering = true;
@@ -231,11 +231,11 @@ int main(int argc, char **argv) {
    
     // map->cam->debugPrintCorners();
 
-    img = newImage(window->state.rDim.w, window->state.rDim.h);
-    clearImage(img);
+    img = new Image(window->state.rDim.w, window->state.rDim.h);
+    img->clear();
 
     window->mainLoop(mainLoop);
     delete window;
     delete map;
-    closeImage(img);
+    delete img;
 }

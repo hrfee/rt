@@ -1,7 +1,6 @@
 #ifndef IMG
 #define IMG
 
-#include <cstdlib>
 #include "vec.hpp"
 
 // Images start from bottom-left.
@@ -9,24 +8,23 @@ struct Image {
     int w, h;
     Vec3 *img;
     std::uint8_t *rgbxImg;
+    Image(int width, int height);
+    ~Image();
+    void resize(int width, int height);
+    void write(int x, int y, Vec3 color);
+    void write(int offset, Vec3c color);
+    Vec3 get(int x, int y);
+    std::uint8_t *getRGBx(int x, int y);
+    void writeTestImage();
+    void clear();
+    private:
+        void allocate() {
+            img = (Vec3*)malloc(sizeof(Vec3)*w*h);
+            rgbxImg = (std::uint8_t*)malloc(sizeof(std::uint8_t)*w*h*4);
+        };
+        void freeImage() {
+            free(img);
+            free(rgbxImg);
+        };
 };
-
-Image *newImage(int w, int h);
-
-void closeImage(Image *img);
-
-void resizeImage(Image *img, int w, int h);
-
-void writePixel(Image *img, int x, int y, Vec3 color);
-
-void writePixel(Image *img, int offset, Vec3c color);
-
-Vec3 getPixel(Image *img, int x, int y);
-
-std::uint8_t *getPixelRGBx(Image *img, int x, int y);
-
-void writeTestImage(Image *img);
-
-void clearImage(Image *img);
-
 #endif

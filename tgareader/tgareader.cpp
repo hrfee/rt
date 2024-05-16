@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
     }
     Image *img = readTGA(argv[1]);
     writeTGA(img, argv[2], "success!");
-    closeImage(img);
+    delete img;
     std::printf("(hopefully) written to \"%s\".\n", argv[2]);
     return 0;
 }
