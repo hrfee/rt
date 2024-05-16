@@ -7,6 +7,7 @@
 #include "img.hpp"
 #include "mat.hpp"
 #include "tex.hpp"
+#include "aa.hpp"
 
 extern const char *modes[3];
 
@@ -26,6 +27,9 @@ struct RenderConfig {
     float globalShininess;
     bool triangles, spheres;
     bool mtTriangleCollision;
+    bool normalMapping;
+    int samplesPerPx;
+    int sampleMode;
     Vec3 manualPosition;
     bool planeOptimisation;
     bool showDebugObjects;
@@ -89,6 +93,7 @@ class WorldMap {
         Container *flatObj;
         Container *optimizedObj;
         TexStore tex;
+        TexStore norms;
         MapStats mapStats;
         Camera *cam;
         bool currentlyRendering;
@@ -103,7 +108,7 @@ class WorldMap {
         void encode(char const* path);
     private:
         void castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
-        void castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1, int *state);
+        void castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1, int *state, Vec2 *offsets, int nOffsets);
         void ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);
         void voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc);

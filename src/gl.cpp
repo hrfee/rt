@@ -166,9 +166,17 @@ void GLWindow::loadUI() {
 
     state.rc.refractiveIndex = 1.52f;
     state.rc.maxBounce = 15;
+
     state.rc.triangles = true;
     state.rc.spheres = true;
+
     state.rc.mtTriangleCollision = false;
+
+    state.rc.normalMapping = false;
+
+    state.rc.samplesPerPx = 1;
+    state.rc.sampleMode = SamplingMode::Grid;
+
     state.rc.planeOptimisation = true;
     state.useOptimizedMap = false;
     state.rc.showDebugObjects = false;
@@ -265,7 +273,11 @@ std::string GLWindow::frameInfo() {
         out << int(1.f/state.lastRenderTime);
     }
     out << "fps) ";
-    out << "at " << state.lastRenderW << 'x' << state.lastRenderH << " on " << state.rc.nthreads << " threads.";
+    out << "at " << state.lastRenderW << 'x' << state.lastRenderH << " on " << state.rc.nthreads << " threads";
+    if (state.rc.samplesPerPx > 1) {
+        out << " with AA @ " << state.rc.samplesPerPx << "s/px (" << samplingModes[state.rc.sampleMode] << ")";
+    }
+    out << ".";
     return out.str();
 }
 
@@ -354,6 +366,7 @@ void GLWindow::addUI() {
         state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::Checkbox("Möller-Trumbore tri collision (faster)", &(state.rc.mtTriangleCollision)) ? true : state.rc.renderNow;
 
+        state.rc.renderNow = ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)) ? true : state.rc.renderNow;
         state.rc.renderNow = ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount);
         state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
         
@@ -410,6 +423,8 @@ void GLWindow::addUI() {
                 (state.useOptimizedMap && state.staleAccelConfig) ? "Optimize" : "Render",
                 ImVec2(120, 40)
         );
+        ImGui::SliderInt("Samples^2 per px", &(state.rc.samplesPerPx), 1, 16);
+        ImGui::Combo("AA Sampling mode", &(state.rc.sampleMode), samplingModes, IM_ARRAYSIZE(samplingModes));
         enable();
         if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {
             for (int i = 0; i < state.rc.nthreads; i++) {

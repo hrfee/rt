@@ -11,6 +11,7 @@ namespace {
     const char* w_thickness = "thickness";
     const char* w_color = "color";
     const char* w_tex = "tex";
+    const char* w_norm = "norm";
     const char w_color_hex = '#';
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
@@ -87,6 +88,7 @@ Shape *emptyShape() {
     sh->shininess = -1.f; // -1 Indicates global shininess param takes precedence
     sh->opacity = 1.f;
     sh->texId = -1; // No texture
+    sh->normId = -1; // No normalmap
     return sh;
 }
 
@@ -146,7 +148,7 @@ std::string encodeSphere(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeSphere(std::string in, TexStore *tex) {
+Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm) {
     std::stringstream stream(in);
     Shape *sh = decodeShape(in);
     sh->s = (Sphere*)alloc(sizeof(Sphere));
@@ -174,6 +176,14 @@ Shape *decodeSphere(std::string in, TexStore *tex) {
             stream >> w;
             if (tex != NULL) {
                 sh->texId = tex->load(w);
+            }
+        } else if (w == w_norm) {
+            // FIXME: Cope with spaces in filenames
+            // FIXME: "Eval" pathnames so they match, even if written differently
+            // FIXME: Move to shape once implemented for tris
+            stream >> w;
+            if (norm != NULL) {
+                sh->normId = norm->load(w);
             }
         }
     } while (stream);

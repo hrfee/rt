@@ -12,3 +12,4 @@ Makefile
 .cache/
 perf.data
 perf.data*
+assets/

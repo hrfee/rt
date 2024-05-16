@@ -37,6 +37,11 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
     if (rc->manualPosition != cam->position) {
         cam->setPosition(rc->manualPosition);
     }
+    // Generate AA offset array
+    int nOffsets = rc->samplesPerPx * rc->samplesPerPx;
+    Vec2 *offsets = (Vec2*)alloc(sizeof(Vec2)*nOffsets);
+    generateOffsets(offsets, rc->samplesPerPx, rc->sampleMode);
+
     // Image is split into horizontal strips for each thread (Previously vertical, because i forgot about contiguous memory access)
     // int sectionWidth = cam->w / nthreads;
     int sectionHeight = cam->h / nthreads;
@@ -57,7 +62,7 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
         // int w1 = w0 + w;
         int h1 = h0 + h;
         // threadptrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, w0, w1, 0, cam->h);
-        threadPtrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, 0, cam->w, h0, h1, &(rc->threadStates[i]));
+        threadPtrs[i] = std::thread(&WorldMap::castSubRays, this, img, rc, 0, cam->w, h0, h1, &(rc->threadStates[i]), offsets, nOffsets);
     }
     for (int i = 0; i < nthreads; i++) {
         threadPtrs[i].join();
@@ -116,6 +121,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     simpleConfig.collisionsOnly = true;
     simpleConfig.triangles = rc->triangles;
     simpleConfig.mtTriangleCollision = rc->mtTriangleCollision;
+    simpleConfig.normalMapping = rc->normalMapping;
     simpleConfig.spheres = rc->spheres;
     simpleConfig.maxBounce = rc->maxBounce;
     simpleConfig.showDebugObjects = rc->showDebugObjects;
@@ -478,11 +484,48 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Shading
     res->color = res->obj->color;
 
+    Vec2 uv = {-1, -1};
     if (res->obj->s != NULL && res->obj->texId != -1) {
-        Vec2 uv = sphereUV(res->obj->s, res->p0);
+        uv = sphereUV(res->obj->s, res->p0);
         // res->color = Vec3{uv.x, uv.y, 0.5f};
         Texture *tx = tex.at(res->obj->texId);
         if (tx != NULL) res->color = tx->at(uv.x, uv.y);
+    }
+    if (res->obj->s != NULL && rc->normalMapping && res->obj->normId != -1) {
+        if (uv.x == -1.f) uv = sphereUV(res->obj->s, res->p0);
+        Texture *nm = norms.at(res->obj->normId);
+        if (nm != NULL) {
+            Vec3 ts = nm->at(uv.x, uv.y); // (0,0,1) is pointing towards the normal
+            // Change from 0-1 to -1-1
+            ts = (ts * 2) - 1;
+
+            // Test
+            // ts = {0,0,1};
+
+            // normalmaps are defined in tangent-space, they are relative to themselves. 
+            // Find tangent to the sphere (i.e. vector orthogonal to normal)
+            
+            // NOTE: this one is the negative of the other one?
+            // Vec3 tan = norm({-res->norm.z, 0.f, res->norm.x});
+            //
+            Vec3 n = res->norm;
+
+            Vec3 a = {0.f, 1.f, 0.f};
+            Vec3 tan = -1.f * norm(cross(a, n));
+            Vec3 bitan = norm(cross(n, tan));
+
+            // Create TBN matrix
+            Mat3 tbn = {
+                tan.x, bitan.x, n.x,
+                tan.y, bitan.y, n.y,
+                tan.z, bitan.z, n.z
+            };
+
+            Vec3 sampledNorm = norm(tbn * ts);
+            // std::printf("for normal (%f, %f, %f), got (%f, %f, %f) => (%f, %f, %f)\n", res->norm.x, res->norm.y, res->norm.z, ts.x, ts.y, ts.z, sampledNorm.x, sampledNorm.y, sampledNorm.z);
+            res->normal = sampledNorm;
+            res->norm = sampledNorm;
+        }
     }
 
     // std::printf("looped over %d objects\n", size);
@@ -524,21 +567,31 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     res->color.z = std::fmin(res->color.z, 1.f);
 }
 
-void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1, int *state) {
+void WorldMap::castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1, int *state, Vec2 *offsets, int nOffsets) {
     RayResult res = RayResult();
     Vec3 startCol = w0 * cam->viewportCol;
     Vec3 startRow = h0 * cam->viewportRow;
     Vec3 baseRowVec = cam->viewportCorner + startRow + startCol;
+
     *state = 1;
+    Vec3 accumulatedColor = {0,0,0};
     for (int y = h0; y < h1; y++) {
         // cam->viewportCorner is a vector from the origin, therefore all calculated pixel positions are.
         Vec3 delta = baseRowVec;
         for (int x = w0; x < w1; x++) {
-            res.resetObj();
-            castRay(&res, obj, cam->position, delta, rc);
-            if (res.collisions > 0) {
-                writePixel(img, x, y, res.color);
+            bool collision = false;
+            for (int i = 0; i < nOffsets; i++) {
+                Vec3 offsetDelta = delta + (offsets[i].x*cam->viewportCol) + (offsets[i].y*cam->viewportRow);
+                res.resetObj();
+                castRay(&res, obj, cam->position, offsetDelta, rc);
+                if (res.collisions > 0) collision = true;
+                accumulatedColor = accumulatedColor + res.color;
             }
+
+            if (collision) {
+                writePixel(img, x, y, accumulatedColor/nOffsets);
+            }
+            accumulatedColor = {0,0,0};
             
             delta = delta + cam->viewportCol; 
             if (*state == -1) break;
@@ -661,6 +714,7 @@ void WorldMap::loadFile(char const* path) {
     mapStats.name = std::string(path);
 
     tex.clear();
+    norms.clear();
 
     std::printf("Allocations: %d\n", loadObjFile(path));
     camPresetNames = (const char**)malloc(sizeof(char*)*camPresets.size());
@@ -753,7 +807,7 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
             c = NULL;
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
-                Shape *sphere = decodeSphere(line, &tex);
+                Shape *sphere = decodeSphere(line, &tex, &norms);
                 sphere->s->center = sphere->s->center * transform;
                 if (c == NULL) {
                     appendToContainer(&unoptimizedObj, sphere);

@@ -18,6 +18,7 @@ struct Shape {
     Container *c;
     Vec3 color;
     int texId;
+    int normId;
     bool noLighting;
     float opacity;
     float reflectiveness; // 0-1
@@ -91,7 +92,7 @@ PointLight decodePointLight(std::string in);
 
 std::string encodeSphere(Shape *sh);
 
-Shape *decodeSphere(std::string in, TexStore *tex = NULL);
+Shape *decodeSphere(std::string in, TexStore *tex = NULL, TexStore *norm = NULL);
 
 std::string encodeTriangle(Shape *sh);
 
