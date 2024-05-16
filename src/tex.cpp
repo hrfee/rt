@@ -3,25 +3,7 @@
 #include <cstring>
 #include <string>
 #include <cstdlib>
-#include "tga.hpp"
-
-Texture *newTexture(Image *img) {
-    Texture *tex = (Texture*)malloc(sizeof(Texture));
-    tex->img = img;
-
-    return tex;
-}
-
-Texture *newTexture(std::string fname) {
-    Image *img = readTGA(fname);
-    if (img == NULL) return NULL;
-    return newTexture(img);
-}
-
-void closeTexture(Texture *tex) {
-    free(tex->img);
-    free(tex);
-}
+#include <algorithm>
 
 Vec3 Texture::at(float u, float v) {
     int x = std::clamp(int(u*float(img->w)), 0, img->w-1);
@@ -42,7 +24,7 @@ int TexStore::load(std::string fname) {
         if (fnames.at(i) == fname) return i;
     }
     int i = fnames.size();
-    Texture *tex = newTexture(fname);
+    Texture *tex = new Texture(fname);
     if (tex == NULL) return -1;
     texes.emplace_back(tex);
     fnames.emplace_back(fname);
@@ -62,7 +44,7 @@ Texture *TexStore::at(int id) {
 
 void TexStore::clear() {
     for (auto t: texes) {
-        closeTexture(t);
+        delete t;
     }
     texes.clear();
     fnames.clear();

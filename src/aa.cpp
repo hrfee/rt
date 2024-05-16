@@ -30,7 +30,7 @@ void generateOffsets(Vec2* offsets, int gridSize, int sampleMode) {
         std::random_device rd;
         int seed = rd();
         std::mt19937 gen(seed);
-        float divs = 1.f/float(gridSize+1);
+        float divs = 0.5f/float(gridSize+1);
         std::uniform_real_distribution<float> dist(-divs, divs);
         for (int i = 0; i < gridSize*gridSize; i++) {
             offsets[i].x += dist(gen);
@@ -40,6 +40,15 @@ void generateOffsets(Vec2* offsets, int gridSize, int sampleMode) {
     return;
 }
 
+// Assumes the image has a border of 1px.
 void visualizeOffsets(Vec2 *offsets, int gridSize, Image *img) {
     img->clear();
+    img->applyThinBorder({1,1,1});
+    for (int i = 0; i < gridSize*gridSize; i++) {
+        // Shift from -0.5-0.5 to 0-1
+        Vec2 px = {offsets[i].x + 0.5f, offsets[i].y + 0.5f};
+        int x = int(px.x * float(img->w-2));
+        int y = int(px.y * float(img->h-2));
+        img->write(x, y, {1.f, 1.f, 1.f});
+    }
 }

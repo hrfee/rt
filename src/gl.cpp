@@ -8,14 +8,65 @@
 #include <cmath>
 
 #include "accel.hpp"
+#include "glad/glad.h"
 #include "shape.hpp"
 #include "tga.hpp"
 #include "imgui_stdlib.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_internal.h"
+#include "aa.hpp"
 
 #define MOVE_SPEED 0.1f
+
+void SubImage::regen() {
+    GLuint nTex = 0; 
+    glGenTextures(1, &nTex);
+    glBindTexture(GL_TEXTURE_2D, nTex);
+    glTexStorage2D(
+            GL_TEXTURE_2D,
+            1,
+            GL_SRGB8_ALPHA8,
+            GLsizei(img->w), GLsizei(img->h)
+    );
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+    if (nTex != 0) {
+        // No-op if no texture is bound already, so no checks needed.
+        glDeleteTextures(1, &tex);
+        tex = nTex;
+        sizeChanged = false;
+    }
+}
+
+void SubImage::upload() {
+    if (!dirty && !sizeChanged) return;
+    if (sizeChanged) {
+        regen();
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexSubImage2D(
+            GL_TEXTURE_2D,
+            0,
+            0, 0,
+            GLsizei(img->w), GLsizei(img->h),
+            GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV,
+            img->rgbxImg
+    );
+    dirty = false;
+}
+
+void SubImage::show() {
+    ImGui::Image((void*)(intptr_t)tex, ImVec2(img->w, img->h));
+}
 
 void GLWindow::loadShader(GLuint *s, GLenum shaderType, char const *fname) {
     std::ifstream f(fname);
@@ -191,7 +242,7 @@ void GLWindow::loadUI() {
     ImGui_ImplOpenGL3_Init();
 }
 
-void GLWindow::reloadTexture() {
+void GLWindow::reloadRenderTexture() {
     std::fprintf(stderr, "Will render @ %dx%d\n", state.texDim.w, state.texDim.h);
     GLuint newTex = 0;
     glGenTextures(1, &newTex);
@@ -207,6 +258,7 @@ void GLWindow::reloadTexture() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    // Unbind
 	glBindTexture(GL_TEXTURE_2D, 0);
 
     if (newTex != 0) {
@@ -419,12 +471,18 @@ void GLWindow::addUI() {
             state.vpDim.update();
         }
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
+        ImGui::Columns(2, "AA");
+        ImGui::SetColumnWidth(0, 500.f);
+        ImGui::SliderInt("Samples^2 per px", &(state.rc.samplesPerPx), 1, 16);
+        ImGui::Combo("AA Sampling mode", &(state.rc.sampleMode), samplingModes, IM_ARRAYSIZE(samplingModes));
         if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button(
                 (state.useOptimizedMap && state.staleAccelConfig) ? "Optimize" : "Render",
                 ImVec2(120, 40)
         );
-        ImGui::SliderInt("Samples^2 per px", &(state.rc.samplesPerPx), 1, 16);
-        ImGui::Combo("AA Sampling mode", &(state.rc.sampleMode), samplingModes, IM_ARRAYSIZE(samplingModes));
+        ImGui::NextColumn();
+        ImGui::Text("AA Offset map:");
+        images.at(0)->show();
+        ImGui::Columns();
         enable();
         if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {
             for (int i = 0; i < state.rc.nthreads; i++) {
@@ -505,7 +563,7 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
 
         state.rc.renderNow = false;
         ui.saveToTGA = false;
-
+        
         addUI();
 
         // bool resizeRequested = state.rDim.dirty();
@@ -517,7 +575,7 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
 
         // Indicates the texture has been updated.
         if (state.texDim.dirty()) {
-            reloadTexture();
+            reloadRenderTexture();
             state.texDim.update();
         }
 
@@ -526,10 +584,15 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         Image *img = func(&(state.rc));
+
         draw(img);
-      
+
         if (ui.saveToTGA && !state.filePath.empty()) {
-            writeTGA(img, state.filePath, frameInfo());
+            TGA::write(img, state.filePath, frameInfo());
+        }
+
+        for (auto windowedImage : images) {
+            windowedImage->upload(); 
         }
 
         ImGui::Render();

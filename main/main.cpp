@@ -18,6 +18,7 @@
 namespace {
     WorldMap *map;
     Image *img;
+    SubImage *aaOffsetMap;
     GLWindow *window;
 }
 
@@ -54,6 +55,7 @@ std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
     out << std::endl;
     return out.str();
 }
+
 
 Image *mainLoop(RenderConfig *rc) {
     bool change = rc->renderNow;
@@ -168,6 +170,11 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.lastRenderTime = glfwGetTime() - map->lastRenderTime;
     }
 
+    if (map->aaOffsetImageDirty) {
+        aaOffsetMap->dirty = true;
+        map->aaOffsetImageDirty = false;
+    }
+
     return img;
 }
 
@@ -233,6 +240,10 @@ int main(int argc, char **argv) {
 
     img = new Image(window->state.rDim.w, window->state.rDim.h);
     img->clear();
+
+    aaOffsetMap = new SubImage(new Image(102, 102)); // 100^2 plus space for a border
+    map->aaOffsetImage = aaOffsetMap->img;
+    window->images.emplace_back(aaOffsetMap);
 
     window->mainLoop(mainLoop);
     delete window;

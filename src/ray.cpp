@@ -88,9 +88,10 @@ float meetsSphere(Vec3 p0, Vec3 delta, Sphere *sphere, float *t1) {
     float discrim = b*b - 4.f*a*c;
     if (discrim < 0) return -1;
     float discrimRoot = std::sqrt(discrim);
-    float t = (-b - discrimRoot) / (2.f*a);
+    float denom = 0.5f / a;
+    float t = (-b - discrimRoot) * denom;
     if (discrim > 0 && t < 0) {
-        float t_1 = (-b + discrimRoot) / (2.f*a);
+        float t_1 = (-b + discrimRoot) * denom;
         float t_ = 0.f;
         if (t < 0 || (t > t_1 && t_1 > 0)) {
             t_ = t;

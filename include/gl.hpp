@@ -75,6 +75,21 @@ struct GLWindowUI {
     int renderMode;
 };
 
+struct SubImage {
+    Image *img;
+    bool sizeChanged;
+    bool dirty;
+    GLuint tex;
+    SubImage(Image *image) {
+        img = image;
+        dirty = true;
+        sizeChanged = true;
+    }
+    void regen();
+    void upload();
+    void show();
+};
+
 class GLWindow {
     public:
         GLFWwindow* window;
@@ -83,7 +98,7 @@ class GLWindow {
         void mainLoop(Image* (*func)(RenderConfig *c));
         void draw(Image *img);
         GLWindowState state;
-        void reloadTexture();
+        void reloadRenderTexture();
         void reloadScaledResolution();
         void loadRequestedWindowResolution();
         std::string frameInfo();
@@ -94,6 +109,7 @@ class GLWindow {
         void hideUI() { ui.hide = true; };
         void showUI() { ui.hide = false; };
         GLWindowUI ui;
+        std::vector<SubImage*> images;
     private:
         const char *title;
         std::string vertString, fragString;

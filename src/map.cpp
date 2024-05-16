@@ -1,5 +1,6 @@
 #include "map.hpp"
 
+#include "aa.hpp"
 #include "shape.hpp"
 #include "util.hpp"
 #include "ray.hpp"
@@ -41,6 +42,12 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
     int nOffsets = rc->samplesPerPx * rc->samplesPerPx;
     Vec2 *offsets = (Vec2*)alloc(sizeof(Vec2)*nOffsets);
     generateOffsets(offsets, rc->samplesPerPx, rc->sampleMode);
+    if (aaOffsetImage != NULL) {
+        visualizeOffsets(offsets, rc->samplesPerPx, aaOffsetImage);
+        aaOffsetImageDirty = true;
+    }
+    // TGA::write(aaOffsetImage, "/tmp/test.tga", "test");
+
 
     // Image is split into horizontal strips for each thread (Previously vertical, because i forgot about contiguous memory access)
     // int sectionWidth = cam->w / nthreads;
@@ -142,10 +149,9 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         // PHONG : CGPaP in C p.730 Sect. 16.1.4
         // \hat{L} = normDistance,
         // \hat{N} = norm(res->normal),
-        Vec3 normNorm = norm(res->normal);
         // \hat{V} = norm(viewDelta)
         // \hat{R} = rNorm;
-        Vec3 rNorm = norm((2.f * normNorm * dot(normNorm, normDistance)) - normDistance);
+        Vec3 rNorm = norm((2.f * res->norm * dot(res->norm, normDistance)) - normDistance);
         // k_s = res->specular,
         // O_{s\varlambda} (Specular Colour) = light.specular * light.specularColor,
         // n (shininess):
@@ -656,8 +662,12 @@ void WorldMap::encode(char const* path) {
 }
 
 WorldMap::WorldMap(char const* path) {
+    baseBrightness = 0;
     optimizeLevel = 0;
+    bvh = false;
     accelIndex = Accel::None;
+    accelParam = -1;
+    accelFloatParam = 1.5f;
     currentlyRendering = false;
     currentlyOptimizing = false;
     lastRenderTime = 0.f;
@@ -668,6 +678,9 @@ WorldMap::WorldMap(char const* path) {
     clearContainer(flatObj, true);
     optimizedObj = NULL;
     camPresetNames = NULL;
+    aaOffsetImage = NULL;
+    aaOffsetImageDirty = false;
+    cam = NULL;
     loadFile(path);
 }
 

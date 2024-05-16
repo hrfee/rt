@@ -34,7 +34,7 @@ void encodeDescriptor(TGAHeader *header, int w, int h) {
     header->imageSpec[9] = 0b00000000; 
 }
 
-void writeTGA(Image *img, std::string fname, std::string id) {
+void TGA::write(Image *img, std::string fname, std::string id) {
     TGAHeader header;
     header.idLength = id.length();
     header.colorMapType = 0;
@@ -61,7 +61,7 @@ void writeTGA(Image *img, std::string fname, std::string id) {
     f.close();
 }
 
-Image *readTGA(std::string fname) {
+Image *TGA::read(std::string fname) {
     std::ifstream f(fname, std::ios_base::binary);
     TGAHeader header;
     f.read(&(header.idLength), 1);

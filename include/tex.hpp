@@ -3,12 +3,16 @@
 
 #include "vec.hpp"
 #include "img.hpp"
+#include "tga.hpp"
 #include <string>
 #include <vector>
 
 struct Texture {
     Image *img;
     Vec3 at(float u, float v);
+    Texture(Image *image): img(image) {};
+    Texture(std::string fname): img(TGA::read(fname)) {};
+    ~Texture() { delete img; };
 };
 
 struct TexStore {
@@ -20,11 +24,5 @@ struct TexStore {
     int load(std::string fname);
     void clear();
 };
-
-Texture *newTexture(Image *img);
-
-Texture *newTexture(std::string fname);
-
-void closeTexture(Texture *tex);
 
 #endif

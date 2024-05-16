@@ -29,7 +29,7 @@ void Image::write(int x, int y, Vec3 color) {
     rgbxImg[idx + 0] = std::uint8_t(color.x*255.f);
     rgbxImg[idx + 1] = std::uint8_t(color.y*255.f);
     rgbxImg[idx + 2] = std::uint8_t(color.z*255.f);
-    rgbxImg[idx + 3] = 0;
+    rgbxImg[idx + 3] = 255;
 }
 
 void Image::write(int offset, Vec3c color) {
@@ -59,6 +59,17 @@ void Image::writeTestImage() {
             Vec3 c = { (float(y) / float(h)), (float(x) / float(w)), (float(x+y) / float(w + h)) };
             write(x, y, c);
         }
+    }
+}
+
+void Image::applyThinBorder(Vec3 color) {
+    for (int i = 0; i < w; i++) {
+        write(i, 0, color);
+        write(i, h-1, color);
+    }
+    for (int i = 1; i < h-1; i++) {
+        write(0, i, color);
+        write(w-1, i, color);
     }
 }
 

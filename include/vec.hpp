@@ -4,8 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
-#include <algorithm>
-
+#include <immintrin.h>
 struct Vec2 {
     float x, y;
 };
@@ -31,7 +30,8 @@ Vec2 operator*(float a, Vec2 b) noexcept {
 
 constexpr
 Vec2 operator/(Vec2 a, float b) noexcept {
-    return Vec2{ a.x/b, a.y/b };
+    float d = 1.f/b;
+    return Vec2{ a.x*d, a.y*d };
 }
 
 struct Vec3 {
@@ -94,7 +94,8 @@ Vec3 operator*(Vec3 a, Vec3 b) noexcept {
 
 constexpr
 Vec3 operator/(Vec3 a, float b) noexcept {
-    return Vec3{ a.x/b, a.y/b, a.z/b };
+    float d = 1.f/b;
+    return Vec3{ a.x*d, a.y*d, a.z*d };
 }
 
 constexpr

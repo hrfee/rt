@@ -16,6 +16,7 @@ struct Image {
     Vec3 get(int x, int y);
     std::uint8_t *getRGBx(int x, int y);
     void writeTestImage();
+    void applyThinBorder(Vec3 color);
     void clear();
     private:
         void allocate() {
