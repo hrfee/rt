@@ -62,6 +62,7 @@ struct Sphere {
 
 struct Triangle {
     Vec3 a, b, c;
+    Vec2 uvs[3]; // UV coordinates of a, b, c respectively
 };
 
 struct PointLight {
@@ -96,7 +97,7 @@ Shape *decodeSphere(std::string in, TexStore *tex = NULL, TexStore *norm = NULL)
 
 std::string encodeTriangle(Shape *sh);
 
-Shape *decodeTriangle(std::string in);
+Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm);
 
 std::string encodeColour(Vec3 c);
 

@@ -398,8 +398,12 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
             Vec3 nNormal = norm(normal);
             if (rc->mtTriangleCollision) {
-                float t = meetsTriangleMT(p0, delta, current->t);
+                Vec3 bary;
+                float t = meetsTriangleMT(p0, delta, current->t, &bary);
                 if (t >= 0 && t < res->t) {
+                    if (current->texId != -1 || current->normId != -1) {
+                        res->uv = triUV(bary, current->t);
+                    }
                     res->potentialCollisions++;
                     res->collisions++;
                     res->obj = current;
@@ -496,6 +500,11 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         // res->color = Vec3{uv.x, uv.y, 0.5f};
         Texture *tx = tex.at(res->obj->texId);
         if (tx != NULL) res->color = tx->at(uv.x, uv.y);
+    }
+    if (res->obj->t != NULL && res->obj->texId != -1) {
+        Texture *tx = tex.at(res->obj->texId);
+        if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
+        // res->color = {res->uv.x, res->uv.y, 1.f};
     }
     if (res->obj->s != NULL && rc->normalMapping && res->obj->normId != -1) {
         if (uv.x == -1.f) uv = sphereUV(res->obj->s, res->p0);
@@ -830,7 +839,7 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.spheres++;
                 allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
-                Shape *triangle = decodeTriangle(line);
+                Shape *triangle = decodeTriangle(line, &tex, &norms);
                 // std::printf("before %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);
                 triangle->t->a = triangle->t->a * transform;
                 // std::printf("after %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);

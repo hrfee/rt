@@ -43,6 +43,7 @@ struct RayResult {
     Vec3 reflectionColor;
     Vec3 specularColor;
     Vec3 refractColor;
+    Vec2 uv;
     Vec3 p0;
     Vec3 normal;
     Vec3 norm;

@@ -10,7 +10,7 @@ sphere center 4 1.0 -2 radius 1 thickness 0.05 color 0.82 0.25 0.82 opacity 0.1 
 triangle a 5.2 0 -0.2 b 2 -0.8 -1.4 c 5 1 1 color #2094ab opacity 0.4 reflectiveness 0.5 specular 1 shininess 20
 
 // mega triangle (close enough to a wall)
-triangle a 50 -5 5.4 b -5 -5 5.5 c -5 15 5.3 color #ffffff reflectiveness 0.2
+triangle a 50 -5 5.4 b -5 -5 5.5 c -5 15 5.3 color #ffffff reflectiveness 0.0 tex assets/mario.tga
 
 plight center 0 4.9 0 color #ffffff brightness 10 specular 0.2 color #ffffff
 plight center 5 2 1 color #ffffff brightness 1.0 specular 0.2 color #ffffff

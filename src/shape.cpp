@@ -107,7 +107,7 @@ std::string encodeShape(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeShape(std::string in) {
+Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm) {
     std::stringstream stream(in);
     Shape *sh = emptyShape();
     do {
@@ -129,6 +129,22 @@ Shape *decodeShape(std::string in) {
             sh->shininess = std::stof(w);
         } else if (w == w_nolighting) {
             sh->noLighting = true;
+        } else if (w == w_tex) {
+            // FIXME: Cope with spaces in filenames
+            // FIXME: "Eval" pathnames so they match, even if written differently
+            // FIXME: Move to shape once implemented for tris
+            stream >> w;
+            if (tex != NULL) {
+                sh->texId = tex->load(w);
+            }
+        } else if (w == w_norm) {
+            // FIXME: Cope with spaces in filenames
+            // FIXME: "Eval" pathnames so they match, even if written differently
+            // FIXME: Move to shape once implemented for tris
+            stream >> w;
+            if (norm != NULL) {
+                sh->normId = norm->load(w);
+            }
         }
     } while (stream);
     return sh;
@@ -150,7 +166,7 @@ std::string encodeSphere(Shape *sh) {
 
 Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in);
+    Shape *sh = decodeShape(in, tex, norm);
     sh->s = (Sphere*)alloc(sizeof(Sphere));
     sh->s->thickness = 1.f;
     do {
@@ -169,22 +185,6 @@ Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm) {
         } else if (w == w_thickness) {
             stream >> w;
             sh->s->thickness = std::stof(w);
-        } else if (w == w_tex) {
-            // FIXME: Cope with spaces in filenames
-            // FIXME: "Eval" pathnames so they match, even if written differently
-            // FIXME: Move to shape once implemented for tris
-            stream >> w;
-            if (tex != NULL) {
-                sh->texId = tex->load(w);
-            }
-        } else if (w == w_norm) {
-            // FIXME: Cope with spaces in filenames
-            // FIXME: "Eval" pathnames so they match, even if written differently
-            // FIXME: Move to shape once implemented for tris
-            stream >> w;
-            if (norm != NULL) {
-                sh->normId = norm->load(w);
-            }
         }
     } while (stream);
     return sh;
@@ -254,10 +254,13 @@ std::string encodeTriangle(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeTriangle(std::string in) {
+Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in);
+    Shape *sh = decodeShape(in, tex, norm);
     sh->t = (Triangle*)alloc(sizeof(Triangle));
+    sh->t->uvs[0] = {0,0};
+    sh->t->uvs[1] = {1,0};
+    sh->t->uvs[2] = {1,1};
     do {
         std::string w;
         stream >> w;

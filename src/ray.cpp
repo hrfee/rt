@@ -120,7 +120,7 @@ float meetsTrianglePlane(Vec3 p0, Vec3 delta, Vec3 normal, Triangle *tri) {
 
 // Faster triangle collision algorithm which calculates barycentric coordinates to determine t.
 // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
-float meetsTriangleMT(Vec3 p0, Vec3 delta, Triangle *tri) {
+float meetsTriangleMT(Vec3 p0, Vec3 delta, Triangle *tri, Vec3 *bary) {
     Vec3 e1 = tri->b - tri->a;
     Vec3 e2 = tri->c - tri->a;
     Vec3 rayEdge = cross(delta, e2);
@@ -131,18 +131,28 @@ float meetsTriangleMT(Vec3 p0, Vec3 delta, Triangle *tri) {
 
     float invDet = 1.f / det;
     Vec3 ap0 = p0 - tri->a;
-    float u = invDet * dot(ap0, rayEdge);
+    // u
+    bary->x = invDet * dot(ap0, rayEdge);
 
-    if (u < 0.f || u > 1.f) return -1.f;
+    if (bary->x < 0.f || bary->x > 1.f) return -1.f;
 
     Vec3 ap0Edge = cross(ap0, e1);
-    float v = invDet * dot(delta, ap0Edge);
+    // v
+    bary->y = invDet * dot(delta, ap0Edge);
 
-    if (v < 0.f || u + v > 1.f) return -1.f;
+    if (bary->y < 0.f || bary->x + bary->y > 1.f) return -1.f;
 
     float t = invDet * dot(e2, ap0Edge);
 
+    // w
+    bary->z = 1.f - bary->x - bary->y;
+
     return t;
+}
+
+Vec2 triUV(Vec3 bary, Triangle *tri) {
+    // FIXME: These obviously aren't right.
+    return bary.z*tri->uvs[0] + bary.x*tri->uvs[1] + bary.y*tri->uvs[2];
 }
 
 bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {
