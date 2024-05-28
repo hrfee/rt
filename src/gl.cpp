@@ -115,11 +115,14 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
         throw std::runtime_error("Failed init (" + std::to_string(code) + "): " + std::string(error));
     }
 
-    glfwInitHint(0x00053001, 0x00038002);
+    // glfwInitHint(0x00053001, 0x00038002);
     // The line above is equivalent to below, but won't fail to compile on older versions.
     // glfwInitHint(GLFW_WAYLAND_LIBDECOR, GLFW_WAYLAND_PREFER_LIBDECOR);
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
     // glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    //
+    glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);

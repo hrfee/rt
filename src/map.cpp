@@ -370,6 +370,7 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
 }
 
 void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
+    if (c->size == 0) return;
     Bound *bo = c->start;
     // When using --bi-trees/kd-trees--, the two sub-nodes always span the area of the parent.
     // Missing one of them means we must hit the other.
@@ -418,7 +419,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                     res->potentialCollisions++;
                     if (t < res->t) {
                         Vec3 cPoint = p0 + (t * delta);
-                        if (meetsTriangle(nNormal, cPoint, current->t)) {
+                        if (current->t->plane || meetsTriangle(nNormal, cPoint, current->t)) {
                             res->collisions++;
                             res->obj = current;
                             res->t = t;
@@ -469,6 +470,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
         }
         bo = bo->next;
     }
+    if (c != &unoptimizable) traversalRay(res, &unoptimizable, p0, delta, rc);
 }
 
 void WorldMap::ray(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
@@ -682,7 +684,9 @@ WorldMap::WorldMap(char const* path) {
     lastRenderTime = 0.f;
     obj = &unoptimizedObj;
     std::memset(&unoptimizedObj, 0, sizeof(Container));
+    std::memset(&unoptimizable, 0, sizeof(Container));
     clearContainer(&unoptimizedObj, true);
+    clearContainer(&unoptimizable, true);
     flatObj = NULL;
     clearContainer(flatObj, true);
     optimizedObj = NULL;
@@ -721,6 +725,7 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
 
 void WorldMap::loadFile(char const* path) {
     std::printf("Frees: %d\n", clearContainer(&unoptimizedObj, true));
+    clearContainer(&unoptimizable, true);
     pointLights.clear();
     camPresets.clear();
     free(camPresetNames);
@@ -731,7 +736,7 @@ void WorldMap::loadFile(char const* path) {
     flatObj = NULL;
     obj = &unoptimizedObj;
 
-    mapStats.spheres = 0, mapStats.tris = 0, mapStats.lights = 0;
+    mapStats.spheres = 0, mapStats.tris = 0, mapStats.lights = 0, mapStats.planes = 0;
     mapStats.name.clear();
     mapStats.name = std::string(path);
 
@@ -845,12 +850,18 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 // std::printf("after %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);
                 triangle->t->b = triangle->t->b * transform;
                 triangle->t->c = triangle->t->c * transform;
-                if (c == NULL) {
-                    appendToContainer(&unoptimizedObj, triangle);
+                if (triangle->t->plane) {
+                    appendToContainer(&unoptimizable, triangle);
+                    mapStats.planes++;
+                    allocCounter--; // Since we allocate then free it
                 } else {
-                    appendToContainer(c, triangle);
+                    if (c == NULL) {
+                        appendToContainer(&unoptimizedObj, triangle);
+                    } else {
+                        appendToContainer(c, triangle);
+                    }
+                    mapStats.tris++;
                 }
-                mapStats.tris++;
                 allocCounter += 2; // One for triangle, one for shape container
             }
         } else if (token == w_pointLight) {
@@ -929,15 +940,19 @@ void flattenRootContainer(Container *dst, Container *src, bool root) {
             if (current->t != NULL) {
                 b->min = {9999, 9999, 9999};
                 b->max = {-9999, -9999, -9999};
-                for (int i = 0; i < 3; i++) {
-                    b->min(i) = std::min(b->min(i), current->t->a(i));
-                    b->min(i) = std::min(b->min(i), current->t->b(i));
-                    b->min(i) = std::min(b->min(i), current->t->c(i));
-                    b->max(i) = std::max(b->max(i), current->t->a(i));
-                    b->max(i) = std::max(b->max(i), current->t->b(i));
-                    b->max(i) = std::max(b->max(i), current->t->c(i));
+                if (current->t->plane) {
+                    // FIXME: Calculating a real bounding box: intersect plane with scene's AABB.
+                } else {
+                    for (int i = 0; i < 3; i++) {
+                        b->min(i) = std::min(b->min(i), current->t->a(i));
+                        b->min(i) = std::min(b->min(i), current->t->b(i));
+                        b->min(i) = std::min(b->min(i), current->t->c(i));
+                        b->max(i) = std::max(b->max(i), current->t->a(i));
+                        b->max(i) = std::max(b->max(i), current->t->b(i));
+                        b->max(i) = std::max(b->max(i), current->t->c(i));
+                    }
+                    b->centroid = 0.333f * (current->t->a + current->t->b + current->t->c);
                 }
-                b->centroid = 0.333f * (current->t->a + current->t->b + current->t->c);
                 Triangle *t = (Triangle*)alloc(sizeof(Triangle));
                 std::memcpy(t, current->t, sizeof(Triangle));
                 b->s->t = t;
@@ -956,6 +971,7 @@ void flattenRootContainer(Container *dst, Container *src, bool root) {
 WorldMap::~WorldMap() {
     delete cam;
     clearContainer(&unoptimizedObj, true);
+    clearContainer(&unoptimizable, true);
     // clearContainer(optimizedObj);
     free(optimizedObj);
     obj = NULL;

@@ -1,0 +1,32 @@
+map dimensions 50 50 50 brightness 0.3 shininess 5
+// Nice shiny spheres
+sphere center 5 0 1 radius 0.6 color 0.8 0.82 0.2 reflectiveness 0.5 specular 1 shininess 40
+sphere center 5.2 0 -0.2 radius 0.4 color #ff0000 reflectiveness 0.5 specular 1
+
+sphere center 2 -0.8 -1.4 radius 0.4 thickness 1 color 0.82 0.25 0.82 opacity 0.2 reflectiveness 0 specular 1 shininess 20
+
+sphere center 4 1.0 -2 radius 1 thickness 0.05 color 0.82 0.25 0.82 opacity 0.1 reflectiveness 0 specular 1 shininess 20
+
+triangle a 5.2 0 -0.2 b 2 -0.8 -1.4 c 5 1 1 color #2094ab opacity 0.4 reflectiveness 0.5 specular 1 shininess 20
+
+// mega triangle (close enough to a wall)
+triangle a 50 -5 5.4 b -5 -5 5.5 c -5 15 5.3 color #ffffff reflectiveness 0.2
+
+plight center 0 4.9 0 color #ffffff brightness 10 specular 0.2 color #ffffff
+plight center 5 2 1 color #ffffff brightness 1.0 specular 0.2 color #ffffff
+
+campreset birds_eye pos -3.19468 2.41251 -13.4276 phi -1.08917 theta -0.0904921 fov 60
+campreset side_view pos -13.1084 2.39844 -4.19527 phi -0.380801 theta -0.134883 fov 60
+campreset behind_wall pos -16.3428 7.41703 6.65733 phi 0.224829 theta -0.415477 fov 60
+campreset broken_boundary pos -0.860128 0.752319 5.03115 phi 1.05829 theta -0.979058 fov 30.968
+
+plight center 3 4.9 1 color #ff9f9f brightness 15 specular 0.05 color #00ff00
+
+include teapot.obj translate 1.7 .49 1.3 rotate 0 0.785398 0 scale .15
+
+// include pooltable.map translate 3 0 1 rotate 0 0.785398 0 scale .5
+
+triangle a 1 -1 1 b 1.5 -1 1 c 1 -1 1.5 color #ff0000 reflectiveness 0.2 plane
+
+// "nolighting" tag so its entirely lit
+sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga nolighting

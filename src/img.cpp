@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <algorithm>
 
 Image::Image(int width, int height) {
     w = width;
@@ -49,13 +50,17 @@ Vec3 Image::get(int x, int y) {
     return img[(w * y) + x];
 }
 
+Vec3 Image::getWrap(int x, int y) {
+    return img[(w * (y % h)) + (x % w)];
+}
+
 // Bilinear interpolation
 Vec3 Image::get(float x, float y) {
     int xs[2] = {int(x), int(x)+1};
     int ys[2] = {int(y), int(y)+1};
     // Top two points
-    Vec3 r1 = (float(xs[1])-x)*get(xs[0], ys[0]) + (x-float(xs[0]))*get(xs[1], ys[0]);
-    Vec3 r2 = (float(xs[1])-x)*get(xs[0], ys[1]) + (x-float(xs[0]))*get(xs[1], ys[1]);
+    Vec3 r1 = (float(xs[1])-x)*getWrap(xs[0], ys[0]) + (x-float(xs[0]))*getWrap(xs[1], ys[0]);
+    Vec3 r2 = (float(xs[1])-x)*getWrap(xs[0], ys[1]) + (x-float(xs[0]))*getWrap(xs[1], ys[1]);
 
     return (float(ys[1])-y)*r1 + (y-float(ys[0]))*r2;
 }

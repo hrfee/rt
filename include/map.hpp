@@ -67,7 +67,7 @@ struct RayResult {
 
 struct MapStats {
     std::string name;
-    int spheres, tris, lights;
+    int spheres, tris, lights, planes;
 };
 
 class WorldMap {
@@ -92,6 +92,7 @@ class WorldMap {
         Container *obj;
         Container *flatObj;
         Container *optimizedObj;
+        Container unoptimizable;
         TexStore tex;
         TexStore norms;
         Image *aaOffsetImage;

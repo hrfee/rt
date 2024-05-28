@@ -25,10 +25,7 @@ int splitBitree(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxis
 Container* generateHierarchy(Container *o, int accel, bool bvh, int splitLimit, int splitCount = 0, int lastAxis = -1, int colorIndex = 0, int extra = 0, float fextra = 0.f);
 Container* generateOctreeHierarchy(Container *o, int splitLimit, int splitCount, int colorIndex, int maxNodesPerVox, int parentId = 1);
 
-    void printShapes(Container *c, int tabIndex = 0);
-
-float containerSA(Container *o);
-float shapeSA(Shape *sh);
+void printShapes(Container *c, int tabIndex = 0);
 
 void containerCube(Container *c, Vec3 color);
 void containerSphereCorners(Container *c, Vec3 color);

@@ -63,6 +63,7 @@ struct Sphere {
 struct Triangle {
     Vec3 a, b, c;
     Vec2 uvs[3]; // UV coordinates of a, b, c respectively
+    bool plane; // Whether or not a plane defined by these points, or just a triangle
 };
 
 struct PointLight {

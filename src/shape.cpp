@@ -25,6 +25,7 @@ namespace {
     const char* w_a = "a";
     const char* w_b = "b";
     const char* w_c = "c";
+    const char* w_plane = "plane";
     const char* w_campreset = "campreset";
     const char* w_pos = "pos";
     const char* w_phi = "phi";
@@ -258,6 +259,7 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
     std::stringstream stream(in);
     Shape *sh = decodeShape(in, tex, norm);
     sh->t = (Triangle*)alloc(sizeof(Triangle));
+    sh->t->plane = false;
     sh->t->uvs[0] = {0,0};
     sh->t->uvs[1] = {1,0};
     sh->t->uvs[2] = {1,1};
@@ -285,6 +287,8 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
             sh->t->c.y = std::stof(w);
             stream >> w;
             sh->t->c.z = std::stof(w);
+        } else if (w == w_plane) {
+            sh->t->plane = true;
         }
     } while (stream);
     return sh;
