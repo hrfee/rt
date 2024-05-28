@@ -6,10 +6,10 @@
 #include <algorithm>
 
 Vec3 Texture::at(float u, float v) {
-    int x = std::clamp(int(u*float(img->w)), 0, img->w-1);
-    int y = std::clamp(img->h-int(v*float(img->h)), 0, img->h-1);
-    Vec3 c = img->get(x, y);
-    return c;
+    float x = std::clamp(u*float(img->w), 0.f, float(img->w-1));
+    float y = std::clamp(float(img->h)-(v*float(img->h)), 0.f, float(img->h-1));
+    // return img->get(int(x), int(y));
+    return img->get(x, y);
 }
 
 int TexStore::id(std::string fname) {
