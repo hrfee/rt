@@ -41,6 +41,7 @@ struct RayResult {
     float t1;
     Vec3 color;
     Vec3 reflectionColor;
+    Vec3 lightColor;
     Vec3 specularColor;
     Vec3 refractColor;
     Vec2 uv;
@@ -57,6 +58,7 @@ struct RayResult {
         color = {0,0,0};
         reflectionColor = {0,0,0};
         specularColor = {0,0,0};
+        lightColor = {0,0,0};
         refractColor = {0,0,0};
         p0 = {0,0,0};
         normal = {0,0,0};

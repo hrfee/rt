@@ -163,7 +163,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     }
     res->specularColor = specularColor;
     // std::printf("%f,%f,%f * %f,%f,%f\n", res->color.x, res->color.y, res->color.z, lightColor.x, lightColor.y, lightColor.z);
-    res->color = (res->color * lightColor);
+    res->lightColor = lightColor;
 }
 
 void castThroughSolidSphere(float r0, float r1, Vec3 pb, Vec3 delta, Sphere *s, Vec3 *pOut, Vec3 *deltaOut) {
@@ -496,23 +496,22 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Shading
     res->color = res->obj->color;
 
-    Vec2 uv = {-1, -1};
     if (res->obj->s != NULL && res->obj->texId != -1) {
-        uv = sphereUV(res->obj->s, res->p0);
+        res->uv = sphereUV(res->obj->s, res->p0);
         // res->color = Vec3{uv.x, uv.y, 0.5f};
         Texture *tx = tex.at(res->obj->texId);
-        if (tx != NULL) res->color = tx->at(uv.x, uv.y);
+        if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
     }
     if (res->obj->t != NULL && res->obj->texId != -1) {
         Texture *tx = tex.at(res->obj->texId);
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
         // res->color = {res->uv.x, res->uv.y, 1.f};
     }
-    if (res->obj->s != NULL && rc->normalMapping && res->obj->normId != -1) {
-        if (uv.x == -1.f) uv = sphereUV(res->obj->s, res->p0);
+    if (rc->normalMapping && res->obj->normId != -1) {
+        if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(res->obj->s, res->p0);
         Texture *nm = norms.at(res->obj->normId);
         if (nm != NULL) {
-            Vec3 ts = nm->at(uv.x, uv.y); // (0,0,1) is pointing towards the normal
+            Vec3 ts = nm->at(res->uv.x, res->uv.y); // (0,0,1) is pointing towards the normal
             // Change from 0-1 to -1-1
             ts = (ts * 2) - 1;
 
@@ -554,11 +553,12 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
         Vec3 reflection = delta - 2.f*dot(delta, res->norm) * res->norm;
         castReflectionRay(p0PlusABit, reflection, rc, res, callCount+1);
-        res->color = ((1.f - res->obj->reflectiveness)*res->color);
     }
 
     if (rc->lighting && !(res->obj->noLighting)) {//  && res->obj->reflectiveness != 0) {
         castShadowRays(-1.f*delta, p0PlusABit, rc, res);
+    } else {
+        res->lightColor = {1.f, 1.f, 1.f};
     }
 
     if (res->obj->opacity != 1.f) {
@@ -576,9 +576,18 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
             res->refractColor = {0.f, 0.f, 0.f};
         }
     }
-   
-    res->color = (res->obj->opacity * res->color) + ((1.f - res->obj->opacity) * res->refractColor) + (res->obj->reflectiveness * res->reflectionColor) + res->specularColor;
+ 
+    
+    // Diffuse lighting and specular reflection
+    Vec3 out = (res->color * res->lightColor) * (1.f - res->obj->reflectiveness) + res->obj->reflectiveness*res->reflectionColor;
+    // Interpolated trasnparency (CGPaP 16.25), but not for the specular component
+    out = res->obj->opacity * out + (1.f - res->obj->opacity) * res->refractColor;
+    // Specular highlight
+    out = out + res->specularColor;
+    
+    res->color = out;
 
+    // Clamp
     res->color.x = std::fmin(res->color.x, 1.f);
     res->color.y = std::fmin(res->color.y, 1.f);
     res->color.z = std::fmin(res->color.z, 1.f);
