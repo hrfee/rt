@@ -50,19 +50,23 @@ Vec3 Image::get(int x, int y) {
     return img[(w * y) + x];
 }
 
-Vec3 Image::getWrap(int x, int y) {
-    return img[(w * (y % h)) + (x % w)];
+int wrap(int coord, int size) {
+    int m = coord % size;
+    return m >= 0 ? m : m + size;
 }
 
 // Bilinear interpolation
 Vec3 Image::get(float x, float y) {
-    int xs[2] = {int(x), int(x)+1};
-    int ys[2] = {int(y), int(y)+1};
-    // Top two points
-    Vec3 r1 = (float(xs[1])-x)*getWrap(xs[0], ys[0]) + (x-float(xs[0]))*getWrap(xs[1], ys[0]);
-    Vec3 r2 = (float(xs[1])-x)*getWrap(xs[0], ys[1]) + (x-float(xs[0]))*getWrap(xs[1], ys[1]);
+    int xs[2] = {wrap(int(x), w), wrap(int(x)+1, w)};
+    int ys[2] = {wrap(int(y), h), wrap(int(y)+1, h)};
+    float rx = x - float(int(x));
+    float ry = y - float(int(y));
 
-    return (float(ys[1])-y)*r1 + (y-float(ys[0]))*r2;
+    // Top two points
+    Vec3 r1 = (1.f - rx)*get(xs[0], ys[0]) + (rx)*get(xs[1], ys[0]);
+    Vec3 r2 = (1.f - rx)*get(xs[0], ys[1]) + (rx)*get(xs[1], ys[1]);
+
+    return (1.f - ry)*r1 + (ry)*r2;
 }
 
 std::uint8_t *Image::getRGBx(int x, int y) {

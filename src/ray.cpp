@@ -152,7 +152,7 @@ float meetsTriangleMT(Vec3 p0, Vec3 delta, Triangle *tri, Vec3 *bary) {
 
 Vec2 triUV(Vec3 bary, Triangle *tri) {
     // FIXME: These obviously aren't right.
-    return bary.z*tri->uvs[0] + bary.x*tri->uvs[1] + bary.y*tri->uvs[2];
+    return bary.z*tri->UVs[0] + bary.x*tri->UVs[1] + bary.y*tri->UVs[2];
 }
 
 bool meetsTriangle(Vec3 normal, Vec3 collisionPoint, Triangle *tri) {

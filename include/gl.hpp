@@ -36,11 +36,13 @@ struct GLWindowState {
     RenderConfig rc;
     std::string filePath;
     std::string mapPath;
+    MapStats *mapStats;
     bool reloadMap;
     bool useOptimizedMap;
     bool renderOptimizedHierarchy;
     Container *optimizedMap;
     double lastOptimizeTime;
+    double lastLoadTime;
     int accelIndex;
     int accelDepth;
     int accelParam;
@@ -63,6 +65,7 @@ struct GLWindowState {
     } mouse;
     bool currentlyRendering;
     bool currentlyOptimizing;
+    bool currentlyLoading;
     std::stringstream csvStats;
     bool dumpToCsv;
     bool csvDirty;
@@ -104,12 +107,14 @@ class GLWindow {
         std::string frameInfo();
         std::string acceleratorInfo();
         std::string threadInfo();
+        std::string mapLoadInfo();
         void generateFrameVertices();
         void toggleUI() { ui.hide = !ui.hide; };
         void hideUI() { ui.hide = true; };
         void showUI() { ui.hide = false; };
         GLWindowUI ui;
         std::vector<SubImage*> images;
+        bool shouldntBeDoingAnything();
     private:
         const char *title;
         std::string vertString, fragString;

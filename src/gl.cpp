@@ -99,6 +99,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.reloadMap = false;
     state.currentlyRendering = false;
     state.currentlyOptimizing = false;
+    state.currentlyLoading = false;
     state.lastRenderTime = 0.f;
     state.camPresetNames = NULL;
     state.camPresetCount = 0;
@@ -357,12 +358,41 @@ std::string GLWindow::acceleratorInfo() {
     return out.str();
 }
 
+// FIXME: Add reporting of file load errors from texturestore/texture (potentially with throws?)
+std::string GLWindow::mapLoadInfo() {
+    std::ostringstream out;
+    out.precision(5);
+    if (state.currentlyLoading) out << "Loading \"";
+    else out << "Loaded \"";
+    out << state.mapStats->name << "\" ";
+    if (state.currentlyLoading) out << "has taken ";
+    else out << "took ";
+    out << int(state.lastLoadTime*1000.f) << "ms: ";
+    out << state.mapStats->spheres << "s/";
+    out << state.mapStats->tris << "t/";
+    out << state.mapStats->lights << "l/";
+    out << state.mapStats->planes << "p/";
+    out << state.mapStats->tex << "tex/";
+    out << state.mapStats->norm << "ntex/";
+    out << state.mapStats->allocs << "allocs.";
+    out << " Failures: ";
+    out << state.mapStats->missingObj << "o/";
+    out << state.mapStats->missingTex << "tex/";
+    out << state.mapStats->missingNorm << "ntex.";
+
+    return out.str();
+}
+
+bool GLWindow::shouldntBeDoingAnything() {
+    return state.currentlyRendering || state.currentlyOptimizing || state.currentlyLoading;
+}
+
 void GLWindow::disable() {
-    if (state.currentlyRendering || state.currentlyOptimizing) ImGui::BeginDisabled();
+    if (shouldntBeDoingAnything()) ImGui::BeginDisabled();
 }
 
 void GLWindow::enable() {
-    if (state.currentlyRendering || state.currentlyOptimizing) ImGui::EndDisabled();
+    if (shouldntBeDoingAnything()) ImGui::EndDisabled();
 }
 
 void GLWindow::addUI() {
@@ -506,11 +536,14 @@ void GLWindow::addUI() {
         ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
         ImGui::Text("Map Loading");
         ImGui::InputText(".map path", &(state.mapPath));
+
         disable();
-        state.reloadMap = ImGui::Button("Reload Map (50/50 SEGV)", ImVec2(90, 25));
-        if (state.reloadMap) {
-            state.rc.baseBrightness = -1.f;
-            state.rc.globalShininess = -1.f;
+        bool reloadMap = ImGui::Button((state.reloadMap ? "Loading..." : "Reload Map (50/50 SEGV)"), ImVec2(180, 25));
+        if (reloadMap) {
+            state.reloadMap = true;
+        }
+        if (state.lastLoadTime != 0.f) {
+            ImGui::Text(mapLoadInfo().c_str());
         }
         enable();
     }
@@ -687,7 +720,7 @@ void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int 
     // Ignore if any imgui fields are being typed in.
     if (ImGui::GetIO().WantTextInput) return;
     GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
-    if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled && !w->state.currentlyRendering && !w->state.currentlyOptimizing) {
+    if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled && !w->shouldntBeDoingAnything()) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         w->state.mouse.enabled = true;
         w->hideUI();

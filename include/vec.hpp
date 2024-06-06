@@ -4,9 +4,28 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
-#include <immintrin.h>
 struct Vec2 {
     float x, y;
+    
+    float& operator() (std::size_t i) noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
+    }
+    
+    float const& operator() (std::size_t i) const noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
+    }
+
+    float& idx(std::size_t i) noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
+    }
+    
+    float const& idx(std::size_t i) const noexcept {
+        return *(((float*)this)+i);
+        // return i == 0 ? x : (i == 1 ? y : z);
+    }
 };
 
 constexpr

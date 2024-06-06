@@ -59,19 +59,31 @@ std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
 
 Image *mainLoop(RenderConfig *rc) {
     bool change = rc->renderNow;
-    if (window->state.reloadMap) {
-        map->loadFile(window->state.mapPath.c_str());
-        window->state.reloadMap = false;
-        window->state.useOptimizedMap = false;
-        window->state.staleAccelConfig = true;
-        change = true;
-        window->state.camPresets = &(map->camPresets);
-        window->state.camPresetNames = map->camPresetNames;
-        window->state.camPresetCount = map->camPresets.size();
+    if (window->state.reloadMap && !map->currentlyLoading) {
+        if (!window->state.currentlyLoading) {
+            window->state.currentlyLoading = true;
+            // map->loadFile(window->state.mapPath.c_str());
+            window->state.camPresetCount = 0;
+            window->state.camPresetNames = NULL;
+            window->state.rc.baseBrightness = -1.f;
+            window->state.rc.globalShininess = -1.f;
+            std::thread load(&WorldMap::loadFile, map, window->state.mapPath.c_str(), glfwGetTime);
+            load.detach();
+        } else {
+            window->state.reloadMap = false;
+            window->state.useOptimizedMap = false;
+            window->state.staleAccelConfig = true;
+            change = true;
+            window->state.camPresets = &(map->camPresets);
+            window->state.camPresetNames = map->camPresetNames;
+            window->state.camPresetCount = map->camPresets.size();
+            window->state.currentlyLoading = false;
+        }
+    } else if (map->currentlyLoading) {
+        window->state.lastLoadTime = glfwGetTime() - map->lastLoadTime;
     }
 
     if (window->state.useOptimizedMap) {
-
         bool hierarchyChanged = 
             (window->state.accelDepth != map->optimizeLevel ||
             window->state.accelIndex != map->accelIndex ||
@@ -146,7 +158,7 @@ Image *mainLoop(RenderConfig *rc) {
         window->state.threadCount = std::thread::hardware_concurrency();
     }
 
-    if (change && !map->currentlyRendering && !window->state.currentlyOptimizing) {
+    if (change && !map->currentlyRendering && !window->state.currentlyOptimizing && !map->currentlyLoading) {
         img->clear();
         // map->castRays(img, rc, glfwGetTime);
         window->state.csvDirty = true;
@@ -220,7 +232,6 @@ int main(int argc, char **argv) {
 
     window = new GLWindow(windowWidth, windowHeight, windowScaleFactor, WINDOW_TITLE);
     map = new WorldMap(mapPath.c_str());
-    window->state.mapPath = mapPath.c_str();
     if (map->camPresetNames != NULL) {
         window->state.camPresets = &(map->camPresets);
         window->state.camPresetNames = map->camPresetNames;
@@ -244,6 +255,9 @@ int main(int argc, char **argv) {
     aaOffsetMap = new SubImage(new Image(102, 102)); // 100^2 plus space for a border
     map->aaOffsetImage = aaOffsetMap->img;
     window->images.emplace_back(aaOffsetMap);
+
+    window->state.mapStats = &(map->mapStats);
+    window->state.mapPath = map->mapStats.name;
 
     window->mainLoop(mainLoop);
     delete window;

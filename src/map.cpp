@@ -690,7 +690,10 @@ WorldMap::WorldMap(char const* path) {
     accelFloatParam = 1.5f;
     currentlyRendering = false;
     currentlyOptimizing = false;
+    currentlyLoading = false;
     lastRenderTime = 0.f;
+    lastOptimizeTime = 0.f;
+    lastLoadTime = 0.f;
     obj = &unoptimizedObj;
     std::memset(&unoptimizedObj, 0, sizeof(Container));
     std::memset(&unoptimizable, 0, sizeof(Container));
@@ -703,7 +706,7 @@ WorldMap::WorldMap(char const* path) {
     aaOffsetImage = NULL;
     aaOffsetImageDirty = false;
     cam = NULL;
-    loadFile(path);
+    loadFile(path, NULL);
 }
 
 void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
@@ -732,11 +735,15 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     currentlyOptimizing = false;
 }
 
-void WorldMap::loadFile(char const* path) {
+void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
+    currentlyLoading = true;
     std::printf("Frees: %d\n", clearContainer(&unoptimizedObj, true));
     clearContainer(&unoptimizable, true);
     pointLights.clear();
     camPresets.clear();
+    mapStats.clear();
+    mapStats.name = std::string(path);
+
     free(camPresetNames);
     clearContainer(optimizedObj, false);
     free(optimizedObj);
@@ -745,25 +752,28 @@ void WorldMap::loadFile(char const* path) {
     flatObj = NULL;
     obj = &unoptimizedObj;
 
-    mapStats.spheres = 0, mapStats.tris = 0, mapStats.lights = 0, mapStats.planes = 0;
-    mapStats.name.clear();
-    mapStats.name = std::string(path);
-
     tex.clear();
     norms.clear();
 
-    std::printf("Allocations: %d\n", loadObjFile(path));
+    if (getTime != NULL) lastLoadTime = getTime();
+    loadObjFile(path);
+    std::printf("Allocations: %d\n", mapStats.allocs);
     camPresetNames = (const char**)malloc(sizeof(char*)*camPresets.size());
     for (size_t i = 0; i < camPresets.size(); i++) {
         camPresetNames[i] = camPresets.at(i).name.c_str();
     }
+    if (getTime != NULL) lastLoadTime = getTime() - lastLoadTime;
+    currentlyLoading = false;
 }
 
-int WorldMap::loadObjFile(const char* path, Mat4 transform) {
+void WorldMap::loadObjFile(const char* path, Mat4 transform) {
     std::ifstream in(path);
+    if (in.fail() || in.bad()) {
+        mapStats.missingObj += 1;
+        return;
+    }
     std::string line;
     Container *c = NULL;
-    int allocCounter = 0;
     while (std::getline(in, line)) {
         std::stringstream lstream(line);
         std::string token;
@@ -795,7 +805,7 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
             }
         } else if (token == w_container) {
             c = emptyContainer(true);
-            allocCounter++;
+            mapStats.allocs++;
             for (int i = 0; i < 4; i++) {
                 lstream >> token;
                 if (token == w_a) {
@@ -838,40 +848,36 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 throw std::runtime_error("Didn't find open brace");
             }
         } else if (token == w_close && c != NULL) {
-            appendToContainer(&unoptimizedObj, c);
-            allocCounter++;
+            mapStats.allocs += appendToContainer(&unoptimizedObj, c);
             c = NULL;
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
                 Shape *sphere = decodeSphere(line, &tex, &norms);
+                mapStats.allocs += 2; // Shape and sphere
                 sphere->s->center = sphere->s->center * transform;
                 if (c == NULL) {
-                    appendToContainer(&unoptimizedObj, sphere);
+                    mapStats.allocs += appendToContainer(&unoptimizedObj, sphere);
                 } else {
-                    appendToContainer(c, sphere);
+                    mapStats.allocs += appendToContainer(c, sphere);
                 }
                 mapStats.spheres++;
-                allocCounter += 2; // One for sphere, one for shape container
             } else if (token == w_triangle) {
                 Shape *triangle = decodeTriangle(line, &tex, &norms);
-                // std::printf("before %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);
+                mapStats.allocs += 2; // Shape and triangle
                 triangle->t->a = triangle->t->a * transform;
-                // std::printf("after %f %f %f\n", triangle->t->a.x, triangle->t->a.y, triangle->t->a.z);
                 triangle->t->b = triangle->t->b * transform;
                 triangle->t->c = triangle->t->c * transform;
                 if (triangle->t->plane) {
-                    appendToContainer(&unoptimizable, triangle);
+                    mapStats.allocs += appendToContainer(&unoptimizable, triangle);
                     mapStats.planes++;
-                    allocCounter--; // Since we allocate then free it
                 } else {
                     if (c == NULL) {
-                        appendToContainer(&unoptimizedObj, triangle);
+                        mapStats.allocs += appendToContainer(&unoptimizedObj, triangle);
                     } else {
-                        appendToContainer(c, triangle);
+                        mapStats.allocs += appendToContainer(c, triangle);
                     }
                     mapStats.tris++;
                 }
-                allocCounter += 2; // One for triangle, one for shape container
             }
         } else if (token == w_pointLight) {
             PointLight pl = decodePointLight(line);
@@ -920,7 +926,6 @@ int WorldMap::loadObjFile(const char* path, Mat4 transform) {
             loadObjFile(eval.c_str(), trans);
         }
     }
-    return allocCounter;
 }
 
 void flattenRootContainer(Container *dst, Container *src, bool root) {

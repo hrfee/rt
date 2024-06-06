@@ -62,7 +62,7 @@ struct Sphere {
 
 struct Triangle {
     Vec3 a, b, c;
-    Vec2 uvs[3]; // UV coordinates of a, b, c respectively
+    Vec2 UVs[3]; // UV coordinates of a, b, c respectively
     bool plane; // Whether or not a plane defined by these points, or just a triangle
 };
 
@@ -110,13 +110,10 @@ Bound *emptyBound();
 
 Container *emptyContainer(bool plane = false);
 
-void appendToContainer(Container *c, Bound *bo);
-
-void appendToContainer(Container *c, Bound bo);
-
-void appendToContainer(Container *c, Shape *sh);
-
-void appendToContainer(Container *cParent, Container *c);
+int appendToContainer(Container *c, Bound *bo);
+int appendToContainer(Container *c, Bound bo);
+int appendToContainer(Container *c, Shape *sh);
+int appendToContainer(Container *cParent, Container *c);
 
 Bound *boundByIndex(Container *c, int i);
 

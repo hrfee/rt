@@ -133,7 +133,6 @@ Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm) {
         } else if (w == w_tex) {
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
-            // FIXME: Move to shape once implemented for tris
             stream >> w;
             if (tex != NULL) {
                 sh->texId = tex->load(w);
@@ -141,7 +140,6 @@ Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm) {
         } else if (w == w_norm) {
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
-            // FIXME: Move to shape once implemented for tris
             stream >> w;
             if (norm != NULL) {
                 sh->normId = norm->load(w);
@@ -303,9 +301,33 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
             min[i] = std::min(proj[0][i], std::min(proj[1][i], proj[2][i]));
             max[i] = std::max(proj[0][i], std::max(proj[1][i], proj[2][i]));
         }
+        
         float range[2] = {max[0] - min[0], max[1] - min[1]};
+        // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to the normal too!
+        Texture *t = NULL;
+        Vec2 scale = {1.f, 1.f};
+        float iw = 0.f, ih = 0.f;
+        if (sh->texId != -1) {
+            t = tex->at(sh->texId);
+        } else if (sh->normId) {
+            t = norm->at(sh->normId);
+        }
+        scale = t->scale;
+        iw = t->img->w;
+        ih = t->img->h;
+
+        if (scale.x == -1.f) {
+            float H = range[1] / scale.y;
+            float W = (H / ih) * iw;
+            scale.x = range[0] / W;
+        } else if (scale.y == -1.f) {
+            float W = range[0] / scale.x;
+            float H = (W / iw) * ih;
+            scale.y = range[1] / H;
+        }
+
         for (int i = 0; i < 3; i++) {
-            sh->t->uvs[i] = {(proj[i][0] - min[0])/range[0], (proj[i][1] - min[1])/range[1]};
+            sh->t->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
         }
     }
 
@@ -401,7 +423,7 @@ Container *emptyContainer(bool plane) {
     return c;
 }
 
-void appendToContainer(Container *c, Bound *bo) {
+int appendToContainer(Container *c, Bound *bo) {
     if (c->start == NULL) c->start = bo;
     if (c->end != NULL) c->end->next = bo;
     c->end = bo;
@@ -412,25 +434,26 @@ void appendToContainer(Container *c, Bound *bo) {
         }
     } */
     c->size++;
+    return 0;
 }
 
-void appendToContainer(Container *c, Bound bo) {
+int appendToContainer(Container *c, Bound bo) {
     Bound *bptr = emptyBound();
     std::memcpy(bptr, &bo, sizeof(Bound));
-    appendToContainer(c, bptr);
+    return 1 + appendToContainer(c, bptr);
 }
 
-void appendToContainer(Container *c, Shape *sh) {
+int appendToContainer(Container *c, Shape *sh) {
     auto bo = emptyBound();
     bo->s = sh;
-    appendToContainer(c, bo);
+    return 1 + appendToContainer(c, bo);
 }
 
-void appendToContainer(Container *cParent, Container *c) {
-    auto bo = emptyBound();
-    bo->s = emptyShape();
+int appendToContainer(Container *cParent, Container *c) {
+    auto bo = emptyBound(); // Alloc 
+    bo->s = emptyShape(); // Alloc
     bo->s->c = c;
-    appendToContainer(cParent, bo);
+    return 2 + appendToContainer(cParent, bo);
 }
 
 Bound *boundByIndex(Container *c, int i) {

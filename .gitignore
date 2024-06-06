@@ -13,3 +13,4 @@ Makefile
 perf.data
 perf.data*
 assets/
+imgui.ini

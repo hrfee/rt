@@ -1,6 +1,7 @@
 #ifndef MAP
 #define MAP
 
+#include <sstream>
 #include <vector>
 #include "shape.hpp"
 #include "cam.hpp"
@@ -70,17 +71,33 @@ struct RayResult {
 struct MapStats {
     std::string name;
     int spheres, tris, lights, planes;
+    int tex, norm;
+    int missingTex, missingNorm, missingObj;
+    int allocs = 0;
+    void clear() {
+        spheres = 0;
+        tris = 0;
+        lights = 0;
+        planes = 0;
+        tex = 0;
+        norm = 0;
+        missingTex = 0;
+        missingNorm = 0;
+        missingObj = 0;
+        allocs = 0;
+        name.clear();
+    }
 };
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), accelIndex(-1), bvh(false), accelParam(-1), accelFloatParam(1.5f), obj(NULL), flatObj(NULL), optimizedObj(NULL), aaOffsetImage(NULL), aaOffsetImageDirty(false), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), lastRenderTime(0.f), lastOptimizeTime(0.f) { obj = &unoptimizedObj; }
+        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), accelIndex(-1), bvh(false), accelParam(-1), accelFloatParam(1.5f), obj(NULL), flatObj(NULL), optimizedObj(NULL), aaOffsetImage(NULL), aaOffsetImageDirty(false), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), currentlyLoading(false), lastRenderTime(0.f), lastOptimizeTime(0.f), lastLoadTime(0.f) { obj = &unoptimizedObj; }
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
         float baseBrightness, globalShininess;
-        void loadFile(char const* path);
-        int loadObjFile(char const* path, Mat4 transform = mat44Identity);
+        void loadFile(char const* path, double (*getTime)(void));
+        void loadObjFile(char const* path, Mat4 transform = mat44Identity);
         void optimizeMap(double (*getTime)(void), int level = 1, int accelIdx = 1);
         int optimizeLevel;
         int accelIndex;
@@ -103,8 +120,10 @@ class WorldMap {
         Camera *cam;
         bool currentlyRendering;
         bool currentlyOptimizing;
+        bool currentlyLoading;
         double lastRenderTime;
         double lastOptimizeTime;
+        double lastLoadTime;
         void createSphere(Vec3 center, float radius, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f, float thickness = -1.f);
         void createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity = 1.f, float reflectiveness = 0.f, float specular = 1.f, float shininess = -1.f); 
         void createDebugVector(Vec3 p0, Vec3 delta, Vec3 color = {1.f, 0.f, 0.f});

@@ -15,7 +15,6 @@ struct Image {
     void write(int offset, Vec3c color);
     Vec3 get(int x, int y);
     Vec3 get(float x, float y); // Interpolates
-    Vec3 getWrap(int x, int y); // Wraps around
     std::uint8_t *getRGBx(int x, int y);
     void writeTestImage();
     void applyThinBorder(Vec3 color);

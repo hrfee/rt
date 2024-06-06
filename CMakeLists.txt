@@ -7,6 +7,10 @@ project(
     LANGUAGES CXX
 )
 
+# --DEBUG--
+# set(CMAKE_BUILD_TYPE Debug)
+# --RELEASE--
+set(CMAKE_BUILD_TYPE Release)
 add_compile_options(-O3)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -18,9 +22,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
+# set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -march=native")
-set(CMAKE_BUILD_TYPE Debug)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 

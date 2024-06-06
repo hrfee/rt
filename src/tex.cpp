@@ -1,13 +1,25 @@
 #include "tex.hpp"
+#include "tga.hpp"
 
 #include <cstring>
 #include <string>
 #include <cstdlib>
-#include <algorithm>
+// #include <algorithm>
+#include <sstream>
 
 Vec3 Texture::at(float u, float v) {
-    float x = std::clamp(u*float(img->w), 0.f, float(img->w-1));
+    /* float x = std::clamp(u*float(img->w), 0.f, float(img->w-1));
     float y = std::clamp(float(img->h)-(v*float(img->h)), 0.f, float(img->h-1));
+    x *= scale.x;
+    y *= scale.y; */
+
+    u = u - int(u);
+    if (u < 0) u += 1;
+    v = v - int(v);
+    if (v < 0) v += 1;
+
+    float x = u * float(img->w);
+    float y = float(img->h) - (v * float(img->h));
     // return img->get(int(x), int(y));
     return img->get(x, y);
 }
@@ -19,6 +31,10 @@ int TexStore::id(std::string fname) {
     return -1;
 }
 
+// Format: fname:<xscale>,<yscale>
+// each <scale> indicates how many times the image should repeat on each of its axes.
+// e.g. fname:2,2 would be equivalent to loading a 2x2 tiled version of the texture.
+// setting a <scale> to "a" tells us to calculate the scale by preserving the image's aspect ratio.
 int TexStore::load(std::string fname) {
     for (int i = 0; i < int(fnames.size()); i++) {
         if (fnames.at(i) == fname) return i;
@@ -48,4 +64,43 @@ void TexStore::clear() {
     }
     texes.clear();
     fnames.clear();
+}
+
+std::string texScaleFromFname(std::string in,  float *x, float *y) {
+    *x = 1.f;
+    *y = 1.f;
+    std::stringstream s(in);
+    std::string f;
+    std::string scaleX;
+    std::string scaleY;
+    if (!std::getline(s, f, ':')) return f;
+    std::getline(s, scaleX, ',');
+    std::getline(s, scaleY);
+    if (scaleX.length() != 0) {
+        if (scaleX != "a") {
+            *x = std::stof(scaleX);
+        } else {
+            *x = -1.f;
+        }
+    }
+    if (scaleY.length() != 0) {
+        if (scaleY != "a") {
+            *y = std::stof(scaleY);
+        } else {
+            *y = -1.f;
+        }
+    }
+    return f;
+}
+
+Texture::Texture(Image *image) {
+    img = image;
+    scale = {1.f, 1.f};
+}
+
+Texture::Texture(std::string fname) {
+    auto fpath = texScaleFromFname(fname, &(scale(0)), &(scale(1))); 
+    img = TGA::read(fpath);
+    // FIXME: Preserve aspect ratio! probably not possible from here but w/e
+    // float aspectRatio = float(img->w)/float(img->h);
 }
