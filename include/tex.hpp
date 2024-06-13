@@ -23,6 +23,8 @@ struct TexStore {
     int id(std::string fname);
     int load(std::string fname);
     void clear();
+    // Stinky way to return load success/failure
+    bool lastLoadFail;
 };
 
 #endif

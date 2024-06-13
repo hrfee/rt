@@ -853,6 +853,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
         } else if (token == w_sphere || token == w_triangle) {
             if (token == w_sphere) {
                 Shape *sphere = decodeSphere(line, &tex, &norms);
+                if (tex.lastLoadFail) mapStats.missingTex += 1;
+                if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 mapStats.allocs += 2; // Shape and sphere
                 sphere->s->center = sphere->s->center * transform;
                 if (c == NULL) {
@@ -863,6 +865,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.spheres++;
             } else if (token == w_triangle) {
                 Shape *triangle = decodeTriangle(line, &tex, &norms);
+                if (tex.lastLoadFail) mapStats.missingTex += 1;
+                if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 mapStats.allocs += 2; // Shape and triangle
                 triangle->t->a = triangle->t->a * transform;
                 triangle->t->b = triangle->t->b * transform;

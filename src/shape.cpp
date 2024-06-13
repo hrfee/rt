@@ -109,6 +109,8 @@ std::string encodeShape(Shape *sh) {
 }
 
 Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm) {
+    if (tex != NULL) tex->lastLoadFail = false;
+    if (norm != NULL) norm->lastLoadFail = false;
     std::stringstream stream(in);
     Shape *sh = emptyShape();
     do {

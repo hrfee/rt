@@ -1,4 +1,5 @@
 #include "tga.hpp"
+#include "img.hpp"
 
 #include <iostream>
 #include <cstdio>
@@ -63,6 +64,9 @@ void TGA::write(Image *img, std::string fname, std::string id) {
 
 Image *TGA::read(std::string fname) {
     std::ifstream f(fname, std::ios_base::binary);
+    if (f.fail() || f.bad()) {
+        throw ImgLoadException(fname);
+    }
     TGAHeader header;
     f.read(&(header.idLength), 1);
     char *id = (char*)malloc(sizeof(char)*header.idLength);

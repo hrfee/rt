@@ -1,4 +1,5 @@
 #include "tex.hpp"
+#include "img.hpp"
 #include "tga.hpp"
 
 #include <cstring>
@@ -6,6 +7,7 @@
 #include <cstdlib>
 // #include <algorithm>
 #include <sstream>
+#include <iostream>
 
 Vec3 Texture::at(float u, float v) {
     /* float x = std::clamp(u*float(img->w), 0.f, float(img->w-1));
@@ -36,11 +38,19 @@ int TexStore::id(std::string fname) {
 // e.g. fname:2,2 would be equivalent to loading a 2x2 tiled version of the texture.
 // setting a <scale> to "a" tells us to calculate the scale by preserving the image's aspect ratio.
 int TexStore::load(std::string fname) {
+    lastLoadFail = false;
     for (int i = 0; i < int(fnames.size()); i++) {
         if (fnames.at(i) == fname) return i;
     }
     int i = fnames.size();
-    Texture *tex = new Texture(fname);
+    Texture *tex = NULL;
+    try {
+        tex = new Texture(fname);
+    } catch (ImgLoadException &e) {
+        lastLoadFail = true;
+        std::cout << e.what() << std::endl;
+        return -1;
+    }
     if (tex == NULL) return -1;
     texes.emplace_back(tex);
     fnames.emplace_back(fname);
@@ -100,7 +110,9 @@ Texture::Texture(Image *image) {
 
 Texture::Texture(std::string fname) {
     auto fpath = texScaleFromFname(fname, &(scale(0)), &(scale(1))); 
-    img = TGA::read(fpath);
-    // FIXME: Preserve aspect ratio! probably not possible from here but w/e
-    // float aspectRatio = float(img->w)/float(img->h);
+    try {
+        img = TGA::read(fpath);
+    } catch (ImgLoadException &e) {
+        throw;
+    }
 }

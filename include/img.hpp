@@ -2,6 +2,24 @@
 #define IMG
 
 #include "vec.hpp"
+#include <string>
+#include <exception>
+
+class ImgLoadException: public std::exception {
+    private:
+        std::string msg;
+    public:
+        ImgLoadException(char *fname) {
+            msg = std::string("Failed to load image \"") + fname + std::string("\"");
+        }
+        ImgLoadException(std::string fname) {
+            msg = std::string("Failed to load image \"") + fname + std::string("\"");
+        }
+
+        const char *what() const throw() {
+            return msg.c_str();
+        }
+};
 
 // Images start from bottom-left.
 struct Image {
