@@ -13,7 +13,7 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-#define MAP_PATH "maps/checker.map"
+#define MAP_PATH "maps/default.map"
 
 namespace {
     WorldMap *map;
@@ -77,6 +77,10 @@ Image *mainLoop(RenderConfig *rc) {
             window->state.camPresets = &(map->camPresets);
             window->state.camPresetNames = map->camPresetNames;
             window->state.camPresetCount = map->camPresets.size();
+            window->state.objectPtrs = map->objectPtrs;
+            window->state.objectCount = map->objectCount;
+            window->state.plCount = map->mapStats.lights;
+            window->state.objectNames = map->objectNames;
             window->state.currentlyLoading = false;
         }
     } else if (map->currentlyLoading) {
@@ -109,6 +113,8 @@ Image *mainLoop(RenderConfig *rc) {
         } else if (!map->currentlyOptimizing) {
             window->state.lastOptimizeTime = map->lastOptimizeTime;
             window->state.optimizedMap = map->optimizedObj;
+            window->state.objectPtrs = map->objectPtrs;
+            window->state.objectNames = map->objectNames;
             window->state.currentlyOptimizing = false;
         } else {
             window->state.lastOptimizeTime = glfwGetTime() - map->lastOptimizeTime;
@@ -163,7 +169,7 @@ Image *mainLoop(RenderConfig *rc) {
         // map->castRays(img, rc, glfwGetTime);
         window->state.csvDirty = true;
         window->state.currentlyRendering = true;
-        if (window->state.mouse.enabled) {
+        if (window->state.mouse.enabled || rc->renderOnChange) {
             map->castRays(img, rc, glfwGetTime, window->state.threadCount);
         } else {
             std::thread cast(&WorldMap::castRays, map, img, rc, glfwGetTime, window->state.threadCount);
@@ -237,6 +243,10 @@ int main(int argc, char **argv) {
         window->state.camPresetNames = map->camPresetNames;
         window->state.camPresetCount = map->camPresets.size();
     }
+    window->state.objectPtrs = map->objectPtrs;
+    window->state.objectCount = map->objectCount;
+    window->state.plCount = map->mapStats.lights;
+    window->state.objectNames = map->objectNames;
 
     // map->o = splitKD(&(map->o), 10);
 

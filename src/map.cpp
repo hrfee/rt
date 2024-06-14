@@ -706,6 +706,9 @@ WorldMap::WorldMap(char const* path) {
     aaOffsetImage = NULL;
     aaOffsetImageDirty = false;
     cam = NULL;
+    objectNames = NULL;
+    objectPtrs = NULL;
+    objectCount = 0;
     loadFile(path, NULL);
 }
 
@@ -720,6 +723,7 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     if (flatObj == NULL) {
         flatObj = emptyContainer();
         flattenRootContainer(flatObj, &unoptimizedObj);
+        genObjectList(flatObj);
     }
     lastOptimizeTime = getTime();
     if (accelIndex == Accel::Voxel) {
@@ -763,7 +767,76 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
         camPresetNames[i] = camPresets.at(i).name.c_str();
     }
     if (getTime != NULL) lastLoadTime = getTime() - lastLoadTime;
+
+    genObjectList(obj);
+    
     currentlyLoading = false;
+}
+
+void WorldMap::genObjectList(Container *c) {
+    free(objectPtrs);
+    if (objectNames != NULL) {
+        for (int i = 0; i < objectCount; i++) {
+            free(objectNames[i]);
+        }
+        free(objectNames);
+    }
+
+    objectCount = mapStats.lights + mapStats.spheres + mapStats.tris + mapStats.planes;
+    objectNames = (char**)malloc(objectCount * sizeof(char*));
+    objectPtrs = (Shape **)malloc(objectCount * sizeof(Shape*));
+    
+    int i = 0;
+    for (auto _: pointLights) {
+        // "#<num>: Light"
+        std::string name = "#" + std::to_string(i) + ": Light";
+        // FIXME: This needs to be frreeeeed!
+        objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
+        strncpy(objectNames[i], name.c_str(), name.size()+1);
+        // Lie about what the pointer is
+        objectPtrs[i] = (Shape *)&(pointLights.at(i));
+        i++;
+    }
+    // FIXME: This only works on the unoptimized object!
+    Bound *bo = c->start;
+    while (bo != c->end->next) {
+        std::string name = "#" + std::to_string(i) + ": ";
+        if (bo->s == NULL) continue;
+        objectPtrs[i] = bo->s;
+        if (bo->s->s != NULL) {
+            name += "Sphere";
+        } else if (bo->s->t != NULL) {
+            if (bo->s->t->plane) {
+                name += "Plane";
+            } else {
+                name += "Triangle";
+            }
+        }
+        objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
+        strncpy(objectNames[i], name.c_str(), name.size()+1);
+        bo = bo->next;
+        i++;
+    }
+    if (unoptimizable.size == 0) return;
+    bo = unoptimizable.start;
+    while (bo != unoptimizable.end->next) {
+        std::string name = "#" + std::to_string(i) + ": ";
+        if (bo->s == NULL) continue;
+        objectPtrs[i] = bo->s;
+        if (bo->s->s != NULL) {
+            name += "Sphere";
+        } else if (bo->s->t != NULL) {
+            if (bo->s->t->plane) {
+                name += "Plane";
+            } else {
+                name += "Triangle";
+            }
+        }
+        objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
+        strncpy(objectNames[i], name.c_str(), name.size()+1);
+        bo = bo->next;
+        i++;
+    }
 }
 
 void WorldMap::loadObjFile(const char* path, Mat4 transform) {

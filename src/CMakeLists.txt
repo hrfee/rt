@@ -68,7 +68,7 @@ add_library(render_gl STATIC gl.cpp ${HEADER_LIST})
 set_target_properties(render_gl PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(render_gl PUBLIC ../include "../third_party/imgui/" "../third_party/imgui/misc/cpp/" "../third_party/imgui/backends/" "../third_party/glad/include/")
 target_link_libraries(render_gl PUBLIC img map)
-target_link_libraries(render_gl PRIVATE render_tga glfw glad imgui accel aa)
+target_link_libraries(render_gl PRIVATE render_tga glfw glad imgui accel aa shape)
 
 add_library(test STATIC test.cpp ${HEADER_LIST})
 set_target_properties(test PROPERTIES LINKER_LANGUAGE CXX)

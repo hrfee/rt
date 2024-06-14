@@ -8,10 +8,10 @@ project(
 )
 
 # --DEBUG--
-# set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Debug)
 # --RELEASE--
-set(CMAKE_BUILD_TYPE Release)
-add_compile_options(-O3)
+# set(CMAKE_BUILD_TYPE Release)
+# add_compile_options(-O3)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

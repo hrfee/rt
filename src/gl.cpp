@@ -106,6 +106,9 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.camPresetIndex = 0;
     state.dumpToCsv = false;
     state.csvDirty = false;
+    state.objectCount = 0;
+    state.plCount = 0;
+    state.objectIndex = -1;
     title = windowTitle;
     ui.hide = false;
     int success = glfwInit();
@@ -586,6 +589,7 @@ void GLWindow::addUI() {
         showKeyboardHelp();
     }
     ImGui::End();
+    showShapeEditor();
 }
 
 
@@ -823,3 +827,49 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
     }
 }
 
+
+void GLWindow::showShapeEditor() {
+    if (state.currentlyLoading || state.currentlyOptimizing) return;
+    ImGui::Begin("edit");
+    { 
+        ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
+        if (state.objectIndex >= 0 && state.objectIndex < state.objectCount) {
+            Shape *sh = state.objectPtrs[state.objectIndex];
+            if (state.objectIndex < state.plCount) {
+                PointLight *pl = (PointLight*)sh;
+                ImGui::Text("Selected: Light");
+                ImGui::InputFloat3("Position", (float*)&(pl->center));
+                state.rc.renderNow = ImGui::ColorEdit3("Color", (float*)&(pl->color)) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f) ? true : state.rc.renderNow;
+            } else {
+                if (sh->s != NULL) {
+                    ImGui::Text("Selected: Sphere");
+                    ImGui::InputFloat3("Position", (float*)&(sh->s->center));
+                    ImGui::SliderFloat("Radius", &(sh->s->radius), 0, 100.f);
+                    ImGui::SliderFloat("\"Thickness\"", &(sh->s->thickness), 0, 1.f);
+                } else if (sh->t != NULL) {
+                    if (sh->t->plane) {
+                        ImGui::Text("Selected: Plane");
+                    } else {
+                        ImGui::Text("Selected: Tri");
+                    }
+                    ImGui::InputFloat3("Pos A", (float*)&(sh->t->a));
+                    ImGui::InputFloat3("Pos B", (float*)&(sh->t->b));
+                    ImGui::InputFloat3("Pos C", (float*)&(sh->t->c));
+
+                    if (ImGui::Button("FIXME: Re-do UVs")) {
+                        // Use recalculateTriUVs somehow
+                    }
+                }
+                // Shape params
+                state.rc.renderNow = ImGui::ColorEdit3("Color", (float*)&(sh->color)) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Opacity", &(sh->opacity), 0, 1.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Reflectiveness", &(sh->reflectiveness), 0, 1.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Specular Component", &(sh->specular), 0, 1.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::SliderFloat("Shininess (n)", &(sh->shininess), 0, 100.f) ? true : state.rc.renderNow;
+                state.rc.renderNow = ImGui::Checkbox("Disable Lighting", &(sh->noLighting)) ? true : state.rc.renderNow;
+            }
+        }
+    }
+    ImGui::End();
+}

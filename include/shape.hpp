@@ -22,7 +22,7 @@ struct Shape {
     bool noLighting;
     float opacity;
     float reflectiveness; // 0-1
-    float specular; // 1-inf
+    float specular; // 0-1
     float shininess;
     bool debug; // Whether to be hidden in normal output or not.
 };
@@ -121,5 +121,7 @@ int clearContainer(Container *c, bool clearChildShapes = true);
 
 CamPreset decodeCamPreset(std::string in);
 std::string encodeCamPreset(CamPreset *p);
+
+void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm);
 
 #endif

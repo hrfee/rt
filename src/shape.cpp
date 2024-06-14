@@ -291,49 +291,53 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
     } while (stream);
 
     if (sh->texId != -1 || sh->normId != -1) {
-        // Project onto 2D plane, any'll do for now
-        float proj[3][2] = {
-            {sh->t->a.x, sh->t->a.y},
-            {sh->t->b.x, sh->t->b.y},
-            {sh->t->c.x, sh->t->c.y}
-        };
-        float min[2] = {9999.f, 9999.f};
-        float max[2] = {-9999.f, -9999.f};
-        for (int i = 0; i < 2; i++) {
-            min[i] = std::min(proj[0][i], std::min(proj[1][i], proj[2][i]));
-            max[i] = std::max(proj[0][i], std::max(proj[1][i], proj[2][i]));
-        }
-        
-        float range[2] = {max[0] - min[0], max[1] - min[1]};
-        // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to the normal too!
-        Texture *t = NULL;
-        Vec2 scale = {1.f, 1.f};
-        float iw = 0.f, ih = 0.f;
-        if (sh->texId != -1) {
-            t = tex->at(sh->texId);
-        } else if (sh->normId) {
-            t = norm->at(sh->normId);
-        }
-        scale = t->scale;
-        iw = t->img->w;
-        ih = t->img->h;
-
-        if (scale.x == -1.f) {
-            float H = range[1] / scale.y;
-            float W = (H / ih) * iw;
-            scale.x = range[0] / W;
-        } else if (scale.y == -1.f) {
-            float W = range[0] / scale.x;
-            float H = (W / iw) * ih;
-            scale.y = range[1] / H;
-        }
-
-        for (int i = 0; i < 3; i++) {
-            sh->t->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
-        }
+        recalculateTriUVs(sh, tex, norm);
     }
 
     return sh;
+}
+
+void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm) {
+    // Project onto 2D plane, any'll do for now
+    float proj[3][2] = {
+        {sh->t->a.x, sh->t->a.y},
+        {sh->t->b.x, sh->t->b.y},
+        {sh->t->c.x, sh->t->c.y}
+    };
+    float min[2] = {9999.f, 9999.f};
+    float max[2] = {-9999.f, -9999.f};
+    for (int i = 0; i < 2; i++) {
+        min[i] = std::min(proj[0][i], std::min(proj[1][i], proj[2][i]));
+        max[i] = std::max(proj[0][i], std::max(proj[1][i], proj[2][i]));
+    }
+    
+    float range[2] = {max[0] - min[0], max[1] - min[1]};
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to the normal too!
+    Texture *t = NULL;
+    Vec2 scale = {1.f, 1.f};
+    float iw = 0.f, ih = 0.f;
+    if (sh->texId != -1) {
+        t = tex->at(sh->texId);
+    } else if (sh->normId) {
+        t = norm->at(sh->normId);
+    }
+    scale = t->scale;
+    iw = t->img->w;
+    ih = t->img->h;
+
+    if (scale.x == -1.f) {
+        float H = range[1] / scale.y;
+        float W = (H / ih) * iw;
+        scale.x = range[0] / W;
+    } else if (scale.y == -1.f) {
+        float W = range[0] / scale.x;
+        float H = (W / iw) * ih;
+        scale.y = range[1] / H;
+    }
+
+    for (int i = 0; i < 3; i++) {
+        sh->t->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
+    }
 }
 
 std::string encodeColour(Vec3 c) {

@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "img.hpp"
 #include "map.hpp"
+#include "shape.hpp"
 #include <string>
 
 struct Dimensions {
@@ -69,6 +70,11 @@ struct GLWindowState {
     std::stringstream csvStats;
     bool dumpToCsv;
     bool csvDirty;
+    char **objectNames;
+    int objectCount;
+    int plCount;
+    Shape **objectPtrs;
+    int objectIndex;
 };
 
 struct GLWindowUI {
@@ -126,6 +132,8 @@ class GLWindow {
         GLfloat glFrameVertices[8];
         void disable();
         void enable();
+
+        void showShapeEditor();
 };
 
 void resizeWindowCallback(GLFWwindow *, int, int);

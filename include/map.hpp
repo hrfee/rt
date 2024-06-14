@@ -91,7 +91,6 @@ struct MapStats {
 
 class WorldMap {
     public:
-        WorldMap(int width, int height, int depth): w(width), h(height), d(depth), baseBrightness(0), optimizeLevel(0), accelIndex(-1), bvh(false), accelParam(-1), accelFloatParam(1.5f), obj(NULL), flatObj(NULL), optimizedObj(NULL), aaOffsetImage(NULL), aaOffsetImageDirty(false), cam(NULL), currentlyRendering(false), currentlyOptimizing(false), currentlyLoading(false), lastRenderTime(0.f), lastOptimizeTime(0.f), lastLoadTime(0.f) { obj = &unoptimizedObj; }
         WorldMap(char const* path);
         ~WorldMap();
         float w, h, d;
@@ -112,6 +111,9 @@ class WorldMap {
         Container *flatObj;
         Container *optimizedObj;
         Container unoptimizable;
+        char **objectNames;
+        int objectCount;
+        Shape **objectPtrs;
         TexStore tex;
         TexStore norms;
         Image *aaOffsetImage;
@@ -129,6 +131,7 @@ class WorldMap {
         void createDebugVector(Vec3 p0, Vec3 delta, Vec3 color = {1.f, 0.f, 0.f});
         void appendPointLight(Vec3 center, Vec3 color, float brightness);
         double castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads = -1);
+
         void encode(char const* path);
     private:
         void castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
@@ -139,6 +142,8 @@ class WorldMap {
         void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
         void castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res);
         void castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount = 0);
+
+        void genObjectList(Container *c);
 };
 
 int clearContainer(Container *c);
