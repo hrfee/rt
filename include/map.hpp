@@ -31,7 +31,7 @@ struct RenderConfig {
     int samplesPerPx;
     int sampleMode;
     Vec3 manualPosition;
-    bool planeOptimisation;
+    // bool planeOptimisation;
     bool showDebugObjects;
 };
 

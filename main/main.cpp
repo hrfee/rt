@@ -3,6 +3,7 @@
 #include "gl.hpp"
 #include "cam.hpp"
 #include "accel.hpp"
+#include "shape.hpp"
 #include <cstdio>
 #include <getopt.h>
 #include <thread>
@@ -124,6 +125,14 @@ Image *mainLoop(RenderConfig *rc) {
         map->obj = &(map->unoptimizedObj);
     }
 
+    if (window->state.recalcUVs) {
+        Shape *sh = window->getShapePointer();
+        if (sh != NULL) {
+            recalculateTriUVs(sh, &(map->tex), &(map->norms));
+        }
+        window->state.recalcUVs = false;
+    }
+
     // If the requested render res has changed
     if (window->state.rDim.dirty()) {
         map->cam->setDimensions(window->state.rDim.w, window->state.rDim.h);
@@ -142,20 +151,26 @@ Image *mainLoop(RenderConfig *rc) {
             change = true;
         }
     }
+
+    double time = glfwGetTime();
+    double delta = time - window->state.renderedAtTime;
+
     if (map->cam->phi != window->state.mouse.phi || map->cam->theta != window->state.mouse.theta) {
         map->cam->rotateRad(window->state.mouse.theta, window->state.mouse.phi);
         change = true;
     }
     if (window->state.mouse.moveForward != 0.f) {
-        map->cam->setPosition(map->cam->position + (window->state.mouse.moveForward * map->cam->viewportNormal));
+        map->cam->setPosition(map->cam->position + (window->state.mouse.moveForward * window->state.mouse.speedMultiplier * delta * map->cam->viewportNormal));
         rc->manualPosition = map->cam->position;
         change = true;
     }
     if (window->state.mouse.moveSideways != 0.f) {
-        map->cam->setPosition(map->cam->position + (window->state.mouse.moveSideways * map->cam->viewportParallel));
+        map->cam->setPosition(map->cam->position + (window->state.mouse.moveSideways * window->state.mouse.speedMultiplier * delta * map->cam->viewportParallel));
         rc->manualPosition = map->cam->position;
         change = true;
     }
+
+    window->state.renderedAtTime = time;
 
     if (window->state.maxThreadCount == -1) {
         window->state.maxThreadCount = std::thread::hardware_concurrency();

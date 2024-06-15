@@ -398,7 +398,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
         } else if (current->t != NULL && rc->triangles) {
             Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
             Vec3 nNormal = norm(normal);
-            if (rc->mtTriangleCollision) {
+            if (rc->mtTriangleCollision && !current->t->plane) {
                 Vec3 bary;
                 float t = meetsTriangleMT(p0, delta, current->t, &bary);
                 if (t >= 0 && t < res->t) {
@@ -437,7 +437,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             if (!siblingContainerCollision && accelIndex == Accel::BiTree) {
                 // Bi-tree, see comment at top of this method
                 collision = true;
-            } else if (current->c->plane) {
+            /* } else if (current->c->plane) {
                 // Test container collision
                 Triangle tris[2] = {
                     {current->c->a, current->c->b, current->c->c},
@@ -456,6 +456,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                         }
                     }
                 }
+            */
             } else {
                 collision = meetsAABB(p0, delta, current->c);
                 if (!collision) {
@@ -521,9 +522,6 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
             // normalmaps are defined in tangent-space, they are relative to themselves. 
             // Find tangent to the sphere (i.e. vector orthogonal to normal)
             
-            // NOTE: this one is the negative of the other one?
-            // Vec3 tan = norm({-res->norm.z, 0.f, res->norm.x});
-            //
             Vec3 n = res->norm;
 
             Vec3 a = {0.f, 1.f, 0.f};
@@ -684,7 +682,7 @@ void WorldMap::encode(char const* path) {
 WorldMap::WorldMap(char const* path) {
     baseBrightness = 0;
     optimizeLevel = 0;
-    bvh = false;
+    bvh = true;
     accelIndex = Accel::None;
     accelParam = -1;
     accelFloatParam = 1.5f;

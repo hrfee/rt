@@ -30,7 +30,7 @@ struct GLWindowState {
     Dimensions vpDim, rDim, fbDim, texDim;
     float scale;
     bool scaleDirty;
-    double lastFrameTime;
+    double renderedAtTime;
     double lastRenderTime;
     int lastRenderW, lastRenderH;
     float fovDeg, prevFovDeg;
@@ -63,6 +63,7 @@ struct GLWindowState {
         float phi, theta;
         float moveForward;
         float moveSideways;
+        float speedMultiplier;
     } mouse;
     bool currentlyRendering;
     bool currentlyOptimizing;
@@ -75,6 +76,7 @@ struct GLWindowState {
     int plCount;
     Shape **objectPtrs;
     int objectIndex;
+    bool recalcUVs;
 };
 
 struct GLWindowUI {
@@ -121,6 +123,7 @@ class GLWindow {
         GLWindowUI ui;
         std::vector<SubImage*> images;
         bool shouldntBeDoingAnything();
+        Shape *getShapePointer();
     private:
         const char *title;
         std::string vertString, fragString;
@@ -132,6 +135,8 @@ class GLWindow {
         GLfloat glFrameVertices[8];
         void disable();
         void enable();
+
+        bool vl(bool t);
 
         void showShapeEditor();
 };

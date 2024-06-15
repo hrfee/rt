@@ -17,7 +17,7 @@
 #include "imgui_internal.h"
 #include "aa.hpp"
 
-#define MOVE_SPEED 0.1f
+#define MOVE_SPEED 1.f
 
 void SubImage::regen() {
     GLuint nTex = 0; 
@@ -195,6 +195,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
         // Mouse
         state.mouse.enabled = false;
         state.mouse.sensitivity = 0.003f;
+        state.mouse.speedMultiplier = 1.f;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         glfwSetCursorPosCallback(window, &mouseCallback);
     }
@@ -228,21 +229,20 @@ void GLWindow::loadUI() {
     state.rc.triangles = true;
     state.rc.spheres = true;
 
-    state.rc.mtTriangleCollision = false;
+    state.rc.mtTriangleCollision = true;
 
     state.rc.normalMapping = false;
 
     state.rc.samplesPerPx = 1;
     state.rc.sampleMode = SamplingMode::Grid;
 
-    state.rc.planeOptimisation = true;
     state.useOptimizedMap = false;
     state.rc.showDebugObjects = false;
-    state.accelDepth = 1;
+    state.accelDepth = 32;
     state.accelIndex = 1; // SAH
     state.accelParam = 2;
     state.accelFloatParam = 1.5f; // For now, SAH tri/sphere cost ratio
-    state.useBVH = false;
+    state.useBVH = true;
     state.renderOptimizedHierarchy = false;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -334,7 +334,7 @@ std::string GLWindow::frameInfo() {
     out << "fps) ";
     out << "at " << state.lastRenderW << 'x' << state.lastRenderH << " on " << state.rc.nthreads << " threads";
     if (state.rc.samplesPerPx > 1) {
-        out << " with AA @ " << state.rc.samplesPerPx << "s/px (" << samplingModes[state.rc.sampleMode] << ")";
+        out << " with AA @ " << state.rc.samplesPerPx << "s^2/px (" << samplingModes[state.rc.sampleMode] << ")";
     }
     out << ".";
     return out.str();
@@ -365,8 +365,7 @@ std::string GLWindow::acceleratorInfo() {
 std::string GLWindow::mapLoadInfo() {
     std::ostringstream out;
     out.precision(5);
-    if (state.currentlyLoading) out << "Loading \"";
-    else out << "Loaded \"";
+    out << "Loading \"";
     out << state.mapStats->name << "\" ";
     if (state.currentlyLoading) out << "has taken ";
     else out << "took ";
@@ -398,7 +397,13 @@ void GLWindow::enable() {
     if (shouldntBeDoingAnything()) ImGui::EndDisabled();
 }
 
+bool GLWindow::vl(bool t) {
+    state.rc.renderNow = t ? true : state.rc.renderNow;
+    return t;
+}
+
 void GLWindow::addUI() {
+    state.rc.renderNow = false;
     bool backgroundText = ui.hide;
     if (backgroundText) {
         ImGui::Begin("backgroundtext", NULL, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoInputs);
@@ -407,6 +412,7 @@ void GLWindow::addUI() {
                 ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
             }
             showKeyboardHelp();
+            ImGui::Text(std::to_string(state.mouse.speedMultiplier).c_str());
         }
         ImGui::End();
         return;
@@ -428,7 +434,7 @@ void GLWindow::addUI() {
     ImGui::Begin("render controls");
     {
         disable();
-        state.rc.renderNow = ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes));
+        vl(ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes)));
         switch(ui.renderMode) {
             case 0:
                 state.rc.reflections = false;
@@ -441,37 +447,37 @@ void GLWindow::addUI() {
             case 2:
                 state.rc.reflections = true;
                 state.rc.lighting = true;
-                state.rc.renderNow = ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 0.1f, 5.f) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f) ? true : state.rc.renderNow;
+                vl(ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 0.1f, 5.f));
+                vl(ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f));
                 state.rc.specular = true;
-                // state.rc.renderNow = ImGui::Checkbox("Phong specular", &(state.rc.specular)) ? true : state.rc.renderNow;
+                // trig(ImGui::Checkbox("Phong specular", &(state.rc.specular)));
                 if (state.rc.specular) {
-                    state.rc.renderNow = ImGui::SliderFloat("Global shininess (phong) (n)", &(state.rc.globalShininess), 0.f, 100.f) ? true : state.rc.renderNow;
+                    vl(ImGui::SliderFloat("Global shininess (phong) (n)", &(state.rc.globalShininess), 0.f, 100.f));
                 }
                 break;
         };
-        state.rc.renderNow = ImGui::Checkbox("Render spheres", &(state.rc.spheres)) ? true : state.rc.renderNow;
-        state.rc.renderNow = ImGui::Checkbox("Render triangles", &(state.rc.triangles)) ? true : state.rc.renderNow;
-        state.rc.renderNow = ImGui::Checkbox("Möller-Trumbore tri collision (faster)", &(state.rc.mtTriangleCollision)) ? true : state.rc.renderNow;
-
-        state.rc.renderNow = ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)) ? true : state.rc.renderNow;
-        state.rc.renderNow = ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount);
-        state.rc.renderNow = ImGui::Checkbox("Use container quad optimisation", &(state.rc.planeOptimisation)) ? true : state.rc.renderNow;
+        vl(ImGui::Checkbox("Render spheres", &(state.rc.spheres)));
+        vl(ImGui::Checkbox("Render triangles", &(state.rc.triangles)));
+        vl(ImGui::Checkbox("Möller-Trumbore tri collision (faster, allows textures)", &(state.rc.mtTriangleCollision)));
+        if (state.rc.mtTriangleCollision) {
+            vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
+        }
+        vl(ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount));
         
-        state.rc.renderNow = ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)) ? true : state.rc.renderNow;
+        vl(ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)));
         if (state.useOptimizedMap) {
-            state.rc.renderNow = ImGui::Checkbox("Use proper BVH", &(state.useBVH)) ? true : state.rc.renderNow;
-            state.rc.renderNow = ImGui::SliderInt("Max hierarchy depth", &(state.accelDepth), 1, 100);
-            state.rc.renderNow = ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)) ? true : state.rc.renderNow;
+            // vl(ImGui::Checkbox("Use proper BVH", &(state.useBVH)));
+            vl(ImGui::SliderInt("Max hierarchy depth", &(state.accelDepth), 1, 100));
+            vl(ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)));
             ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
             if (state.renderOptimizedHierarchy) {
                 renderTree(state.optimizedMap);
             }
-            state.rc.renderNow = ImGui::Combo("Acceleration method", &(state.accelIndex), accelerators, IM_ARRAYSIZE(accelerators));
+            vl(ImGui::Combo("Acceleration method", &(state.accelIndex), accelerators, IM_ARRAYSIZE(accelerators)));
             if (state.accelIndex == Accel::BiTree || state.accelIndex == Accel::FalseOctree) {
-                state.rc.renderNow = ImGui::SliderInt("Max leaves per node", &(state.accelParam), 1, 100) ? true : state.rc.renderNow;
+                vl(ImGui::SliderInt("Max leaves per node", &(state.accelParam), 1, 100));
             } else if (state.accelIndex == Accel::SAH) {
-                state.rc.renderNow = ImGui::SliderFloat("SAH Triangle/Sphere cost ratio", &(state.accelFloatParam), 0.1f, 100.f) ? true : state.rc.renderNow;
+                vl(ImGui::SliderFloat("SAH Triangle/Sphere cost ratio", &(state.accelFloatParam), 0.1f, 100.f));
             }
             if (state.lastOptimizeTime != 0.f) {
                 ImGui::Text(acceleratorInfo().c_str());
@@ -480,8 +486,8 @@ void GLWindow::addUI() {
             state.renderOptimizedHierarchy = false;
         }
 
-        state.rc.renderNow = ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10) ? true : state.rc.renderNow;
-        state.rc.renderNow = ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f) ? true : state.rc.renderNow;
+        vl(ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10));
+        vl(ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f));
         enable();
     }
     ImGui::End();
@@ -558,7 +564,7 @@ void GLWindow::addUI() {
         ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
         ImGui::SliderFloat("theta (up/down) (radians)", &(state.mouse.theta), -M_PI/2.f, M_PI/2.f);
         ImGui::SliderFloat("Field of View (degrees)", &(state.fovDeg), 0.f, 180.f);
-        state.rc.renderNow = ImGui::InputFloat3("Position", (float*)&(state.rc.manualPosition)) ? true : state.rc.renderNow;
+        vl(ImGui::InputFloat3("Position", (float*)&(state.rc.manualPosition)));
         enable();
         if (state.camPresetNames != NULL && state.camPresetCount != 0) {
             ImGui::Combo("Camera Preset", &(state.camPresetIndex), state.camPresetNames, state.camPresetCount);
@@ -720,32 +726,48 @@ void showKeyboardHelp() {
     )");
 }
 
-void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /* mod */) {
+bool down(int action) {
+    return action == GLFW_PRESS || action == GLFW_REPEAT;
+}
+
+void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int mod) {
     // Ignore if any imgui fields are being typed in.
     if (ImGui::GetIO().WantTextInput) return;
     GLWindow* w = static_cast<GLWindow*>(glfwGetWindowUserPointer(window));
-    if (key == GLFW_KEY_M && action == GLFW_PRESS && !w->state.mouse.enabled && !w->shouldntBeDoingAnything()) {
+    if (key == GLFW_KEY_M && down(action) && !w->state.mouse.enabled && !w->shouldntBeDoingAnything()) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         w->state.mouse.enabled = true;
         w->hideUI();
-    } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && action == GLFW_PRESS && w->state.mouse.enabled) {
+    } else if ((key == GLFW_KEY_M || key == GLFW_KEY_ESCAPE) && down(action) && w->state.mouse.enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         w->state.mouse.enabled = false;
         w->showUI();
-    } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && !w->state.mouse.enabled) {
+    } else if (key == GLFW_KEY_ESCAPE && down(action) && !w->state.mouse.enabled) {
         glfwSetWindowShouldClose(window, GL_TRUE);
-    } else if (key == GLFW_KEY_H && action == GLFW_PRESS) {
+    } else if (key == GLFW_KEY_H && down(action)) {
         w->toggleUI();
     }
     if (!(w->state.mouse.enabled)) return;
+
+    if (key == GLFW_KEY_LEFT_SHIFT) {
+        w->state.mouse.speedMultiplier = down(action) ? 2.f : 1.f;
+    }
+    if (mod == GLFW_MOD_SHIFT) {
+        w->state.mouse.speedMultiplier = 2.f;
+    }
+    
     if (key == GLFW_KEY_W) {
-        w->state.mouse.moveForward = (action == GLFW_PRESS) ? MOVE_SPEED : 0.f;
+        w->state.mouse.moveForward = down(action) ? MOVE_SPEED : 0.f;
+        if (action == GLFW_RELEASE) w->state.mouse.speedMultiplier = 1.f;
     } else if (key == GLFW_KEY_S) {
-        w->state.mouse.moveForward = (action == GLFW_PRESS) ? -1.f*MOVE_SPEED : 0.f;
+        w->state.mouse.moveForward = down(action) ? -1.f*MOVE_SPEED : 0.f;
+        if (action == GLFW_RELEASE) w->state.mouse.speedMultiplier = 1.f;
     } else if (key == GLFW_KEY_D) {
-        w->state.mouse.moveSideways = (action == GLFW_PRESS) ? 1.f*MOVE_SPEED : 0.f;
+        w->state.mouse.moveSideways = down(action) ? 1.f*MOVE_SPEED : 0.f;
+        if (action == GLFW_RELEASE) w->state.mouse.speedMultiplier = 1.f;
     } else if (key == GLFW_KEY_A) {
-        w->state.mouse.moveSideways = (action == GLFW_PRESS) ? -1.f*MOVE_SPEED : 0.f;
+        w->state.mouse.moveSideways = down(action) ? -1.f*MOVE_SPEED : 0.f;
+        if (action == GLFW_RELEASE) w->state.mouse.speedMultiplier = 1.f;
     }
 }
 
@@ -827,26 +849,30 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
     }
 }
 
+Shape *GLWindow::getShapePointer() {
+    if (state.objectIndex < 0 || state.objectIndex >= state.objectCount) return NULL;
+    return state.objectPtrs[state.objectIndex];
+}
 
 void GLWindow::showShapeEditor() {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
     ImGui::Begin("edit");
     { 
         ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
-        if (state.objectIndex >= 0 && state.objectIndex < state.objectCount) {
-            Shape *sh = state.objectPtrs[state.objectIndex];
+        Shape *sh = getShapePointer();
+        if (sh != NULL) {
             if (state.objectIndex < state.plCount) {
                 PointLight *pl = (PointLight*)sh;
                 ImGui::Text("Selected: Light");
                 ImGui::InputFloat3("Position", (float*)&(pl->center));
-                state.rc.renderNow = ImGui::ColorEdit3("Color", (float*)&(pl->color)) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f) ? true : state.rc.renderNow;
+                vl(ImGui::ColorEdit3("Color", (float*)&(pl->color)));
+                vl(ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f));
             } else {
                 if (sh->s != NULL) {
                     ImGui::Text("Selected: Sphere");
                     ImGui::InputFloat3("Position", (float*)&(sh->s->center));
-                    ImGui::SliderFloat("Radius", &(sh->s->radius), 0, 100.f);
-                    ImGui::SliderFloat("\"Thickness\"", &(sh->s->thickness), 0, 1.f);
+                    vl(ImGui::SliderFloat("Radius", &(sh->s->radius), 0, 20.f));
+                    vl(ImGui::SliderFloat("\"Thickness\"", &(sh->s->thickness), 0, 1.f));
                 } else if (sh->t != NULL) {
                     if (sh->t->plane) {
                         ImGui::Text("Selected: Plane");
@@ -857,17 +883,17 @@ void GLWindow::showShapeEditor() {
                     ImGui::InputFloat3("Pos B", (float*)&(sh->t->b));
                     ImGui::InputFloat3("Pos C", (float*)&(sh->t->c));
 
-                    if (ImGui::Button("FIXME: Re-do UVs")) {
-                        // Use recalculateTriUVs somehow
+                    if (ImGui::Button("Recalculate UVs")) {
+                        state.recalcUVs = true;
                     }
                 }
                 // Shape params
-                state.rc.renderNow = ImGui::ColorEdit3("Color", (float*)&(sh->color)) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::SliderFloat("Opacity", &(sh->opacity), 0, 1.f) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::SliderFloat("Reflectiveness", &(sh->reflectiveness), 0, 1.f) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::SliderFloat("Specular Component", &(sh->specular), 0, 1.f) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::SliderFloat("Shininess (n)", &(sh->shininess), 0, 100.f) ? true : state.rc.renderNow;
-                state.rc.renderNow = ImGui::Checkbox("Disable Lighting", &(sh->noLighting)) ? true : state.rc.renderNow;
+                vl(ImGui::ColorEdit3("Color", (float*)&(sh->color)));
+                vl(ImGui::SliderFloat("Opacity", &(sh->opacity), 0, 1.f));
+                vl(ImGui::SliderFloat("Reflectiveness", &(sh->reflectiveness), 0, 1.f));
+                vl(ImGui::SliderFloat("Specular Component", &(sh->specular), 0, 1.f));
+                vl(ImGui::SliderFloat("Shininess (n)", &(sh->shininess), 0, 100.f));
+                vl(ImGui::Checkbox("Disable Lighting", &(sh->noLighting)));
             }
         }
     }
