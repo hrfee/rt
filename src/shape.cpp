@@ -81,10 +81,6 @@ CamPreset decodeCamPreset(std::string in) {
 
 Shape *emptyShape() {
     Shape *sh = (Shape*)alloc(sizeof(Shape));
-    /*sh->s = NULL;
-    sh->t = NULL;
-    sh->c = NULL;
-    sh->next = NULL;*/
     std::memset(sh, 0, sizeof(Shape));
     sh->shininess = -1.f; // -1 Indicates global shininess param takes precedence
     sh->opacity = 1.f;
@@ -338,6 +334,50 @@ void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm) {
     for (int i = 0; i < 3; i++) {
         sh->t->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
     }
+}
+
+std::string encodeAAB(Shape *sh) {
+    std::ostringstream fmt;
+    fmt << "box ";
+    fmt << w_a << " ";
+    fmt << sh->t->a.x << " " << sh->t->a.y << " " << sh->t->a.z << " ";
+    fmt << w_b << " ";
+    fmt << sh->t->b.x << " " << sh->t->b.y << " " << sh->t->b.z << " ";
+    fmt << encodeShape(sh) << " ";
+    fmt << std::endl;
+    return fmt.str();
+}
+
+Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm) {
+    std::stringstream stream(in);
+    Shape *sh = decodeShape(in, tex, norm);
+    sh->b = (AAB*)alloc(sizeof(AAB));
+
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_a) {
+            stream >> w;
+            sh->b->min.x = std::stof(w);
+            stream >> w;
+            sh->b->min.y = std::stof(w);
+            stream >> w;
+            sh->b->min.z = std::stof(w);
+        } else if (w == w_b) {
+            stream >> w;
+            sh->b->max.x = std::stof(w);
+            stream >> w;
+            sh->b->max.y = std::stof(w);
+            stream >> w;
+            sh->b->max.z = std::stof(w);
+        }
+    } while (stream);
+
+    if (sh->texId != -1 || sh->normId != -1) {
+        // FIXME: AABB textures!
+    }
+
+    return sh;
 }
 
 std::string encodeColour(Vec3 c) {

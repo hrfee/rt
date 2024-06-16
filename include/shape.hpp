@@ -11,11 +11,13 @@
 struct Sphere;
 struct Triangle;
 struct Container;
+struct AAB;
 
 struct Shape {
     Sphere *s;
     Triangle *t;
     Container *c;
+    AAB *b;
     Vec3 color;
     int texId;
     int normId;
@@ -50,6 +52,10 @@ struct Container {
     bool voxelSubdiv;
     int size;
     int id;
+};
+
+struct AAB {
+    Vec3 min, max;
 };
 
 struct Sphere {
@@ -99,6 +105,10 @@ Shape *decodeSphere(std::string in, TexStore *tex = NULL, TexStore *norm = NULL)
 std::string encodeTriangle(Shape *sh);
 
 Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm);
+
+std::string encodeAAB(Shape *sh);
+
+Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm);
 
 std::string encodeColour(Vec3 c);
 

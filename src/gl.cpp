@@ -228,6 +228,7 @@ void GLWindow::loadUI() {
 
     state.rc.triangles = true;
     state.rc.spheres = true;
+    state.rc.aabs = true;
 
     state.rc.mtTriangleCollision = true;
 
@@ -374,6 +375,7 @@ std::string GLWindow::mapLoadInfo() {
     out << state.mapStats->tris << "t/";
     out << state.mapStats->lights << "l/";
     out << state.mapStats->planes << "p/";
+    out << state.mapStats->aabs << "b/";
     out << state.mapStats->tex << "tex/";
     out << state.mapStats->norm << "ntex/";
     out << state.mapStats->allocs << "allocs.";
@@ -458,6 +460,7 @@ void GLWindow::addUI() {
         };
         vl(ImGui::Checkbox("Render spheres", &(state.rc.spheres)));
         vl(ImGui::Checkbox("Render triangles", &(state.rc.triangles)));
+        vl(ImGui::Checkbox("Render AABs (boxes)", &(state.rc.aabs)));
         vl(ImGui::Checkbox("Möller-Trumbore tri collision (faster, allows textures)", &(state.rc.mtTriangleCollision)));
         if (state.rc.mtTriangleCollision) {
             vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
@@ -886,6 +889,9 @@ void GLWindow::showShapeEditor() {
                     if (ImGui::Button("Recalculate UVs")) {
                         state.recalcUVs = true;
                     }
+                } else if (sh->b != NULL) {
+                    ImGui::InputFloat3("Min Corner", (float*)&(sh->b->min));
+                    ImGui::InputFloat3("Max Corner", (float*)&(sh->b->max));
                 }
                 // Shape params
                 vl(ImGui::ColorEdit3("Color", (float*)&(sh->color)));

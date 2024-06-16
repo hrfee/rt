@@ -25,7 +25,7 @@ struct RenderConfig {
     float distanceDivisor;
     float baseBrightness;
     float globalShininess;
-    bool triangles, spheres;
+    bool triangles, spheres, aabs;
     bool mtTriangleCollision;
     bool normalMapping;
     int samplesPerPx;
@@ -70,7 +70,7 @@ struct RayResult {
 
 struct MapStats {
     std::string name;
-    int spheres, tris, lights, planes;
+    int spheres, tris, lights, planes, aabs;
     int tex, norm;
     int missingTex, missingNorm, missingObj;
     int allocs = 0;
@@ -79,6 +79,7 @@ struct MapStats {
         tris = 0;
         lights = 0;
         planes = 0;
+        aabs = 0;
         tex = 0;
         norm = 0;
         missingTex = 0;
@@ -86,6 +87,9 @@ struct MapStats {
         missingObj = 0;
         allocs = 0;
         name.clear();
+    }
+    int size() {
+        return lights + spheres + tris + planes + aabs;
     }
 };
 

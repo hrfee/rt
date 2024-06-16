@@ -18,6 +18,8 @@
 #define RI_AIR 1.f
 #define RI_GLASS 1.52f
 
+#define EPSILON 0.00001f
+
 const char *modes[3] = {"Raycasting", "Raycasting w/ Reflections", "Lighting w/ Phong Specular"};
 
 double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads) {
@@ -173,12 +175,12 @@ void castThroughSolidSphere(float r0, float r1, Vec3 pb, Vec3 delta, Sphere *s, 
     if (tir) {
         r = delta - 2.f*dot(delta, normal) * normal;
         *deltaOut = r;
-        *pOut = pb + (0.001f * r);
+        *pOut = pb + (EPSILON * r);
         return;
     }
     tir = true;
     while (tir) {
-        pb = pb + (0.001f * r);
+        pb = pb + (EPSILON * r);
         float t = meetsSphere(pb, r, s, NULL);
         pb = pb + (t * r);
         Vec3 n = -1.f*(pb - s->center);
@@ -253,7 +255,7 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
     }
    
     // Finally, cast a ray out from the sphere.
-    pb = pb + (0.001f * refract);
+    pb = pb + (EPSILON * refract);
     RayResult r = RayResult();
     castRay(&r, obj, pb, refract, rc, callCount+1);
     res->refractColor = r.color;
@@ -432,6 +434,21 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                     }
                 }
             }
+        } else if (current->b != NULL && rc->aabs) {
+            Vec3 normal;
+            // float t = meetAABB(p0, delta, current->b->min, current->b->max);
+            float t = meetAABBWithNormal(p0, delta, current->b->min, current->b->max, &normal);
+            if (t >= 0) {
+                res->collisions++;
+                res->potentialCollisions++;
+                if (t < res->t) {
+                    res->obj = current;
+                    res->t = t;
+                    res->p0 = p0 + (res->t * delta);
+                    res->normal = normal;
+                    res->norm = norm(res->normal);
+                }
+            }
         } else if (current->c != NULL) {
             bool collision = false;
             if (!siblingContainerCollision && accelIndex == Accel::BiTree) {
@@ -496,6 +513,9 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
 
     // Shading
     res->color = res->obj->color;
+    
+    // Uncomment to visualize normals
+    // res->color = (res->norm + 1) / 2.f;
 
     if (res->obj->s != NULL && res->obj->texId != -1) {
         res->uv = sphereUV(res->obj->s, res->p0);
@@ -508,7 +528,11 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
         // res->color = {res->uv.x, res->uv.y, 1.f};
     }
+    if (res->obj->b != NULL && res->obj->texId != -1) {
+        // FIXME: AAB textures!
+    }
     if (rc->normalMapping && res->obj->normId != -1) {
+        // FIXME: AAB normal mapping!
         if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(res->obj->s, res->p0);
         Texture *nm = norms.at(res->obj->normId);
         if (nm != NULL) {
@@ -544,9 +568,9 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
 
     // std::printf("looped over %d objects\n", size);
     if (rc->collisionsOnly) return;
-    
-    // FIXME: This shouldn't be necessary, but without it, bouncing rays collide with the sphere they bounce off, causing a weird moiré pattern. To avoid, this moves the origin just further than the edge of the sphere.
-    Vec3 p0PlusABit = res->p0 + (0.01f * res->norm);
+   
+    // Epsilon (small number) bias so we don't accidentally hit ourselves due to f.p. 
+    Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm);
     if (rc->reflections && res->obj->reflectiveness != 0) {
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
         Vec3 reflection = delta - 2.f*dot(delta, res->norm) * res->norm;
@@ -562,13 +586,15 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     if (res->obj->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
         if (res->collisions >= 1 && res->potentialCollisions > 1) {
-            Vec3 p0Transparent = res->p0 - (0.01f * res->norm);
+            Vec3 p0Transparent = res->p0 - (EPSILON * res->norm);
             if (res->obj->t != NULL) {
                 RayResult r = RayResult();
                 castRay(&r, obj, p0Transparent, delta, rc, callCount+1);
                 res->refractColor = r.color;
             } else if (res->obj->s != NULL) {
                 castThroughSphere(delta, rc, res, callCount);
+            } else if (res->obj->b != NULL) {
+                // FIXME: AAB opacity
             }
         } else {
             res->refractColor = {0.f, 0.f, 0.f};
@@ -632,6 +658,7 @@ namespace {
     const char* w_brightness = "brightness";
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
+    const char* w_aab = "box";
     const char* w_pointLight = "plight";
     const char* w_shininess = "shininess";
     const char* w_include = "include";
@@ -780,7 +807,7 @@ void WorldMap::genObjectList(Container *c) {
         free(objectNames);
     }
 
-    objectCount = mapStats.lights + mapStats.spheres + mapStats.tris + mapStats.planes;
+    objectCount = mapStats.size();
     objectNames = (char**)malloc(objectCount * sizeof(char*));
     objectPtrs = (Shape **)malloc(objectCount * sizeof(Shape*));
     
@@ -809,6 +836,8 @@ void WorldMap::genObjectList(Container *c) {
             } else {
                 name += "Triangle";
             }
+        } else if (bo->s->b != NULL) {
+            name += "Box";
         }
         objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
         strncpy(objectNames[i], name.c_str(), name.size()+1);
@@ -829,6 +858,8 @@ void WorldMap::genObjectList(Container *c) {
             } else {
                 name += "Triangle";
             }
+        } else if (bo->s->b != NULL) {
+            name += "Box";
         }
         objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
         strncpy(objectNames[i], name.c_str(), name.size()+1);
@@ -921,7 +952,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
         } else if (token == w_close && c != NULL) {
             mapStats.allocs += appendToContainer(&unoptimizedObj, c);
             c = NULL;
-        } else if (token == w_sphere || token == w_triangle) {
+        } else if (token == w_sphere || token == w_triangle || token == w_aab) {
             if (token == w_sphere) {
                 Shape *sphere = decodeSphere(line, &tex, &norms);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
@@ -953,6 +984,19 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                     }
                     mapStats.tris++;
                 }
+            } else if (token == w_aab) {
+                Shape *aab = decodeAAB(line, &tex, &norms);
+                if (tex.lastLoadFail) mapStats.missingTex += 1;
+                if (norms.lastLoadFail) mapStats.missingNorm += 1;
+                mapStats.allocs += 2; // Shape and AAB
+                aab->b->min = aab->b->min * transform;
+                aab->b->max = aab->b->max * transform;
+                if (c == NULL) {
+                    mapStats.allocs += appendToContainer(&unoptimizedObj, aab);
+                } else {
+                    mapStats.allocs += appendToContainer(c, aab);
+                }
+                mapStats.aabs++;
             }
         } else if (token == w_pointLight) {
             PointLight pl = decodePointLight(line);
@@ -1045,6 +1089,14 @@ void flattenRootContainer(Container *dst, Container *src, bool root) {
                 Triangle *t = (Triangle*)alloc(sizeof(Triangle));
                 std::memcpy(t, current->t, sizeof(Triangle));
                 b->s->t = t;
+            }
+            if (current->b != NULL) {
+                b->min = current->b->min;
+                b->max = current->b->max;
+                b->centroid = b->min + 0.5f*(b->max - b->min);
+                AAB *bb = (AAB*)alloc(sizeof(AAB));
+                std::memcpy(bb, current->b, sizeof(AAB));
+                b->s->b = bb;
             }
             for (int i = 0; i < 3; i++) {
                 dst->a(i) = std::min(dst->a(i), b->min(i));

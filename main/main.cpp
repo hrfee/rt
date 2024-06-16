@@ -14,7 +14,7 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-#define MAP_PATH "maps/default.map"
+#define MAP_PATH "maps/box.map"
 
 namespace {
     WorldMap *map;
@@ -28,11 +28,11 @@ namespace {
 std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
     std::ostringstream out;
     if (header) {
-        out << "Map Name,# Tris,# Spheres,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms),Accel Int Param,Accel Float Param," << ",";
+        out << "Map Name,# Tris,# Planes,# Spheres,# AABs,# Lights,Max Ray bounces,Render mode,Phi (l/r) (radians),Theta (u/d) (radians),Field of View (°),Position (x y z),Render time (ms),Width (px),Height (px),# Threads,Acceleration Method,Max splitting depth,Structure build time (ms),Accel Int Param,Accel Float Param," << ",";
         out << std::endl;
     }
     // Map & Cam info
-    out << map->mapStats.name << "," << map->mapStats.tris << "," << map->mapStats.spheres << "," << map->mapStats.lights << ",";
+    out << map->mapStats.name << "," << map->mapStats.tris << "," << map->mapStats.planes << "," << map->mapStats.spheres << "," << map->mapStats.aabs << "," << map->mapStats.lights << ",";
     out << window->state.rc.maxBounce << ",";
     out << modes[window->ui.renderMode] << ",";
     out << window->state.mouse.phi << "," << window->state.mouse.theta << "," << window->state.fovDeg << ",";

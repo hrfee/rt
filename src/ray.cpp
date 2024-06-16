@@ -254,6 +254,40 @@ float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
     return tmin;
 }
 
+
+// FIXME: A bit glitchy, normal can be weird at edges? and doesn't work when inside AABB.
+float meetAABBWithNormal(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b, Vec3 *normal) {
+    // Based on the "slab method".
+    // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
+    // then select the largest distance to one of the nearer faces, and the shortest distance to one of the furthest faces.
+    // If the latter is negative, we're looking in the wrong direction.
+    // Where the ray actually intersects the AABB, the latter (furthest) should be greater than the former (nearest).
+    // and therefore if a nearer face appears to be closer than a farther face, we do not intersect.
+    
+    // Pre-divide, since multiplication is faster and we use it twice
+    float d[3] = {1.f/delta.x, 1.f/delta.y, 1.f/delta.z};
+    float tmin = -9999.f;
+    float tmax = 9999.f;
+    int normIdx = -1;
+    for (int i = 0; i < 3; i++) {
+        float t0 = (a(i) - p0(i)) * d[i];
+        float t1 = (b(i) - p0(i)) * d[i];
+        float mn = std::min(t0, t1);
+        if (mn >= tmin) {
+            tmin = mn;
+            normIdx = i;
+        }
+        tmax = std::min(tmax, std::max(t0, t1));
+    }
+
+    if (tmax < 0) return -9999.f;
+    if (tmin > tmax) return -9998.f;
+    *normal = {0.f, 0.f, 0.f};
+    normal->idx(normIdx) = delta(normIdx) >= 0 ? -1.f : 1.f;
+    // normal->idx(normIdx) = 1.f;
+    return tmin;
+}
+
 Vec2 sphereUV(Sphere *s, Vec3 p) {
     // "Move" the sphere (and the point on it) to center O.
     p = p - s->center;

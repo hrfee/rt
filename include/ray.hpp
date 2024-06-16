@@ -15,6 +15,7 @@ float meetsTriangleMT(Vec3 p0, Vec3 delta, Triangle *tri, Vec3 *bary);
 Vec2 triUV(Vec3 bary, Triangle *tri);
 bool meetsAABB(Vec3 p0, Vec3 delta, Container *container);
 float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b);
+float meetAABBWithNormal(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b, Vec3 *normal);
 Vec2 sphereUV(Sphere *s, Vec3 p);
 
 Vec3 Refract(float ra, float rb, Vec3 a, Vec3 normal, bool *tir);
