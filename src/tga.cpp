@@ -81,9 +81,18 @@ Image *TGA::read(std::string fname) {
     /*std::printf("got comment: \"%s\"\n", id);
     std::printf("Got width and height %dx%d\n", w, h);
     std::printf("Got bitdepth %d\n", header.imageSpec[8]);*/
+    int bitDepth = header.imageSpec[8];
+    int bpc = 3;
+    if (bitDepth % 8 != 0) std::printf("WARNING: Bitdepth weird: %d\n", bitDepth);
     
     // Naively, assume we only need 3 bytes of colour for rgb, and that anything further is junk
     int bytesToIgnore = (header.imageSpec[8] - 3*8)/8;
+
+    // Also, naively deal with mono images
+    if (bitDepth == 8) {
+        bytesToIgnore = 0;
+        bpc = 1;
+    }
 
     Image *img = new Image(w, h);
 
@@ -91,8 +100,13 @@ Image *TGA::read(std::string fname) {
     for (int i = 0; i < pxCount; i++) {
         // BGR, not RGB!
         Vec3c pxBGR = {0,0,0};
-        f.read((char*)(&pxBGR), 3);
+        f.read((char*)(&pxBGR), bpc);
         Vec3c px = {pxBGR.z, pxBGR.y, pxBGR.x};
+        // For mono images, copy to all channels.
+        if (bpc == 1) {
+            px.x = px.z;
+            px.y = px.z;
+        }
         img->write(i, px);
         if (bytesToIgnore > 0) {
             f.seekg(bytesToIgnore, std::ios_base::cur);

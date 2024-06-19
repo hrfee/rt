@@ -255,7 +255,7 @@ float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
 }
 
 
-// FIXME: A bit glitchy, normal can be weird at edges? and doesn't work when inside AABB.
+// FIXME: doesn't work when inside AABB.
 float meetAABBWithNormal(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b, Vec3 *normal) {
     // Based on the "slab method".
     // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
@@ -286,6 +286,17 @@ float meetAABBWithNormal(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b, Vec3 *normal) {
     normal->idx(normIdx) = delta(normIdx) >= 0 ? -1.f : 1.f;
     // normal->idx(normIdx) = 1.f;
     return tmin;
+}
+
+Vec2 aabUV(Vec3 p0, AAB *aab, Vec3 normal) {
+    int uvIdx = 0;
+    Vec2 uv = {0.f, 0.f};
+    for (int i = 0; i < 3; i++) {
+        if (normal(i) != 0.f) continue;
+        uv(uvIdx) = (p0(i) - aab->min(i)) / (aab->max(i) - aab->min(i));
+        uvIdx++;
+    }
+    return uv;
 }
 
 Vec2 sphereUV(Sphere *s, Vec3 p) {

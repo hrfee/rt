@@ -122,13 +122,18 @@ Image *mainLoop(RenderConfig *rc) {
         }
         map->obj = map->optimizedObj;
     } else {
+        if (map->obj == map->optimizedObj) {
+            map->genObjectList(&(map->unoptimizedObj));
+            window->state.objectPtrs = map->objectPtrs;
+            window->state.objectNames = map->objectNames;
+        }
         map->obj = &(map->unoptimizedObj);
     }
 
     if (window->state.recalcUVs) {
         Shape *sh = window->getShapePointer();
         if (sh != NULL) {
-            recalculateTriUVs(sh, &(map->tex), &(map->norms));
+            recalculateTriUVs(sh, &(map->tex), &(map->norms), &(map->refs));
         }
         window->state.recalcUVs = false;
     }

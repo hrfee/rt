@@ -131,6 +131,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
     simpleConfig.triangles = rc->triangles;
     simpleConfig.mtTriangleCollision = rc->mtTriangleCollision;
     simpleConfig.normalMapping = rc->normalMapping;
+    simpleConfig.reflectanceMapping = rc->reflectanceMapping;
     simpleConfig.spheres = rc->spheres;
     simpleConfig.maxBounce = rc->maxBounce;
     simpleConfig.showDebugObjects = rc->showDebugObjects;
@@ -523,17 +524,22 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         Texture *tx = tex.at(res->obj->texId);
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
     }
+    if (res->obj->b != NULL && res->obj->texId != -1) {
+        res->uv = aabUV(res->p0, res->obj->b, res->norm);
+        // res->color = Vec3{uv.x, uv.y, 0.5f};
+        Texture *tx = tex.at(res->obj->texId);
+        // if (tx != NULL) res->color = {res->uv.x, res->uv.y, 0.f};
+        if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
+    }
     if (res->obj->t != NULL && res->obj->texId != -1) {
         Texture *tx = tex.at(res->obj->texId);
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
         // res->color = {res->uv.x, res->uv.y, 1.f};
     }
-    if (res->obj->b != NULL && res->obj->texId != -1) {
-        // FIXME: AAB textures!
-    }
     if (rc->normalMapping && res->obj->normId != -1) {
-        // FIXME: AAB normal mapping!
         if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(res->obj->s, res->p0);
+        else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, res->obj->b, res->norm);
+
         Texture *nm = norms.at(res->obj->normId);
         if (nm != NULL) {
             Vec3 ts = nm->at(res->uv.x, res->uv.y); // (0,0,1) is pointing towards the normal
@@ -571,7 +577,15 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
    
     // Epsilon (small number) bias so we don't accidentally hit ourselves due to f.p. 
     Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm);
-    if (rc->reflections && res->obj->reflectiveness != 0) {
+    float reflectiveness = res->obj->reflectiveness;
+    if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj->refId != -1))) {
+        if (rc->reflectanceMapping && res->obj->refId != -1) {
+            if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(res->obj->s, res->p0);
+            else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, res->obj->b, res->norm);
+            
+            Texture *rf = refs.at(res->obj->refId);
+            if (rf != NULL) reflectiveness = rf->at(res->uv.x, res->uv.y)(0); // B&W map, so all channels are identical
+        }
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
         Vec3 reflection = delta - 2.f*dot(delta, res->norm) * res->norm;
         castReflectionRay(p0PlusABit, reflection, rc, res, callCount+1);
@@ -603,7 +617,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
  
     
     // Diffuse lighting and specular reflection
-    Vec3 out = (res->color * res->lightColor) * (1.f - res->obj->reflectiveness) + res->obj->reflectiveness*res->reflectionColor;
+    Vec3 out = (res->color * res->lightColor) * (1.f - reflectiveness) + reflectiveness*res->reflectionColor;
     // Interpolated trasnparency (CGPaP 16.25), but not for the specular component
     out = res->obj->opacity * out + (1.f - res->obj->opacity) * res->refractColor;
     // Specular highlight
@@ -783,6 +797,7 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
 
     tex.clear();
     norms.clear();
+    refs.clear();
 
     if (getTime != NULL) lastLoadTime = getTime();
     loadObjFile(path);
@@ -954,9 +969,10 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             c = NULL;
         } else if (token == w_sphere || token == w_triangle || token == w_aab) {
             if (token == w_sphere) {
-                Shape *sphere = decodeSphere(line, &tex, &norms);
+                Shape *sphere = decodeSphere(line, &tex, &norms, &refs);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
+                if (refs.lastLoadFail) mapStats.missingRef += 1;
                 mapStats.allocs += 2; // Shape and sphere
                 sphere->s->center = sphere->s->center * transform;
                 if (c == NULL) {
@@ -966,9 +982,10 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 }
                 mapStats.spheres++;
             } else if (token == w_triangle) {
-                Shape *triangle = decodeTriangle(line, &tex, &norms);
+                Shape *triangle = decodeTriangle(line, &tex, &norms, &refs);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
+                if (refs.lastLoadFail) mapStats.missingRef += 1;
                 mapStats.allocs += 2; // Shape and triangle
                 triangle->t->a = triangle->t->a * transform;
                 triangle->t->b = triangle->t->b * transform;
@@ -985,9 +1002,10 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                     mapStats.tris++;
                 }
             } else if (token == w_aab) {
-                Shape *aab = decodeAAB(line, &tex, &norms);
+                Shape *aab = decodeAAB(line, &tex, &norms, &refs);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
+                if (refs.lastLoadFail) mapStats.missingRef += 1;
                 mapStats.allocs += 2; // Shape and AAB
                 aab->b->min = aab->b->min * transform;
                 aab->b->max = aab->b->max * transform;

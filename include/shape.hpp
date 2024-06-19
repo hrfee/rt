@@ -19,8 +19,7 @@ struct Shape {
     Container *c;
     AAB *b;
     Vec3 color;
-    int texId;
-    int normId;
+    int texId, normId, refId;
     bool noLighting;
     float opacity;
     float reflectiveness; // 0-1
@@ -100,15 +99,15 @@ PointLight decodePointLight(std::string in);
 
 std::string encodeSphere(Shape *sh);
 
-Shape *decodeSphere(std::string in, TexStore *tex = NULL, TexStore *norm = NULL);
+Shape *decodeSphere(std::string in, TexStore *tex = NULL, TexStore *norm = NULL, TexStore *ref = NULL);
 
 std::string encodeTriangle(Shape *sh);
 
-Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm);
+Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm, TexStore *ref);
 
 std::string encodeAAB(Shape *sh);
 
-Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm);
+Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm, TexStore *ref);
 
 std::string encodeColour(Vec3 c);
 
@@ -132,6 +131,6 @@ int clearContainer(Container *c, bool clearChildShapes = true);
 CamPreset decodeCamPreset(std::string in);
 std::string encodeCamPreset(CamPreset *p);
 
-void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm);
+void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm, TexStore *ref);
 
 #endif

@@ -233,6 +233,7 @@ void GLWindow::loadUI() {
     state.rc.mtTriangleCollision = true;
 
     state.rc.normalMapping = false;
+    state.rc.reflectanceMapping = false;
 
     state.rc.samplesPerPx = 1;
     state.rc.sampleMode = SamplingMode::Grid;
@@ -462,9 +463,9 @@ void GLWindow::addUI() {
         vl(ImGui::Checkbox("Render triangles", &(state.rc.triangles)));
         vl(ImGui::Checkbox("Render AABs (boxes)", &(state.rc.aabs)));
         vl(ImGui::Checkbox("Möller-Trumbore tri collision (faster, allows textures)", &(state.rc.mtTriangleCollision)));
-        if (state.rc.mtTriangleCollision) {
-            vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
-        }
+        vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
+        vl(ImGui::Checkbox("Reflectance mapping", &(state.rc.reflectanceMapping)));
+
         vl(ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount));
         
         vl(ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)));
@@ -860,7 +861,8 @@ Shape *GLWindow::getShapePointer() {
 void GLWindow::showShapeEditor() {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
     ImGui::Begin("edit");
-    { 
+    {
+        ImGui::Text("note: changes made when using an acceleration structure are not reflected in the unoptimized version.");
         ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
         Shape *sh = getShapePointer();
         if (sh != NULL) {

@@ -12,6 +12,7 @@ namespace {
     const char* w_color = "color";
     const char* w_tex = "tex";
     const char* w_norm = "norm";
+    const char* w_refmap = "refmap";
     const char w_color_hex = '#';
     const char* w_color_rgb_start = "rgb(";
     const char w_color_rgb_end = ')';
@@ -86,9 +87,11 @@ Shape *emptyShape() {
     sh->opacity = 1.f;
     sh->texId = -1; // No texture
     sh->normId = -1; // No normalmap
+    sh->refId = -1; // No reflectance map
     return sh;
 }
 
+// FIXME: very out of date
 std::string encodeShape(Shape *sh) {
     std::ostringstream fmt;
     fmt << encodeColour(sh->color) << " ";
@@ -104,9 +107,10 @@ std::string encodeShape(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm) {
+Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
     if (tex != NULL) tex->lastLoadFail = false;
     if (norm != NULL) norm->lastLoadFail = false;
+    if (ref != NULL) ref->lastLoadFail = false;
     std::stringstream stream(in);
     Shape *sh = emptyShape();
     do {
@@ -142,6 +146,13 @@ Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm) {
             if (norm != NULL) {
                 sh->normId = norm->load(w);
             }
+        } else if (w == w_refmap) {
+            // FIXME: Cope with spaces in filenames
+            // FIXME: "Eval" pathnames so they match, even if written differently
+            stream >> w;
+            if (ref != NULL) {
+                sh->refId = ref->load(w);
+            }
         }
     } while (stream);
     return sh;
@@ -161,9 +172,9 @@ std::string encodeSphere(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm) {
+Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in, tex, norm);
+    Shape *sh = decodeShape(in, tex, norm, ref);
     sh->s = (Sphere*)alloc(sizeof(Sphere));
     sh->s->thickness = 1.f;
     do {
@@ -251,9 +262,9 @@ std::string encodeTriangle(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
+Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in, tex, norm);
+    Shape *sh = decodeShape(in, tex, norm, ref);
     sh->t = (Triangle*)alloc(sizeof(Triangle));
     sh->t->plane = false;
 
@@ -286,14 +297,14 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm) {
         }
     } while (stream);
 
-    if (sh->texId != -1 || sh->normId != -1) {
-        recalculateTriUVs(sh, tex, norm);
+    if (sh->texId != -1 || sh->normId != -1 || sh->refId != -1) {
+        recalculateTriUVs(sh, tex, norm, ref);
     }
 
     return sh;
 }
 
-void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm) {
+void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm, TexStore *ref) {
     // Project onto 2D plane, any'll do for now
     float proj[3][2] = {
         {sh->t->a.x, sh->t->a.y},
@@ -314,8 +325,10 @@ void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm) {
     float iw = 0.f, ih = 0.f;
     if (sh->texId != -1) {
         t = tex->at(sh->texId);
-    } else if (sh->normId) {
+    } else if (sh->normId != -1) {
         t = norm->at(sh->normId);
+    } else if (sh->refId != -1) {
+        t = ref->at(sh->refId);
     }
     scale = t->scale;
     iw = t->img->w;
@@ -348,9 +361,9 @@ std::string encodeAAB(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm) {
+Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in, tex, norm);
+    Shape *sh = decodeShape(in, tex, norm, ref);
     sh->b = (AAB*)alloc(sizeof(AAB));
 
     do {
@@ -373,8 +386,8 @@ Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm) {
         }
     } while (stream);
 
-    if (sh->texId != -1 || sh->normId != -1) {
-        // FIXME: AABB textures!
+    if (sh->texId != -1 || sh->normId != -1 || sh->refId != -1) {
+        // FIXME: AABB texture improvements?
     }
 
     return sh;

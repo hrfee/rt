@@ -28,6 +28,7 @@ struct RenderConfig {
     bool triangles, spheres, aabs;
     bool mtTriangleCollision;
     bool normalMapping;
+    bool reflectanceMapping;
     int samplesPerPx;
     int sampleMode;
     Vec3 manualPosition;
@@ -72,7 +73,7 @@ struct MapStats {
     std::string name;
     int spheres, tris, lights, planes, aabs;
     int tex, norm;
-    int missingTex, missingNorm, missingObj;
+    int missingTex, missingNorm, missingRef, missingObj;
     int allocs = 0;
     void clear() {
         spheres = 0;
@@ -84,6 +85,7 @@ struct MapStats {
         norm = 0;
         missingTex = 0;
         missingNorm = 0;
+        missingRef = 0;
         missingObj = 0;
         allocs = 0;
         name.clear();
@@ -120,6 +122,7 @@ class WorldMap {
         Shape **objectPtrs;
         TexStore tex;
         TexStore norms;
+        TexStore refs;
         Image *aaOffsetImage;
         bool aaOffsetImageDirty;
         MapStats mapStats;
@@ -137,6 +140,8 @@ class WorldMap {
         double castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads = -1);
 
         void encode(char const* path);
+
+        void genObjectList(Container *c);
     private:
         void castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc, int callCount = 0);
         void castSubRays(Image *img, RenderConfig *rc, int w0, int w1, int h0, int h1, int *state, Vec2 *offsets, int nOffsets);
@@ -146,8 +151,6 @@ class WorldMap {
         void castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount);
         void castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResult *res);
         void castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount = 0);
-
-        void genObjectList(Container *c);
 };
 
 int clearContainer(Container *c);
