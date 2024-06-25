@@ -255,7 +255,6 @@ float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
 }
 
 
-// FIXME: doesn't work when inside AABB.
 float meetAABBWithNormal(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b, Vec3 *normal) {
     // Based on the "slab method".
     // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
@@ -268,24 +267,35 @@ float meetAABBWithNormal(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b, Vec3 *normal) {
     float d[3] = {1.f/delta.x, 1.f/delta.y, 1.f/delta.z};
     float tmin = -9999.f;
     float tmax = 9999.f;
-    int normIdx = -1;
+    int nminIdx = -1, nmaxIdx = -1;
     for (int i = 0; i < 3; i++) {
         float t0 = (a(i) - p0(i)) * d[i];
         float t1 = (b(i) - p0(i)) * d[i];
         float mn = std::min(t0, t1);
         if (mn >= tmin) {
             tmin = mn;
-            normIdx = i;
+            nminIdx = i;
         }
-        tmax = std::min(tmax, std::max(t0, t1));
+        float mx = std::max(t0, t1);
+        if (mx <= tmax) {
+            tmax = mx;
+            nmaxIdx = i;
+        }
     }
 
     if (tmax < 0) return -9999.f;
     if (tmin > tmax) return -9998.f;
     *normal = {0.f, 0.f, 0.f};
-    normal->idx(normIdx) = delta(normIdx) >= 0 ? -1.f : 1.f;
+    // Inside the box
+    if (tmin < 0.f) {
+        normal->idx(nmaxIdx) = delta(nmaxIdx) >= 0 ? -1.f : 1.f;
+        return tmax;
+    // Outside the box
+    } else {
+        normal->idx(nminIdx) = delta(nminIdx) >= 0 ? -1.f : 1.f;
+        return tmin;
+    }
     // normal->idx(normIdx) = 1.f;
-    return tmin;
 }
 
 Vec2 aabUV(Vec3 p0, AAB *aab, Vec3 normal) {

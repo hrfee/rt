@@ -800,6 +800,12 @@ void keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int 
     if (mod == GLFW_MOD_SHIFT) {
         w->state.mouse.speedMultiplier = 2.f;
     }
+    if (key == GLFW_KEY_LEFT_CONTROL) {
+        w->state.mouse.speedMultiplier = down(action) ? .5f : 1.f;
+    }
+    if (mod == GLFW_MOD_CONTROL) {
+        w->state.mouse.speedMultiplier = .5f;
+    }
     
     if (key == GLFW_KEY_W) {
         w->state.mouse.moveForward = down(action) ? MOVE_SPEED : 0.f;

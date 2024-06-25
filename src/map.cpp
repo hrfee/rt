@@ -518,6 +518,9 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Uncomment to visualize normals
     // res->color = (res->norm + 1) / 2.f;
 
+    // std::printf("looped over %d objects\n", size);
+    if (rc->collisionsOnly) return;
+
     if (res->obj->s != NULL && res->obj->texId != -1) {
         res->uv = sphereUV(res->obj->s, res->p0);
         // res->color = Vec3{uv.x, uv.y, 0.5f};
@@ -555,7 +558,14 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
             Vec3 n = res->norm;
 
             Vec3 a = {0.f, 1.f, 0.f};
-            Vec3 tan = -1.f * norm(cross(a, n));
+            Vec3 anC = cross(a, n);
+            // If the normal is vertical, cross(a, n) will be zeros.
+            // We just need a vector perp. to a and n, so we just use {1,0,0} instead.
+            if (n.x == 0.f && n.z == 0.f && n.y != 0.f) {
+                anC = {1.f, 0.f, 0.f};
+            }
+            anC = norm(anC);
+            Vec3 tan = -1.f * anC;
             Vec3 bitan = norm(cross(n, tan));
 
             // Create TBN matrix
@@ -566,14 +576,18 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
             };
 
             Vec3 sampledNorm = norm(tbn * ts);
+            /*if (std::isnan(sampledNorm.y)) {
+                std::printf("got nan for (%f %f %f)\n", res->norm.x, res->norm.y, res->norm.z);
+            } */
             // std::printf("for normal (%f, %f, %f), got (%f, %f, %f) => (%f, %f, %f)\n", res->norm.x, res->norm.y, res->norm.z, ts.x, ts.y, ts.z, sampledNorm.x, sampledNorm.y, sampledNorm.z);
             res->normal = sampledNorm;
             res->norm = sampledNorm;
         }
     }
-
-    // std::printf("looped over %d objects\n", size);
-    if (rc->collisionsOnly) return;
+    
+    /* if (res->normal.y != 0.f && res->normal.x == 0.f && res->normal.z == 0.f) {
+        res->color = {1.f, 0.f, 0.f};
+    } */
    
     // Epsilon (small number) bias so we don't accidentally hit ourselves due to f.p. 
     Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm);
