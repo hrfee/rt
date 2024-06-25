@@ -119,7 +119,11 @@ std::string encodeShape(Shape *sh) {
 
 Shape *Decoder::decodeShape(std::string in) {
     Shape *sh = emptyShape(true);
-    sh->m = decodeMaterial(in);
+    if (usedMaterial != NULL) {
+        sh->m = usedMaterial;
+    } else {
+        sh->m = decodeMaterial(in);
+    }
     return sh;
 }
 
@@ -697,4 +701,11 @@ Material *MaterialStore::byName(std::string name) {
         m = m->next;
     }
     return NULL;
+}
+
+void Decoder::usingMaterial(std::string name) {
+    usedMaterial = mat->byName(name);
+    if (usedMaterial == NULL) {
+        std::printf("WARNING: Couldn't resolve material \"%s\"\n", name.c_str());
+    }
 }

@@ -923,7 +923,7 @@ void GLWindow::showMaterialEditor(Material *m) {
 void GLWindow::showShapeEditor() {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
     if (IMGUIBEGIN("edit object")) {
-        ImGui::Text("note: changes made when using an acceleration structure are not reflected in the unoptimized version.");
+        ImGui::Text("note: non-material changes (i.e. position) made when using an acceleration structure are not reflected in the unoptimized version.");
         ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
         Shape *sh = getShapePointer();
         if (sh != NULL) {

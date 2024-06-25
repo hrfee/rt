@@ -120,6 +120,7 @@ struct Decoder {
     TexStore *tex, *norm, *ref;
     MaterialStore *mat;
     void setStores(TexStore *t = NULL, TexStore *n = NULL, TexStore *r = NULL, MaterialStore *m  = NULL) {
+        usedMaterial = NULL;
         tex = t;
         norm = n;
         ref = r;
@@ -144,7 +145,13 @@ struct Decoder {
     std::string encodeAAB(Shape *sh);
 
     Shape *decodeAAB(std::string in);
+    
     void recalculateTriUVs(Shape *sh);
+    
+    Material *usedMaterial;
+    void usingMaterial(std::string name);
+    bool isUsingMaterial() { return usedMaterial != NULL; };
+    void endUsingMaterial() { usedMaterial = NULL; };
 };
 
 std::string encodeColour(Vec3 c);

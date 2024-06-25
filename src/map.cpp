@@ -699,6 +699,7 @@ namespace {
     const char* w_comment = "//";
     const char* w_container = "container";
     const char* w_material = "material";
+    const char* w_usingMaterial = "using";
     const char* w_campreset = "campreset";
     const char* w_a = "a";
     const char* w_b = "b";
@@ -947,6 +948,14 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             if (norms.lastLoadFail) mapStats.missingNorm += 1;
             if (refs.lastLoadFail) mapStats.missingRef += 1;
             // mapStats.materials++;
+        } else if (token == w_usingMaterial) {
+            lstream >> token;
+            dec.usingMaterial(token);
+            lstream >> token;
+            if (token == w_open) {
+            } else {
+                throw std::runtime_error("Didn't find open brace");
+            }
         } else if (token == w_container) {
             c = emptyContainer(true);
             mapStats.allocs++;
@@ -991,9 +1000,13 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             } else {
                 throw std::runtime_error("Didn't find open brace");
             }
-        } else if (token == w_close && c != NULL) {
-            mapStats.allocs += appendToContainer(&unoptimizedObj, c);
-            c = NULL;
+        } else if (token == w_close) {
+            if (c != NULL) {
+                mapStats.allocs += appendToContainer(&unoptimizedObj, c);
+                c = NULL;
+            } else if (dec.isUsingMaterial()) {
+                dec.endUsingMaterial();
+            }
         } else if (token == w_sphere || token == w_triangle || token == w_aab) {
             if (token == w_sphere) {
                 Shape *sphere = dec.decodeSphere(line);
@@ -1105,7 +1118,7 @@ void flattenRootContainer(Container *dst, Container *src, bool root) {
             flattenRootContainer(dst, current->c, false);
         } else {
             Bound *b = emptyBound();
-            b->s = emptyShape();
+            b->s = emptyShape(true);
             std::memcpy(b->s, current, sizeof(Shape));
             if (current->s != NULL) {
                 b->min = current->s->center - current->s->radius;
