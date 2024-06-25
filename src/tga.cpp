@@ -3,9 +3,8 @@
 
 #include <iostream>
 #include <cstdio>
-#include <cstdint>
 #include <fstream>
-#include <bitset>
+#include <chrono>
 
 // Rough implementation of TGA v1.0
 // Source used for header format: https://en.wikipedia.org/wiki/Truevision_TGA
@@ -63,6 +62,7 @@ void TGA::write(Image *img, std::string fname, std::string id) {
 }
 
 Image *TGA::read(std::string fname) {
+    auto start = std::chrono::high_resolution_clock::now();
     std::ifstream f(fname, std::ios_base::binary);
     if (f.fail() || f.bad()) {
         throw ImgLoadException(fname);
@@ -97,9 +97,13 @@ Image *TGA::read(std::string fname) {
     Image *img = new Image(w, h);
 
     int pxCount = w*h;
+    Vec3c pxBGR = {0,0,0};
+    
+    // Hopefully bytesToIgnore is less than this!
+    char ignore[8];
+    
     for (int i = 0; i < pxCount; i++) {
         // BGR, not RGB!
-        Vec3c pxBGR = {0,0,0};
         f.read((char*)(&pxBGR), bpc);
         Vec3c px = {pxBGR.z, pxBGR.y, pxBGR.x};
         // For mono images, copy to all channels.
@@ -109,10 +113,18 @@ Image *TGA::read(std::string fname) {
         }
         img->write(i, px);
         if (bytesToIgnore > 0) {
-            f.seekg(bytesToIgnore, std::ios_base::cur);
+            // Seekg is really slow, Reading a 4096^2 32-bit image takes 13s with it, while
+            // reading a 8192x4096 image withoout takes just 700ms.
+            // f.seekg(bytesToIgnore, std::ios_base::cur);
+            // Instead, read and do nothing with it.
+            f.read(ignore, bytesToIgnore);
         }
     }
 
     f.close();
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> ms = end - start;
+    std::printf("Reading \"%s\" took %fms\n", fname.c_str(), ms.count());
     return img;
 }
