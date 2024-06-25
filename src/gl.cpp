@@ -854,7 +854,7 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
         while (bo != end) {
             Shape *current = bo->s;
             if (current->t != NULL && current->debug) {
-                containerColor = ImVec4(current->color.x, current->color.y, current->color.z, 1.f);
+                containerColor = ImVec4(current->m->color.x, current->m->color.y, current->m->color.z, 1.f);
                 break;
             }
             if (c->voxelSubdiv != 0) {
@@ -905,6 +905,15 @@ Shape *GLWindow::getShapePointer() {
     return state.objectPtrs[state.objectIndex];
 }
 
+void GLWindow::showMaterialEditor(Material *m) {
+    vl(ImGui::ColorEdit3("Color", (float*)&(m->color)));
+    vl(ImGui::SliderFloat("Opacity", &(m->opacity), 0, 1.f));
+    vl(ImGui::SliderFloat("Reflectiveness", &(m->reflectiveness), 0, 1.f));
+    vl(ImGui::SliderFloat("Specular Component", &(m->specular), 0, 1.f));
+    vl(ImGui::SliderFloat("Shininess (n)", &(m->shininess), 0, 100.f));
+    vl(ImGui::Checkbox("Disable Lighting", &(m->noLighting)));
+}
+
 void GLWindow::showShapeEditor() {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
     if (IMGUIBEGIN("edit")) {
@@ -941,13 +950,8 @@ void GLWindow::showShapeEditor() {
                     ImGui::InputFloat3("Min Corner", (float*)&(sh->b->min));
                     ImGui::InputFloat3("Max Corner", (float*)&(sh->b->max));
                 }
-                // Shape params
-                vl(ImGui::ColorEdit3("Color", (float*)&(sh->color)));
-                vl(ImGui::SliderFloat("Opacity", &(sh->opacity), 0, 1.f));
-                vl(ImGui::SliderFloat("Reflectiveness", &(sh->reflectiveness), 0, 1.f));
-                vl(ImGui::SliderFloat("Specular Component", &(sh->specular), 0, 1.f));
-                vl(ImGui::SliderFloat("Shininess (n)", &(sh->shininess), 0, 100.f));
-                vl(ImGui::Checkbox("Disable Lighting", &(sh->noLighting)));
+                // material params
+                showMaterialEditor(sh->m);
             }
         }
         IMGUIEND();

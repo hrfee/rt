@@ -12,12 +12,19 @@ struct Sphere;
 struct Triangle;
 struct Container;
 struct AAB;
+struct Material;
+
 
 struct Shape {
     Sphere *s;
     Triangle *t;
     Container *c;
     AAB *b;
+    Material *m;
+    bool debug; // Whether to be hidden in normal output or not.
+};
+
+struct Material {
     Vec3 color;
     int texId, normId, refId;
     bool noLighting;
@@ -25,7 +32,6 @@ struct Shape {
     float reflectiveness; // 0-1
     float specular; // 0-1
     float shininess;
-    bool debug; // Whether to be hidden in normal output or not.
 };
 
 struct Bound {

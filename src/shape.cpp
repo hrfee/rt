@@ -83,26 +83,28 @@ CamPreset decodeCamPreset(std::string in) {
 Shape *emptyShape() {
     Shape *sh = (Shape*)alloc(sizeof(Shape));
     std::memset(sh, 0, sizeof(Shape));
-    sh->shininess = -1.f; // -1 Indicates global shininess param takes precedence
-    sh->opacity = 1.f;
-    sh->texId = -1; // No texture
-    sh->normId = -1; // No normalmap
-    sh->refId = -1; // No reflectance map
+    sh->m = (Material*)alloc(sizeof(Material));
+    std::memset(sh->m, 0, sizeof(Material));
+    sh->m->shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    sh->m->opacity = 1.f;
+    sh->m->texId = -1; // No texture
+    sh->m->normId = -1; // No normalmap
+    sh->m->refId = -1; // No reflectance map
     return sh;
 }
 
 // FIXME: very out of date
 std::string encodeShape(Shape *sh) {
     std::ostringstream fmt;
-    fmt << encodeColour(sh->color) << " ";
+    fmt << encodeColour(sh->m->color) << " ";
     fmt << w_opacity << " ";
-    fmt << sh->opacity << " ";
+    fmt << sh->m->opacity << " ";
     fmt << w_reflectiveness << " ";
-    fmt << sh->reflectiveness << " ";
+    fmt << sh->m->reflectiveness << " ";
     fmt << w_specular << " ";
-    fmt << sh->specular << " ";
+    fmt << sh->m->specular << " ";
     fmt << w_shininess << " ";
-    fmt << sh->shininess << " ";
+    fmt << sh->m->shininess << " ";
     fmt << std::endl;
     return fmt.str();
 }
@@ -117,41 +119,41 @@ Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm, TexStore *ref)
         std::string w;
         stream >> w;
         if (w == w_color) {
-            sh->color = decodeColour(&stream);
+            sh->m->color = decodeColour(&stream);
         } else if (w == w_opacity) {
             stream >> w;
-            sh->opacity = std::stof(w);
+            sh->m->opacity = std::stof(w);
         } else if (w == w_reflectiveness) {
             stream >> w;
-            sh->reflectiveness = std::stof(w);
+            sh->m->reflectiveness = std::stof(w);
         } else if (w == w_specular) {
             stream >> w;
-            sh->specular = std::stof(w);
+            sh->m->specular = std::stof(w);
         } else if (w == w_shininess) {
             stream >> w;
-            sh->shininess = std::stof(w);
+            sh->m->shininess = std::stof(w);
         } else if (w == w_nolighting) {
-            sh->noLighting = true;
+            sh->m->noLighting = true;
         } else if (w == w_tex) {
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
             stream >> w;
             if (tex != NULL) {
-                sh->texId = tex->load(w);
+                sh->m->texId = tex->load(w);
             }
         } else if (w == w_norm) {
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
             stream >> w;
             if (norm != NULL) {
-                sh->normId = norm->load(w);
+                sh->m->normId = norm->load(w);
             }
         } else if (w == w_refmap) {
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
             stream >> w;
             if (ref != NULL) {
-                sh->refId = ref->load(w);
+                sh->m->refId = ref->load(w);
             }
         }
     } while (stream);
@@ -297,7 +299,7 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm, TexStore *r
         }
     } while (stream);
 
-    if (sh->texId != -1 || sh->normId != -1 || sh->refId != -1) {
+    if (sh->m->texId != -1 || sh->m->normId != -1 || sh->m->refId != -1) {
         recalculateTriUVs(sh, tex, norm, ref);
     }
 
@@ -323,12 +325,12 @@ void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm, TexStore *ref) 
     Texture *t = NULL;
     Vec2 scale = {1.f, 1.f};
     float iw = 0.f, ih = 0.f;
-    if (sh->texId != -1) {
-        t = tex->at(sh->texId);
-    } else if (sh->normId != -1) {
-        t = norm->at(sh->normId);
-    } else if (sh->refId != -1) {
-        t = ref->at(sh->refId);
+    if (sh->m->texId != -1) {
+        t = tex->at(sh->m->texId);
+    } else if (sh->m->normId != -1) {
+        t = norm->at(sh->m->normId);
+    } else if (sh->m->refId != -1) {
+        t = ref->at(sh->m->refId);
     }
     scale = t->scale;
     iw = t->img->w;
@@ -386,7 +388,7 @@ Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
         }
     } while (stream);
 
-    if (sh->texId != -1 || sh->normId != -1 || sh->refId != -1) {
+    if (sh->m->texId != -1 || sh->m->normId != -1 || sh->m->refId != -1) {
         // FIXME: AABB texture improvements?
     }
 
@@ -555,8 +557,14 @@ int clearContainer(Container *c, bool clearChildShapes) {
                 current->t = NULL;
                 freeCounter++;
             }
+            if (current->b != NULL) {
+                free(current->b);
+                current->b = NULL;
+                freeCounter++;
+            }
         }
         if (isContainer || clearChildShapes || current->debug) {
+            if (current->m != NULL) free(current->m);
             free(current);
             freeCounter++;
         }
@@ -579,4 +587,3 @@ int clearContainer(Container *c, bool clearChildShapes) {
     c->end = NULL;
     return freeCounter;
 }
-

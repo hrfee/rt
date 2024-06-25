@@ -611,7 +611,7 @@ void printShapes(Container *c, int tabIndex) {
             } else if (current->t != NULL) {
                 std::printf("triangle ");
             }
-            std::printf("color(%.3f, %.3f, %.3f);\n", current->color.x, current->color.y, current->color.z);
+            std::printf("color(%.3f, %.3f, %.3f);\n", current->m->color.x, current->m->color.y, current->m->color.z);
         }
         bo = bo->next;
     }
@@ -672,11 +672,11 @@ void containerCube(Container *c, Vec3 color) {
             Shape *sh0 = emptyShape();
             sh0->debug = true;
             sh0->t = t0;
-            sh0->color = color;
+            sh0->m->color = color;
             appendToContainer(c, sh0);
             Shape *sh1 = emptyShape();
             sh1->debug = true;
-            sh1->color = color;
+            sh1->m->color = color;
             sh1->t = t1;
             appendToContainer(c, sh1);
         }
@@ -697,11 +697,11 @@ void containerSphereCorners(Container *c, Vec3 color) {
         dsh->s->center = (j == 0) ? c->a : c->b;
         dsh->s->radius = 0.3f;
         dsh->s->thickness = 1.f;
-        dsh->color = color;
-        dsh->opacity = 1.f;
-        dsh->reflectiveness = 0.f;
-        dsh->specular = 0.f;
-        dsh->shininess = 5.f;
+        dsh->m->color = color;
+        dsh->m->opacity = 1.f;
+        dsh->m->reflectiveness = 0.f;
+        dsh->m->specular = 0.f;
+        dsh->m->shininess = 5.f;
         appendToContainer(c, bo);
     }
 }

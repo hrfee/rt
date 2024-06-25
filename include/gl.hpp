@@ -140,6 +140,7 @@ class GLWindow {
         bool vl(bool t);
 
         void showShapeEditor();
+        void showMaterialEditor(Material *m);
 };
 
 void resizeWindowCallback(GLFWwindow *, int, int);
