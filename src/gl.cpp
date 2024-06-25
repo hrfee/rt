@@ -9,6 +9,7 @@
 
 #include "accel.hpp"
 #include "glad/glad.h"
+#include "imgui.h"
 #include "shape.hpp"
 #include "tga.hpp"
 #include "imgui_stdlib.h"
@@ -405,7 +406,21 @@ bool GLWindow::vl(bool t) {
     return t;
 }
 
+#define TAB
+#ifdef TAB
+#define IMGUIBEGIN(n) ImGui::BeginTabItem(n)
+#define IMGUIEND() ImGui::EndTabItem()
+#define STARTTAB(n) ImGui::BeginTabBar(n)
+#define ENDTAB() ImGui::EndTabBar()
+#else
+#define IMGUIBEGIN(n) ImGui::Begin(n)
+#define IMGUIEND() ImGui::End()
+#define STARTTAB(n)
+#define ENDTAB()
+#endif
+
 void GLWindow::addUI() {
+    ImGui::ShowDemoWindow();
     state.rc.renderNow = false;
     bool backgroundText = ui.hide;
     if (backgroundText) {
@@ -434,68 +449,11 @@ void GLWindow::addUI() {
         }
         ImGui::End();
     }
-    ImGui::Begin("render controls");
-    {
-        disable();
-        vl(ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes)));
-        switch(ui.renderMode) {
-            case 0:
-                state.rc.reflections = false;
-                state.rc.lighting = false;
-                break;
-            case 1:
-                state.rc.reflections = true;
-                state.rc.lighting = false;
-                break;
-            case 2:
-                state.rc.reflections = true;
-                state.rc.lighting = true;
-                vl(ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 0.1f, 5.f));
-                vl(ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f));
-                state.rc.specular = true;
-                // trig(ImGui::Checkbox("Phong specular", &(state.rc.specular)));
-                if (state.rc.specular) {
-                    vl(ImGui::SliderFloat("Global shininess (phong) (n)", &(state.rc.globalShininess), 0.f, 100.f));
-                }
-                break;
-        };
-        vl(ImGui::Checkbox("Render spheres", &(state.rc.spheres)));
-        vl(ImGui::Checkbox("Render triangles", &(state.rc.triangles)));
-        vl(ImGui::Checkbox("Render AABs (boxes)", &(state.rc.aabs)));
-        vl(ImGui::Checkbox("Möller-Trumbore tri collision (faster, allows textures)", &(state.rc.mtTriangleCollision)));
-        vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
-        vl(ImGui::Checkbox("Reflectance mapping", &(state.rc.reflectanceMapping)));
-
-        vl(ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount));
-        
-        vl(ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)));
-        if (state.useOptimizedMap) {
-            // vl(ImGui::Checkbox("Use proper BVH", &(state.useBVH)));
-            vl(ImGui::SliderInt("Max hierarchy depth", &(state.accelDepth), 1, 100));
-            vl(ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)));
-            ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
-            if (state.renderOptimizedHierarchy) {
-                renderTree(state.optimizedMap);
-            }
-            vl(ImGui::Combo("Acceleration method", &(state.accelIndex), accelerators, IM_ARRAYSIZE(accelerators)));
-            if (state.accelIndex == Accel::BiTree || state.accelIndex == Accel::FalseOctree) {
-                vl(ImGui::SliderInt("Max leaves per node", &(state.accelParam), 1, 100));
-            } else if (state.accelIndex == Accel::SAH) {
-                vl(ImGui::SliderFloat("SAH Triangle/Sphere cost ratio", &(state.accelFloatParam), 0.1f, 100.f));
-            }
-            if (state.lastOptimizeTime != 0.f) {
-                ImGui::Text(acceleratorInfo().c_str());
-            }
-        } else {
-            state.renderOptimizedHierarchy = false;
-        }
-
-        vl(ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10));
-        vl(ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f));
-        enable();
-    }
-    ImGui::End();
-    ImGui::Begin("output controls");
+    #ifdef TAB
+    ImGui::Begin("controls");
+    #endif
+    // if (IMGUIBEGIN("output controls")) {
+    ImGui::Text("--output controls--");
     {
         ImGui::Checkbox("Render on parameter change (may cause unresponsiveness, scale limit will be reduced)", &(state.rc.renderOnChange));
 
@@ -559,10 +517,70 @@ void GLWindow::addUI() {
             ImGui::Text(mapLoadInfo().c_str());
         }
         enable();
+        // IMGUIEND();
     }
-    ImGui::End();
-    ImGui::Begin("camera controls");
-    {
+    STARTTAB("Tabs");
+    if (IMGUIBEGIN("render controls")) {
+        disable();
+        vl(ImGui::Combo("Render Mode", &(ui.renderMode), modes, IM_ARRAYSIZE(modes)));
+        switch(ui.renderMode) {
+            case 0:
+                state.rc.reflections = false;
+                state.rc.lighting = false;
+                break;
+            case 1:
+                state.rc.reflections = true;
+                state.rc.lighting = false;
+                break;
+            case 2:
+                state.rc.reflections = true;
+                state.rc.lighting = true;
+                vl(ImGui::SliderFloat("Inverse square distance divisor", &(state.rc.distanceDivisor), 0.1f, 5.f));
+                vl(ImGui::SliderFloat("Base brightness", &(state.rc.baseBrightness), 0.f, 1.f));
+                state.rc.specular = true;
+                // trig(ImGui::Checkbox("Phong specular", &(state.rc.specular)));
+                if (state.rc.specular) {
+                    vl(ImGui::SliderFloat("Global shininess (phong) (n)", &(state.rc.globalShininess), 0.f, 100.f));
+                }
+                break;
+        };
+        vl(ImGui::Checkbox("Render spheres", &(state.rc.spheres)));
+        vl(ImGui::Checkbox("Render triangles", &(state.rc.triangles)));
+        vl(ImGui::Checkbox("Render AABs (boxes)", &(state.rc.aabs)));
+        vl(ImGui::Checkbox("Möller-Trumbore tri collision (faster, allows textures)", &(state.rc.mtTriangleCollision)));
+        vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
+        vl(ImGui::Checkbox("Reflectance mapping", &(state.rc.reflectanceMapping)));
+
+        vl(ImGui::SliderInt("Rendering Threads", &(state.threadCount), 1, state.maxThreadCount));
+        
+        vl(ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)));
+        if (state.useOptimizedMap) {
+            // vl(ImGui::Checkbox("Use proper BVH", &(state.useBVH)));
+            vl(ImGui::SliderInt("Max hierarchy depth", &(state.accelDepth), 1, 100));
+            vl(ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)));
+            ImGui::Checkbox("Show hierarchy", &(state.renderOptimizedHierarchy));
+            if (state.renderOptimizedHierarchy) {
+                renderTree(state.optimizedMap);
+            }
+            vl(ImGui::Combo("Acceleration method", &(state.accelIndex), accelerators, IM_ARRAYSIZE(accelerators)));
+            if (state.accelIndex == Accel::BiTree || state.accelIndex == Accel::FalseOctree) {
+                vl(ImGui::SliderInt("Max leaves per node", &(state.accelParam), 1, 100));
+            } else if (state.accelIndex == Accel::SAH) {
+                vl(ImGui::SliderFloat("SAH Triangle/Sphere cost ratio", &(state.accelFloatParam), 0.1f, 100.f));
+            }
+            if (state.lastOptimizeTime != 0.f) {
+                ImGui::Text(acceleratorInfo().c_str());
+            }
+        } else {
+            state.renderOptimizedHierarchy = false;
+        }
+
+        vl(ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10));
+        vl(ImGui::SliderFloat("Refractive Index", &(state.rc.refractiveIndex), 0.f, 2.f));
+        enable();
+        IMGUIEND();
+    }
+    if (IMGUIBEGIN("camera controls")) {
         disable();
         ImGui::Text("Camera Angle");
         ImGui::SliderFloat("phi (left/right) (radians)", &(state.mouse.phi), -M_PI, M_PI);
@@ -592,14 +610,18 @@ void GLWindow::addUI() {
             std::string camString = encodeCamPreset(&p);
             glfwSetClipboardString(window, camString.c_str());
         }
+        IMGUIEND();
     }
+    showShapeEditor();
+    ENDTAB();
+    #ifdef TAB
     ImGui::End();
+    #endif
     ImGui::Begin("keyboard controls");
     {
         showKeyboardHelp();
     }
     ImGui::End();
-    showShapeEditor();
 }
 
 
@@ -860,8 +882,7 @@ Shape *GLWindow::getShapePointer() {
 
 void GLWindow::showShapeEditor() {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
-    ImGui::Begin("edit");
-    {
+    if (IMGUIBEGIN("edit")) {
         ImGui::Text("note: changes made when using an acceleration structure are not reflected in the unoptimized version.");
         ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
         Shape *sh = getShapePointer();
@@ -904,6 +925,6 @@ void GLWindow::showShapeEditor() {
                 vl(ImGui::Checkbox("Disable Lighting", &(sh->noLighting)));
             }
         }
+        IMGUIEND();
     }
-    ImGui::End();
 }
