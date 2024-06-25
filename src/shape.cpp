@@ -9,6 +9,7 @@ namespace {
     const char* w_center = "center";
     const char* w_radius = "radius";
     const char* w_thickness = "thickness";
+    const char* w_material = "material";
     const char* w_color = "color";
     const char* w_tex = "tex";
     const char* w_norm = "norm";
@@ -80,16 +81,23 @@ CamPreset decodeCamPreset(std::string in) {
     return p;
 }
 
-Shape *emptyShape() {
+Material *emptyMaterial() {
+    Material *m = (Material*)alloc(sizeof(Material));
+    std::memset(m, 0, sizeof(Material));
+    m->shininess = -1.f; // -1 Indicates global shininess param takes precedence
+    m->opacity = 1.f;
+    m->texId = -1; // No texture
+    m->normId = -1; // No normalmap
+    m->refId = -1; // No reflectance map
+    m->name = NULL;
+    m->next = NULL; // Nothing after it
+    return m;
+}
+
+Shape *emptyShape(bool noMaterial) {
     Shape *sh = (Shape*)alloc(sizeof(Shape));
     std::memset(sh, 0, sizeof(Shape));
-    sh->m = (Material*)alloc(sizeof(Material));
-    std::memset(sh->m, 0, sizeof(Material));
-    sh->m->shininess = -1.f; // -1 Indicates global shininess param takes precedence
-    sh->m->opacity = 1.f;
-    sh->m->texId = -1; // No texture
-    sh->m->normId = -1; // No normalmap
-    sh->m->refId = -1; // No reflectance map
+    if (!noMaterial) sh->m = emptyMaterial();
     return sh;
 }
 
@@ -109,58 +117,93 @@ std::string encodeShape(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeShape(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
+Shape *Decoder::decodeShape(std::string in) {
+    Shape *sh = emptyShape(true);
+    sh->m = decodeMaterial(in);
+    return sh;
+}
+
+#define NONULLMTL() if (m == NULL) { m = emptyMaterial(); newMaterial = true; }
+
+Material *Decoder::decodeMaterial(std::string in, bool definition) {
     if (tex != NULL) tex->lastLoadFail = false;
     if (norm != NULL) norm->lastLoadFail = false;
     if (ref != NULL) ref->lastLoadFail = false;
     std::stringstream stream(in);
-    Shape *sh = emptyShape();
+    Material *m = NULL;
+    bool newMaterial = false;
     do {
         std::string w;
         stream >> w;
-        if (w == w_color) {
-            sh->m->color = decodeColour(&stream);
+        if (w == w_material) {
+            stream >> w;
+            if (definition) {
+                NONULLMTL();
+                if (m->name != NULL) free(m->name);
+                m->name = (char*)alloc(sizeof(char)*(w.size()+1));
+                strncpy(m->name, w.c_str(), w.size()+1);
+            } else {
+                m = mat->byName(w);
+                if (m == NULL) {
+                    std::printf("WARNING: Couldn't resolve material \"%s\"\n", w.c_str());
+                }
+            }
+        } else if (w == w_color) {
+            NONULLMTL();
+            m->color = decodeColour(&stream);
         } else if (w == w_opacity) {
+            NONULLMTL();
             stream >> w;
-            sh->m->opacity = std::stof(w);
+            m->opacity = std::stof(w);
         } else if (w == w_reflectiveness) {
+            NONULLMTL();
             stream >> w;
-            sh->m->reflectiveness = std::stof(w);
+            m->reflectiveness = std::stof(w);
         } else if (w == w_specular) {
+            NONULLMTL();
             stream >> w;
-            sh->m->specular = std::stof(w);
+            m->specular = std::stof(w);
         } else if (w == w_shininess) {
+            NONULLMTL();
             stream >> w;
-            sh->m->shininess = std::stof(w);
+            m->shininess = std::stof(w);
         } else if (w == w_nolighting) {
-            sh->m->noLighting = true;
+            NONULLMTL();
+            m->noLighting = true;
         } else if (w == w_tex) {
+            NONULLMTL();
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
             stream >> w;
             if (tex != NULL) {
-                sh->m->texId = tex->load(w);
+                m->texId = tex->load(w);
             }
         } else if (w == w_norm) {
+            NONULLMTL();
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
             stream >> w;
             if (norm != NULL) {
-                sh->m->normId = norm->load(w);
+                m->normId = norm->load(w);
             }
         } else if (w == w_refmap) {
+            NONULLMTL();
             // FIXME: Cope with spaces in filenames
             // FIXME: "Eval" pathnames so they match, even if written differently
             stream >> w;
             if (ref != NULL) {
-                sh->m->refId = ref->load(w);
+                m->refId = ref->load(w);
             }
         }
     } while (stream);
-    return sh;
+    NONULLMTL();
+    if (newMaterial) {
+        mat->append(m);
+    }
+    return m;
 }
 
-std::string encodeSphere(Shape *sh) {
+std::string Decoder::encodeSphere(Shape *sh) {
     std::ostringstream fmt;
     fmt << "sphere ";
     fmt << w_center << " ";
@@ -174,9 +217,9 @@ std::string encodeSphere(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
+Shape *Decoder::decodeSphere(std::string in) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in, tex, norm, ref);
+    Shape *sh = decodeShape(in);
     sh->s = (Sphere*)alloc(sizeof(Sphere));
     sh->s->thickness = 1.f;
     do {
@@ -200,7 +243,7 @@ Shape *decodeSphere(std::string in, TexStore *tex, TexStore *norm, TexStore *ref
     return sh;
 }
 
-std::string encodePointLight(PointLight *p) {
+std::string Decoder::encodePointLight(PointLight *p) {
     std::ostringstream fmt;
     fmt << "plight ";
     fmt << w_center << " ";
@@ -215,7 +258,7 @@ std::string encodePointLight(PointLight *p) {
     return fmt.str();
 }
 
-PointLight decodePointLight(std::string in) {
+PointLight Decoder::decodePointLight(std::string in) {
     std::stringstream stream(in);
     PointLight p;
     p.specular = -1.f;
@@ -250,7 +293,7 @@ PointLight decodePointLight(std::string in) {
     return p;
 }
 
-std::string encodeTriangle(Shape *sh) {
+std::string Decoder::encodeTriangle(Shape *sh) {
     std::ostringstream fmt;
     fmt << "triangle ";
     fmt << w_a << " ";
@@ -264,9 +307,9 @@ std::string encodeTriangle(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
+Shape *Decoder::decodeTriangle(std::string in) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in, tex, norm, ref);
+    Shape *sh = decodeShape(in);
     sh->t = (Triangle*)alloc(sizeof(Triangle));
     sh->t->plane = false;
 
@@ -300,13 +343,13 @@ Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm, TexStore *r
     } while (stream);
 
     if (sh->m->texId != -1 || sh->m->normId != -1 || sh->m->refId != -1) {
-        recalculateTriUVs(sh, tex, norm, ref);
+        recalculateTriUVs(sh);
     }
 
     return sh;
 }
 
-void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm, TexStore *ref) {
+void Decoder::recalculateTriUVs(Shape *sh) {
     // Project onto 2D plane, any'll do for now
     float proj[3][2] = {
         {sh->t->a.x, sh->t->a.y},
@@ -351,7 +394,7 @@ void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm, TexStore *ref) 
     }
 }
 
-std::string encodeAAB(Shape *sh) {
+std::string Decoder::encodeAAB(Shape *sh) {
     std::ostringstream fmt;
     fmt << "box ";
     fmt << w_a << " ";
@@ -363,9 +406,9 @@ std::string encodeAAB(Shape *sh) {
     return fmt.str();
 }
 
-Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm, TexStore *ref) {
+Shape *Decoder::decodeAAB(std::string in) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in, tex, norm, ref);
+    Shape *sh = decodeShape(in);
     sh->b = (AAB*)alloc(sizeof(AAB));
 
     do {
@@ -564,7 +607,6 @@ int clearContainer(Container *c, bool clearChildShapes) {
             }
         }
         if (isContainer || clearChildShapes || current->debug) {
-            if (current->m != NULL) free(current->m);
             free(current);
             freeCounter++;
         }
@@ -586,4 +628,73 @@ int clearContainer(Container *c, bool clearChildShapes) {
     c->start = NULL;
     c->end = NULL;
     return freeCounter;
+}
+
+void MaterialStore::append(Material *m) {
+    if (start == NULL) start = m;
+    if (end != NULL) end->next = m;
+    end = m;
+    count++;
+}
+
+void MaterialStore::clear() {
+    if (start == NULL) return;
+    Material *m = start;
+    Material *e = NULL;
+    if (end != NULL) e = end->next;
+    while (m != e) {
+        Material *n = m->next;
+        free(m);
+        m = n;
+    }
+    clearLists();
+    count = 0;
+    start = NULL;
+    end = NULL;
+}
+
+void MaterialStore::clearLists() {
+    if (names != NULL) {
+        for (int i = 0; i < count; i++) {
+            free(names[i]);
+        }
+        free(names);
+        names = NULL;
+    }
+    if (ptrs != NULL) free(ptrs);
+    ptrs = NULL;
+}
+
+void MaterialStore::genLists() {
+    clearLists();
+    names = (char**)alloc(count * sizeof(char*));
+    ptrs = (Material**)alloc(count * sizeof(Material*));
+
+    int i = 0;
+    Material *m = start;
+    Material *e = NULL;
+    if (end != NULL) e = end->next;
+    while (m != e) {
+        std::string name;
+        if (m->name != NULL) name = std::string(m->name);
+        if (name.empty()) {
+            name = "Material #" + std::to_string(i);
+        }
+        names[i] = (char*)alloc(sizeof(char)*(name.size()+1));
+        strncpy(names[i], name.c_str(), name.size()+1);
+        ptrs[i] = m;
+        m = m->next;
+        i++;
+    }
+}
+
+Material *MaterialStore::byName(std::string name) {
+    Material *m = start;
+    Material *e = NULL;
+    if (end != NULL) e = end->next;
+    while (m != e) {
+        if (m->name != NULL && name == std::string(m->name)) return m;
+        m = m->next;
+    }
+    return NULL;
 }

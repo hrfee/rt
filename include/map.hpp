@@ -121,9 +121,14 @@ class WorldMap {
         char **objectNames;
         int objectCount;
         Shape **objectPtrs;
+        
         TexStore tex;
         TexStore norms;
         TexStore refs;
+        MaterialStore materials;
+       
+        Decoder dec;
+
         Image *aaOffsetImage;
         bool aaOffsetImageDirty;
         MapStats mapStats;

@@ -76,6 +76,8 @@ struct GLWindowState {
     int plCount;
     Shape **objectPtrs;
     int objectIndex;
+    MaterialStore *materials;
+    int materialIndex;
     bool recalcUVs;
 };
 
@@ -125,6 +127,7 @@ class GLWindow {
         std::vector<SubImage*> images;
         bool shouldntBeDoingAnything();
         Shape *getShapePointer();
+        Material *getMaterialPointer();
     private:
         const char *title;
         std::string vertString, fragString;

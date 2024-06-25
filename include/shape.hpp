@@ -25,6 +25,7 @@ struct Shape {
 };
 
 struct Material {
+    char *name;
     Vec3 color;
     int texId, normId, refId;
     bool noLighting;
@@ -32,6 +33,22 @@ struct Material {
     float reflectiveness; // 0-1
     float specular; // 0-1
     float shininess;
+    Material *next;
+};
+
+class MaterialStore {
+    public:
+        MaterialStore(): start(NULL), end(NULL), ptrs(NULL), names(NULL), count(0) {};
+        Material *start, *end;
+        void append(Material *m);
+        void clear();
+        void genLists();
+        Material *byName(std::string name);
+        Material **ptrs;
+        char **names;
+        int count;
+    private:
+        void clearLists();
 };
 
 struct Bound {
@@ -99,27 +116,43 @@ struct CamPreset {
     };
 };
 
-std::string encodePointLight(PointLight *p);
+struct Decoder {
+    TexStore *tex, *norm, *ref;
+    MaterialStore *mat;
+    void setStores(TexStore *t = NULL, TexStore *n = NULL, TexStore *r = NULL, MaterialStore *m  = NULL) {
+        tex = t;
+        norm = n;
+        ref = r;
+        mat = m;
+    }
+    Shape *decodeShape(std::string in);
 
-PointLight decodePointLight(std::string in);
+    Material *decodeMaterial(std::string in, bool definition = false);
 
-std::string encodeSphere(Shape *sh);
+    std::string encodePointLight(PointLight *p);
 
-Shape *decodeSphere(std::string in, TexStore *tex = NULL, TexStore *norm = NULL, TexStore *ref = NULL);
+    PointLight decodePointLight(std::string in);
 
-std::string encodeTriangle(Shape *sh);
+    std::string encodeSphere(Shape *sh);
 
-Shape *decodeTriangle(std::string in, TexStore *tex, TexStore *norm, TexStore *ref);
+    Shape *decodeSphere(std::string in);
 
-std::string encodeAAB(Shape *sh);
+    std::string encodeTriangle(Shape *sh);
 
-Shape *decodeAAB(std::string in, TexStore *tex, TexStore *norm, TexStore *ref);
+    Shape *decodeTriangle(std::string in);
+
+    std::string encodeAAB(Shape *sh);
+
+    Shape *decodeAAB(std::string in);
+    void recalculateTriUVs(Shape *sh);
+};
 
 std::string encodeColour(Vec3 c);
 
 Vec3 decodeColour(std::stringstream *in);
 
-Shape *emptyShape();
+Shape *emptyShape(bool noMaterial = false);
+Material *emptyMaterial();
 
 Bound *emptyBound();
 
@@ -137,6 +170,5 @@ int clearContainer(Container *c, bool clearChildShapes = true);
 CamPreset decodeCamPreset(std::string in);
 std::string encodeCamPreset(CamPreset *p);
 
-void recalculateTriUVs(Shape *sh, TexStore *tex, TexStore *norm, TexStore *ref);
 
 #endif

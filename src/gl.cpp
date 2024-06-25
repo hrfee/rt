@@ -110,6 +110,7 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
     state.objectCount = 0;
     state.plCount = 0;
     state.objectIndex = -1;
+    state.materialIndex = -1;
     title = windowTitle;
     ui.hide = false;
     int success = glfwInit();
@@ -905,6 +906,11 @@ Shape *GLWindow::getShapePointer() {
     return state.objectPtrs[state.objectIndex];
 }
 
+Material *GLWindow::getMaterialPointer() {
+    if (state.materialIndex < 0 || state.materialIndex >= state.materials->count) return NULL;
+    return state.materials->ptrs[state.materialIndex];
+}
+
 void GLWindow::showMaterialEditor(Material *m) {
     vl(ImGui::ColorEdit3("Color", (float*)&(m->color)));
     vl(ImGui::SliderFloat("Opacity", &(m->opacity), 0, 1.f));
@@ -916,7 +922,7 @@ void GLWindow::showMaterialEditor(Material *m) {
 
 void GLWindow::showShapeEditor() {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
-    if (IMGUIBEGIN("edit")) {
+    if (IMGUIBEGIN("edit object")) {
         ImGui::Text("note: changes made when using an acceleration structure are not reflected in the unoptimized version.");
         ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
         Shape *sh = getShapePointer();
@@ -953,6 +959,17 @@ void GLWindow::showShapeEditor() {
                 // material params
                 showMaterialEditor(sh->m);
             }
+        }
+        IMGUIEND();
+    }
+    if (IMGUIBEGIN("edit material")) {
+        ImGui::Text("\"Materials\" are created for all objects with unique material properties.");
+        ImGui::Text("Shared materials can be defined with \"material <name> <properties>\",");
+        ImGui::Text("and applied to objects by adding \"material <name>\" (+ remove other material properties).");
+        ImGui::Combo("Material", &(state.materialIndex), state.materials->names, state.materials->count);
+        Material *m = getMaterialPointer();
+        if (m != NULL) {
+            showMaterialEditor(m);
         }
         IMGUIEND();
     }

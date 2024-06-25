@@ -613,6 +613,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         res->lightColor = {1.f, 1.f, 1.f};
     }
 
+    // FIXME: AAB opacity and refraction!
     if (res->obj->m->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
         if (res->collisions >= 1 && res->potentialCollisions > 1) {
@@ -697,6 +698,7 @@ namespace {
     const char* w_scale = "scale";
     const char* w_comment = "//";
     const char* w_container = "container";
+    const char* w_material = "material";
     const char* w_campreset = "campreset";
     const char* w_a = "a";
     const char* w_b = "b";
@@ -727,8 +729,8 @@ void WorldMap::encode(char const* path) {
     Bound *bo = unoptimizedObj.start;
     while (bo != unoptimizedObj.end) {
         Shape *current = bo->s;
-        if (current->s != NULL) out << encodeSphere(current);
-        else if (current->t != NULL) out << encodeTriangle(current);
+        if (current->s != NULL) out << dec.encodeSphere(current);
+        else if (current->t != NULL) out << dec.encodeTriangle(current);
         bo = bo->next;
     }
 
@@ -764,6 +766,7 @@ WorldMap::WorldMap(char const* path) {
     objectNames = NULL;
     objectPtrs = NULL;
     objectCount = 0;
+    dec.setStores(&tex, &norms, &refs, &materials);
     loadFile(path, NULL);
 }
 
@@ -801,6 +804,7 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     pointLights.clear();
     camPresets.clear();
     mapStats.clear();
+    materials.clear();
     mapStats.name = std::string(path);
 
     free(camPresetNames);
@@ -825,6 +829,7 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     if (getTime != NULL) lastLoadTime = getTime() - lastLoadTime;
 
     genObjectList(obj);
+    materials.genLists();
     
     currentlyLoading = false;
 }
@@ -936,6 +941,12 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 globalShininess = 1.f;
                 lstream << " " << token;
             }
+        } else if (token == w_material) {
+            dec.decodeMaterial(line, true);
+            if (tex.lastLoadFail) mapStats.missingTex += 1;
+            if (norms.lastLoadFail) mapStats.missingNorm += 1;
+            if (refs.lastLoadFail) mapStats.missingRef += 1;
+            // mapStats.materials++;
         } else if (token == w_container) {
             c = emptyContainer(true);
             mapStats.allocs++;
@@ -985,7 +996,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             c = NULL;
         } else if (token == w_sphere || token == w_triangle || token == w_aab) {
             if (token == w_sphere) {
-                Shape *sphere = decodeSphere(line, &tex, &norms, &refs);
+                Shape *sphere = dec.decodeSphere(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
@@ -998,7 +1009,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 }
                 mapStats.spheres++;
             } else if (token == w_triangle) {
-                Shape *triangle = decodeTriangle(line, &tex, &norms, &refs);
+                Shape *triangle = dec.decodeTriangle(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
@@ -1018,7 +1029,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                     mapStats.tris++;
                 }
             } else if (token == w_aab) {
-                Shape *aab = decodeAAB(line, &tex, &norms, &refs);
+                Shape *aab = dec.decodeAAB(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
@@ -1033,7 +1044,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.aabs++;
             }
         } else if (token == w_pointLight) {
-            PointLight pl = decodePointLight(line);
+            PointLight pl = dec.decodePointLight(line);
             pl.center = pl.center * transform;
             pointLights.emplace_back(pl);
             mapStats.lights++;

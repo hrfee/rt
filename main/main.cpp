@@ -133,7 +133,7 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.recalcUVs) {
         Shape *sh = window->getShapePointer();
         if (sh != NULL) {
-            recalculateTriUVs(sh, &(map->tex), &(map->norms), &(map->refs));
+            map->dec.recalculateTriUVs(sh);
         }
         window->state.recalcUVs = false;
     }
@@ -267,6 +267,7 @@ int main(int argc, char **argv) {
     window->state.objectCount = map->objectCount;
     window->state.plCount = map->mapStats.lights;
     window->state.objectNames = map->objectNames;
+    window->state.materials = &(map->materials);
 
     // map->o = splitKD(&(map->o), 10);
 
