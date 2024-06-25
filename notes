@@ -1,3 +1,3 @@
-Planes,
 Convex Hulls,
-AABB objects
+The concept of models (integrating with materials feature)
+Ability to "possess" objects to move them

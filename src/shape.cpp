@@ -58,7 +58,7 @@ CamPreset decodeCamPreset(std::string in) {
         std::string w;
         stream >> w;
         if (w == w_campreset) {
-            stream >> w;
+            w = collectWordOrString(stream);
             p.name = w;
         } else if (w == w_pos) {
             stream >> w;
@@ -140,7 +140,7 @@ Material *Decoder::decodeMaterial(std::string in, bool definition) {
         std::string w;
         stream >> w;
         if (w == w_material) {
-            stream >> w;
+            w = collectWordOrString(stream);
             if (definition) {
                 NONULLMTL();
                 if (m->name != NULL) free(m->name);
@@ -176,25 +176,19 @@ Material *Decoder::decodeMaterial(std::string in, bool definition) {
             m->noLighting = true;
         } else if (w == w_tex) {
             NONULLMTL();
-            // FIXME: Cope with spaces in filenames
-            // FIXME: "Eval" pathnames so they match, even if written differently
-            stream >> w;
+            w = collectWordOrString(stream);
             if (tex != NULL) {
                 m->texId = tex->load(w);
             }
         } else if (w == w_norm) {
             NONULLMTL();
-            // FIXME: Cope with spaces in filenames
-            // FIXME: "Eval" pathnames so they match, even if written differently
-            stream >> w;
+            w = collectWordOrString(stream);
             if (norm != NULL) {
                 m->normId = norm->load(w);
             }
         } else if (w == w_refmap) {
             NONULLMTL();
-            // FIXME: Cope with spaces in filenames
-            // FIXME: "Eval" pathnames so they match, even if written differently
-            stream >> w;
+            w = collectWordOrString(stream);
             if (ref != NULL) {
                 m->refId = ref->load(w);
             }

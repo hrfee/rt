@@ -2,9 +2,9 @@ map dimensions 50 50 50 brightness 0.3 shininess 5
 
 
 
-material shinybox color #0fa0ff reflectiveness 0 specular 1 tex assets/metal/base.tga norm assets/metal/normal.tga refmap assets/metal/metal.tga
+material "Shiny Box" color #0fa0ff reflectiveness 0 specular 1 tex assets/metal/base.tga norm assets/metal/normal.tga refmap assets/metal/metal.tga
 
-using shinybox {
+using "Shiny Box" {
     box a 1 1 0 b 2 2.5 1
     box a 0 0 0 b 1 1 1
 }
@@ -24,3 +24,5 @@ material hippo color #0fa0ff reflectiveness 0 specular 1 tex assets/metal/base.t
 // using hippo {
 //     include hippo.obj translate 4 -0.3 0 rotate 0 -1.385398 0 scale 0.05
 // }
+
+campreset "from above" pos -1.30972 2.71734 4.93045 phi 1.07254 theta -0.312023 fov 60

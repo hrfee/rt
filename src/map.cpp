@@ -952,7 +952,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             if (refs.lastLoadFail) mapStats.missingRef += 1;
             // mapStats.materials++;
         } else if (token == w_usingMaterial) {
-            lstream >> token;
+            token = collectWordOrString(lstream);
             dec.usingMaterial(token);
             lstream >> token;
             if (token == w_open) {

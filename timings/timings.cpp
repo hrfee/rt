@@ -1,12 +1,22 @@
 #include "test.hpp"
 #include "shape.hpp"
+#include "util.hpp"
 #include <getopt.h>
 #include <cstdio>
 #include <cfloat>
+#include <sstream>
 
 #define REPEAT 1000
 
 int main(int argc, char **argv) {
+    /*std::string words[]  { "justhis please", "\"just this\" please", "not this, \"this please\"", "nothis,\"this please\"", "assets/metal/metal.tga\n" };
+    for (auto word: words) {
+        std::stringstream w(word);
+        std::string out = collectWordOrString(w);
+        std::printf("got \"%s\" from \"%s\"\n", out.c_str(), w.str().c_str());
+    }
+    return 0;*/
+
     int n = 1000;
     int flag;
     while ((flag = getopt(argc, argv, "n:")) != -1) {
