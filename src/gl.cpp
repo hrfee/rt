@@ -213,6 +213,22 @@ void GLWindow::loadUI() {
     ui.ctx = ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.Fonts->AddFontFromFileTTF("third_party/fonts/static/HankenGrotesk-SemiBold.ttf", 18.f);
+    // io.Fonts->AddFontFromFileTTF("third_party/fonts/HankenGrotesk-VariableFont_wght.ttf", 18.f);
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding = 10.f;
+    style.FrameRounding = 2.0f;
+    // style.GrabRounding = 10.0f;
+    // style.PopupRounding = 10.0f;
+    // style.ScrollbarRounding = 10.0f;
+    // style.TabRounding = 5.0f;
+    // style.ChildRounding = 10.0f;
+
+    style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
+    style.FramePadding = ImVec2(6.f, 4.5f);
+
 
     state.rc.threadStates = NULL;
     state.rc.renderOnChange = false;
@@ -306,15 +322,18 @@ void GLWindow::draw(Image *img) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-std::string GLWindow::threadInfo() {
+void GLWindow::threadInfo() {
     std::ostringstream out;
-    if (state.rc.threadStates == NULL) return out.str();
+    if (state.rc.threadStates == NULL) return;
     int done = 0;
     for (int i = 0; i < state.rc.nthreads; i++) {
         if (state.rc.threadStates[i] == 0) done++;
     }
     out << done << "/" << state.rc.nthreads << " threads complete.";
-    return out.str();
+
+    ImGui::ProgressBar(float(done)/float(state.rc.nthreads), ImVec2(0.f, 0.f), out.str().c_str());
+    // ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+    // ImGui::Text(out.str().c_str());
 }
 
 std::string GLWindow::frameInfo() {
@@ -402,7 +421,7 @@ void GLWindow::enable() {
 }
 
 bool GLWindow::vl(bool t) {
-    state.rc.renderNow = t ? true : state.rc.renderNow;
+    state.rc.change = t ? true : state.rc.change;
     return t;
 }
 
@@ -430,24 +449,10 @@ void GLWindow::addUI() {
                 ImGui::Text("--movement enabled - press <M> or <ESC> to escape--");
             }
             showKeyboardHelp();
-            ImGui::Text(std::to_string(state.mouse.speedMultiplier).c_str());
+            // ImGui::Text(std::to_string(state.mouse.speedMultiplier).c_str());
         }
         ImGui::End();
         return;
-    }
-    if (state.csvStats.tellp() != 0) {
-        ImGui::Begin("csv stats");
-        {
-            ImGui::Text(state.csvStats.str().c_str());
-            if (ImGui::Button("Copy to clipboard")) {
-                glfwSetClipboardString(window, state.csvStats.str().c_str());
-                std::printf("copied %s\n", state.csvStats.str().c_str());
-            }
-            if (ImGui::Button("Clear")) {
-                state.csvStats.str("");
-            }
-        }
-        ImGui::End();
     }
     #ifdef TAB
     ImGui::Begin("controls");
@@ -477,27 +482,27 @@ void GLWindow::addUI() {
         ImGui::Text("Effective resolution: %dx%d", state.rDim.w, state.rDim.h);
         ImGui::Columns(2, "AA");
         ImGui::SetColumnWidth(0, 500.f);
-        ImGui::SliderInt("Samples^2 per px", &(state.rc.samplesPerPx), 1, 16);
-        ImGui::Combo("AA Sampling mode", &(state.rc.sampleMode), samplingModes, IM_ARRAYSIZE(samplingModes));
+        vl(ImGui::SliderInt("Samples^2 per px", &(state.rc.samplesPerPx), 1, 16));
+        vl(ImGui::Combo("AA Sampling mode", &(state.rc.sampleMode), samplingModes, IM_ARRAYSIZE(samplingModes)));
         if (!state.rc.renderOnChange) state.rc.renderNow = ImGui::Button(
                 (state.useOptimizedMap && state.staleAccelConfig) ? "Optimize" : "Render",
                 ImVec2(120, 40)
         );
         ImGui::NextColumn();
-        ImGui::Text("AA Offset map:");
+        ImGui::Text("Sample Grid");
         images.at(0)->show();
         ImGui::Columns();
         enable();
-        if (state.currentlyRendering && ImGui::Button("Cancel", ImVec2(120, 40))) {
-            for (int i = 0; i < state.rc.nthreads; i++) {
-                state.rc.threadStates[i] = -1;
+        if (state.currentlyRendering) {
+            if (ImGui::Button("Cancel", ImVec2(120, 40))) {
+                for (int i = 0; i < state.rc.nthreads; i++) {
+                    state.rc.threadStates[i] = -1;
+                }
             }
+            threadInfo();
         }
         if (state.lastRenderTime != 0.f) {
             ImGui::Text(frameInfo().c_str());
-        }
-        if (state.currentlyRendering) {
-            ImGui::Text(threadInfo().c_str());
         }
        
         ImGui::Checkbox("Dump future render stats to CSV buffer", &(state.dumpToCsv));
@@ -613,6 +618,19 @@ void GLWindow::addUI() {
         IMGUIEND();
     }
     showShapeEditor();
+    if (state.csvStats.tellp() != 0) {
+        if (IMGUIBEGIN("csv stats")) {
+            ImGui::Text(state.csvStats.str().c_str());
+            if (ImGui::Button("Copy to clipboard")) {
+                glfwSetClipboardString(window, state.csvStats.str().c_str());
+                std::printf("copied %s\n", state.csvStats.str().c_str());
+            }
+            if (ImGui::Button("Clear")) {
+                state.csvStats.str("");
+            }
+            IMGUIEND();
+        }
+    }
     ENDTAB();
     #ifdef TAB
     ImGui::End();
@@ -634,6 +652,7 @@ void GLWindow::mainLoop(Image* (*func)(RenderConfig *c)) {
         ImGui::NewFrame();
 
         state.rc.renderNow = false;
+        state.rc.change = false;
         ui.saveToTGA = false;
         
         addUI();

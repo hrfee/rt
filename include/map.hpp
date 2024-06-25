@@ -16,6 +16,7 @@ struct RenderConfig {
     int nthreads;
     bool renderOnChange;
     bool renderNow;
+    bool change;
     bool collisionsOnly;
     bool lighting;
     bool reflections;

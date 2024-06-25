@@ -59,7 +59,7 @@ std::string csvStats(GLWindow *window, WorldMap *map, bool header = false) {
 
 
 Image *mainLoop(RenderConfig *rc) {
-    bool change = rc->renderNow;
+    bool change = (rc->renderOnChange && rc->change) || rc->renderNow;
     if (window->state.reloadMap && !map->currentlyLoading) {
         if (!window->state.currentlyLoading) {
             window->state.currentlyLoading = true;
