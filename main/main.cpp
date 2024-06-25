@@ -268,6 +268,9 @@ int main(int argc, char **argv) {
     window->state.plCount = map->mapStats.lights;
     window->state.objectNames = map->objectNames;
     window->state.materials = &(map->materials);
+    window->state.tex = &(map->tex);
+    window->state.norms = &(map->norms);
+    window->state.refs = &(map->refs);
 
     // map->o = splitKD(&(map->o), 10);
 

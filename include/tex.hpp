@@ -15,16 +15,22 @@ struct Texture {
     ~Texture() { delete img; };
 };
 
-struct TexStore {
-    std::vector<std::string> fnames;
-    std::vector<Texture*> texes;
-    Texture* at(int id);
-    Texture* from(std::string fname);
-    int id(std::string fname);
-    int load(std::string fname);
-    void clear();
-    // Stinky way to return load success/failure
-    bool lastLoadFail;
+class TexStore {
+    public:
+        TexStore(): lastLoadFail(false), names(NULL) {};
+        std::vector<std::string> fnames;
+        std::vector<Texture*> texes;
+        Texture* at(int id);
+        Texture* from(std::string fname);
+        int id(std::string fname);
+        int load(std::string fname);
+        void clear();
+        // Stinky way to return load success/failure
+        bool lastLoadFail;
+        
+        Texture** ptrs() { return texes.data(); };
+        void genList();
+        char **names;
 };
 
 #endif

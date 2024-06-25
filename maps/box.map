@@ -19,3 +19,8 @@ plight center 2 2 2 color #ffffff brightness 2 specular 0.5 color #f0f0ff
 
 // "nolighting" tag so its entirely lit
 sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga nolighting
+
+material hippo color #0fa0ff reflectiveness 0 specular 1 tex assets/metal/base.tga norm assets/metal/normal.tga refmap assets/metal/metal.tga
+// using hippo {
+//     include hippo.obj translate 4 -0.3 0 rotate 0 -1.385398 0 scale 0.05
+// }

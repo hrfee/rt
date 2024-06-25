@@ -918,6 +918,24 @@ void GLWindow::showMaterialEditor(Material *m) {
     vl(ImGui::SliderFloat("Specular Component", &(m->specular), 0, 1.f));
     vl(ImGui::SliderFloat("Shininess (n)", &(m->shininess), 0, 100.f));
     vl(ImGui::Checkbox("Disable Lighting", &(m->noLighting)));
+
+    if (vl(ImGui::Button("X##1"))) {
+        m->texId = -1;
+    }
+    ImGui::SameLine();
+    vl(ImGui::Combo("Texture", &(m->texId), state.tex->names, state.tex->texes.size()));
+    
+    if (vl(ImGui::Button("X##2"))) {
+        m->normId = -1;
+    }
+    ImGui::SameLine();
+    vl(ImGui::Combo("Normal Map", &(m->normId), state.norms->names, state.norms->texes.size()));
+    
+    if (vl(ImGui::Button("X##3"))) {
+        m->refId = -1;
+    }
+    ImGui::SameLine();
+    vl(ImGui::Combo("Reflection Map", &(m->refId), state.refs->names, state.refs->texes.size()));
 }
 
 void GLWindow::showShapeEditor() {

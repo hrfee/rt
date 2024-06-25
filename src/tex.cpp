@@ -74,6 +74,19 @@ void TexStore::clear() {
     }
     texes.clear();
     fnames.clear();
+    if (names != NULL) free(names);
+    names = NULL;
+}
+
+void TexStore::genList() {
+    if (names != NULL) free(names);
+    names = (char**)malloc(sizeof(char*)*texes.size());
+    int i = 0;
+    for (std::string n: fnames) {
+        names[i] = (char*)malloc(sizeof(char)*(n.size()+1));
+        strncpy(names[i], n.c_str(), n.size()+1);
+        i++;
+    }
 }
 
 std::string texScaleFromFname(std::string in,  float *x, float *y) {

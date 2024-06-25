@@ -77,6 +77,7 @@ struct GLWindowState {
     Shape **objectPtrs;
     int objectIndex;
     MaterialStore *materials;
+    TexStore *tex, *norms, *refs;
     int materialIndex;
     bool recalcUVs;
 };

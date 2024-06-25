@@ -831,6 +831,9 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
 
     genObjectList(obj);
     materials.genLists();
+    tex.genList();
+    norms.genList();
+    refs.genList();
     
     currentlyLoading = false;
 }
