@@ -10,7 +10,7 @@ add_library(shape STATIC shape.cpp ${HEADER_LIST})
 set_target_properties(shape PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(shape PUBLIC ../include)
 target_link_libraries(shape PUBLIC vec tex)
-target_link_libraries(shape PRIVATE util)
+target_link_libraries(shape PRIVATE util ray)
 
 add_library(vec STATIC ${HEADER_LIST})
 set_target_properties(vec PROPERTIES LINKER_LANGUAGE CXX)

@@ -55,9 +55,10 @@ class Shape {
         virtual Transform& trans() { return transform; };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
-        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual Shape applyTransform();
         virtual void bakeTransform();
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
         virtual int clear(bool deleteShapes = true) { return 0; };
         virtual ~Shape();
     // Note no destructor for the dynamically allocated "material",
@@ -152,9 +153,10 @@ class AAB: public Shape {
         };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
-        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual Shape applyTransform();
         virtual void bakeTransform();
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
 
 class Container: public AAB {
@@ -214,9 +216,12 @@ class Sphere: public Shape {
         };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
-        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual Shape applyTransform();
         virtual void bakeTransform();
+
+        void refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
 
 /* struct Sphere {
@@ -256,9 +261,10 @@ class Triangle: public Shape {
         
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
-        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual Shape applyTransform();
         virtual void bakeTransform();
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
 
 struct PointLight {

@@ -160,45 +160,18 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         // k_s = res->specular,
         // O_{s\varlambda} (Specular Colour) = light.specular * light.specularColor,
         // n (shininess):
-        float n = (res->obj->m->shininess == -1.f) ? globalShininess : res->obj->m->shininess;
+        float n = (res->obj.mat()->shininess == -1.f) ? globalShininess : res->obj.mat()->shininess;
         float rDotV = std::fmax(std::pow(dot(rNorm, norm(viewDelta)), n), 0);
         // std::printf("got rDotV %f\n", rDotV);
         // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
-        specularColor = specularColor + (res->obj->m->specular * (light.specular * light.specularColor) * rDotV);
+        specularColor = specularColor + (res->obj.mat()->specular * (light.specular * light.specularColor) * rDotV);
     }
     res->specularColor = specularColor;
     // std::printf("%f,%f,%f * %f,%f,%f\n", res->color.x, res->color.y, res->color.z, lightColor.x, lightColor.y, lightColor.z);
     res->lightColor = lightColor;
 }
 
-void castThroughSolidSphere(float r0, float r1, Vec3 pb, Vec3 delta, Sphere *s, Vec3 *pOut, Vec3 *deltaOut) {
-    Vec3 normal = pb - s->center;
-    bool tir = true;
-    Vec3 r = Refract(r0, r1, delta, normal, &tir);
-    if (tir) {
-        r = delta - 2.f*dot(delta, normal) * normal;
-        *deltaOut = r;
-        *pOut = pb + (EPSILON * r);
-        return;
-    }
-    tir = true;
-    while (tir) {
-        pb = pb + (EPSILON * r);
-        float t = meetsSphere(pb, r, s, NULL);
-        pb = pb + (t * r);
-        Vec3 n = -1.f*(pb - s->center);
-        Vec3 r2 = Refract(r1, r0, r, n, &tir);
-        if (tir) {
-            r = r - 2.f*dot(r, n) * n;
-        } else {
-            r = r2;
-        }
-    }
-    *pOut = pb;
-    *deltaOut = r;
-}
-
-void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
+/* void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
     float ri = rc->refractiveIndex;
     float thickness = res->sphere.thickness;
     Vec3 center = res->sphere.center;;
@@ -255,14 +228,14 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
                 }
             }
         }
-    }
+    } 
    
     // Finally, cast a ray out from the sphere.
     pb = pb + (EPSILON * refract);
     RayResult r = RayResult();
     castRay(&r, obj, pb, refract, rc, callCount+1);
     res->refractColor = r.color;
-}
+} */
 
 // FIXME?:
 // An object can span multiple voxels, so to avoid intersecting twice,
@@ -274,7 +247,7 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
     delta = norm(delta);
     int x = 0, y = 0, z = 0;
     int subdivision = optimizeLevel;
-    Vec3 dims = c->b - c->a;
+    Vec3 dims = c->max - c->min;
     Vec3 vox = dims / subdivision;
     float t = 0;
     // Find the first voxel our ray hits, store it in (x, y, z), and how far long the ray we've traveled to get there in "t".
@@ -288,7 +261,7 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
     t = 0.f;
     
     // Get the min/max corners of our home voxel.
-    Vec3 cVoxMin = c->a + Vec3{float(x)*vox.x, float(y)*vox.y, float(z)*vox.z};
+    Vec3 cVoxMin = c->min + Vec3{float(x)*vox.x, float(y)*vox.y, float(z)*vox.z};
     Vec3 cVoxMax = cVoxMin + vox;
 
     // stepX/Y/Z, indicating the direction on each axis.
@@ -325,11 +298,12 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
     // we go out of the grid bounds.
     while (o != NULL) {
         // Check if the bound contains a non-empty container.
-        bool empty = !(o->s != NULL && o->s->c != NULL && o->s->c->size > 0);
+        Container *c = dynamic_cast<Container*>(o->s);
+        bool empty = !(c != nullptr && c->size > 0);
         if (!empty) {
-            traversalRay(res, o->s->c, p0, delta, rc);
+            traversalRay(res, c, p0, delta, rc);
             // the caller, castRay, only casts additional transparency rays if we hit anything behind (i.e. res->collisions > 1), therefore we can only quit if we've hit something solid, or more than 1 object.
-            if (res->obj != NULL && (res->obj->m->opacity == 1.f || res->collisions > 1)) {
+            if (res->hit() && (res->obj.mat()->opacity == 1.f || res->collisions > 1)) {
                 o = NULL;
                 break;
             }
@@ -388,94 +362,8 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             bo = bo->next;
             continue;
         }
-        if (current->s != NULL && rc->spheres) {
-            Sphere *s = current->s;
-            Sphere tS;
-            if (current->trans.needed()) {
-                tS = current->trans.apply(s);
-                s = &tS;
-            }
-            float t = meetsSphere(p0, delta, s, NULL);
-            if (t >= 0) {
-                res->collisions++;
-                res->potentialCollisions++;
-                if (t < res->t) {
-                    res->obj = current;
-                    res->sphere = *s;
-                    res->t = t;
-                    res->p0 = p0 + (res->t * delta);
-                    res->normal = res->p0 - s->center;
-                    res->norm = norm(res->normal);
-                }
-            }
-        } else if (current->t != NULL && rc->triangles) {
-            Triangle *tri = current->t;
-            Triangle tT;
-            if (current->trans.needed()) {
-                tT = current->trans.apply(tri);
-                tri = &tT;
-            }
-            Vec3 normal = getVisibleTriNormal(delta, tri->a, tri->b, tri->c);
-            Vec3 nNormal = norm(normal);
-            if (rc->mtTriangleCollision && !tri->plane) {
-                Vec3 bary;
-                float t = meetsTriangleMT(p0, delta, tri, &bary);
-                if (t >= 0 && t < res->t) {
-                    if (current->m->texId != -1 || current->m->normId != -1) {
-                        res->uv = triUV(bary, tri);
-                    }
-                    res->potentialCollisions++;
-                    res->collisions++;
-                    res->obj = current;
-                    res->triangle = *tri;
-                    res->t = t;
-                    res->p0 = p0 + (t *delta);
-                    res->normal = normal;
-                    res->norm = nNormal;
-                }
-            } else {
-                float t = meetsTrianglePlane(p0, delta, nNormal, tri);
-                if (t >= 0) {
-                    res->potentialCollisions++;
-                    if (t < res->t) {
-                        Vec3 cPoint = p0 + (t * delta);
-                        if (tri->plane || meetsTriangle(nNormal, cPoint, tri)) {
-                            res->collisions++;
-                            res->obj = current;
-                            res->triangle = *tri;
-                            res->t = t;
-                            res->p0 = cPoint;
-                            res->normal = normal;
-                            res->norm = nNormal;
-                        } else {
-                            res->potentialCollisions--;
-                        }
-                    }
-                }
-            }
-        } else if (current->b != NULL && rc->aabs) {
-            AAB *b = current->b;
-            AAB tB;
-            if (current->trans.needed()) {
-                tB = current->trans.apply(b);
-                b = &tB;
-            }
-            Vec3 normal;
-            // float t = meetAABB(p0, delta, b->min, b->max);
-            float t = meetAABBWithNormal(p0, delta, b->min, b->max, &normal);
-            if (t >= 0) {
-                res->collisions++;
-                res->potentialCollisions++;
-                if (t < res->t) {
-                    res->obj = current;
-                    res->box = *b;
-                    res->t = t;
-                    res->p0 = p0 + (res->t * delta);
-                    res->normal = normal;
-                    res->norm = norm(res->normal);
-                }
-            }
-        } else if (current->c != NULL) {
+        Container *c = dynamic_cast<Container*>(current);
+        if (c != nullptr) {
             bool collision = false;
             if (!siblingContainerCollision && accelIndex == Accel::BiTree) {
                 // Bi-tree, see comment at top of this method
@@ -501,7 +389,9 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                 }
             */
             } else {
-                collision = meetsAABB(p0, delta, current->c);
+                // FIXME: Maybe change this in the future?
+                // We don't need to apply a transform, as this is a container.
+                collision = c->intersects(p0, delta);
                 if (!collision) {
                     siblingContainerCollision = false;
                 }
@@ -509,7 +399,25 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             }
             // If collision, cast ray to objects within the container
             if (collision) {
-                ray(res, current->c, p0, delta, rc);
+                ray(res, c, p0, delta, rc);
+            }
+        } else {
+            Shape transformedShape = current->applyTransform();
+            Vec3 normal;
+            Vec2 uv;
+            Vec2 *uvPtr = (current->mat() != NULL && transformedShape.mat()->hasTexture()) ? &uv : NULL;
+            float t = transformedShape.intersect(p0, delta, &normal, uvPtr);
+            if (t >= 0) {
+                res->collisions++;
+                // res->potentialCollisions++;
+                if (t <= res->t) {
+                    res->obj = transformedShape;
+                    res->t = t;
+                    res->p0 = p0 + (res->t * delta);
+                    res->normal = normal;
+                    res->norm = norm(normal);
+                    if (uvPtr != NULL) res->uv = *uvPtr;
+                }
             }
         }
         bo = bo->next;
@@ -535,10 +443,10 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Collision Detection
     ray(res, c, p0, delta, rc);
 
-    if (res->obj == NULL) return;
+    if (!res->hit()) return;
 
     // Shading
-    res->color = res->obj->m->color;
+    res->color = res->obj.mat()->color;
     
     // Uncomment to visualize normals
     // res->color = (res->norm + 1) / 2.f;
@@ -546,29 +454,12 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // std::printf("looped over %d objects\n", size);
     if (rc->collisionsOnly) return;
 
-    if (res->obj->s != NULL && res->obj->m->texId != -1) {
-        res->uv = sphereUV(&(res->sphere), res->p0);
-        // res->color = Vec3{uv.x, uv.y, 0.5f};
-        Texture *tx = tex.at(res->obj->m->texId);
+    if (res->obj.mat()->texId != -1) {
+        Texture *tx = tex.at(res->obj.mat()->texId);
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
     }
-    if (res->obj->b != NULL && res->obj->m->texId != -1) {
-        res->uv = aabUV(res->p0, &(res->box), res->norm);
-        // res->color = Vec3{uv.x, uv.y, 0.5f};
-        Texture *tx = tex.at(res->obj->m->texId);
-        // if (tx != NULL) res->color = {res->uv.x, res->uv.y, 0.f};
-        if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
-    }
-    if (res->obj->t != NULL && res->obj->m->texId != -1) {
-        Texture *tx = tex.at(res->obj->m->texId);
-        if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
-        // res->color = {res->uv.x, res->uv.y, 1.f};
-    }
-    if (rc->normalMapping && res->obj->m->normId != -1) {
-        if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(&(res->sphere), res->p0);
-        else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, &(res->box), res->norm);
-
-        Texture *nm = norms.at(res->obj->m->normId);
+    if (rc->normalMapping && res->obj.mat()->normId != -1) {
+        Texture *nm = norms.at(res->obj.mat()->normId);
         if (nm != NULL) {
             Vec3 ts = nm->at(res->uv.x, res->uv.y); // (0,0,1) is pointing towards the normal
             // Change from 0-1 to -1-1
@@ -616,40 +507,34 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
    
     // Epsilon (small number) bias so we don't accidentally hit ourselves due to f.p. 
     Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm);
-    float reflectiveness = res->obj->m->reflectiveness;
-    if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj->m->refId != -1))) {
-        if (rc->reflectanceMapping && res->obj->m->refId != -1) {
-            if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(&(res->sphere), res->p0);
-            else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, &(res->box), res->norm);
-            
-            Texture *rf = refs.at(res->obj->m->refId);
+    float reflectiveness = res->obj.mat()->reflectiveness;
+    if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj.mat()->refId != -1))) {
+        if (rc->reflectanceMapping && res->obj.mat()->refId != -1) {
+            Texture *rf = refs.at(res->obj.mat()->refId);
             if (rf != NULL) reflectiveness = rf->at(res->uv.x, res->uv.y)(0); // B&W map, so all channels are identical
         }
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
+        // FIXME: Put this reflection in a shared function!
         Vec3 reflection = delta - 2.f*dot(delta, res->norm) * res->norm;
         castReflectionRay(p0PlusABit, reflection, rc, res, callCount+1);
     }
 
-    if (rc->lighting && !(res->obj->m->noLighting)) {//  && res->obj->reflectiveness != 0) {
+    if (rc->lighting && !(res->obj.mat()->noLighting)) {//  && res->obj->reflectiveness != 0) {
         castShadowRays(-1.f*delta, p0PlusABit, rc, res);
     } else {
         res->lightColor = {1.f, 1.f, 1.f};
     }
 
     // FIXME: AAB opacity and refraction!
-    if (res->obj->m->opacity != 1.f) {
+    if (res->obj.mat()->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
-        if (res->collisions >= 1 && res->potentialCollisions > 1) {
-            Vec3 p0Transparent = res->p0 - (EPSILON * res->norm);
-            if (res->obj->t != NULL) {
-                RayResult r = RayResult();
-                castRay(&r, obj, p0Transparent, delta, rc, callCount+1);
-                res->refractColor = r.color;
-            } else if (res->obj->s != NULL) {
-                castThroughSphere(delta, rc, res, callCount);
-            } else if (res->obj->b != NULL) {
-                // FIXME: AAB opacity
-            }
+        // if (res->collisions >= 1 && res->potentialCollisions > 1) {
+        if (res->collisions >= 1) {
+            Vec3 p1, delta1;
+            res->obj.refract(rc->refractiveIndex, res->p0, delta, &p1, &delta1);
+            RayResult r = RayResult();
+            castRay(&r, obj, p1, delta1, rc, callCount+1);
+            res->refractColor = r.color;
         } else {
             res->refractColor = {0.f, 0.f, 0.f};
         }
@@ -659,7 +544,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Diffuse lighting and specular reflection
     Vec3 out = (res->color * res->lightColor) * (1.f - reflectiveness) + reflectiveness*res->reflectionColor;
     // Interpolated trasnparency (CGPaP 16.25), but not for the specular component
-    out = res->obj->m->opacity * out + (1.f - res->obj->m->opacity) * res->refractColor;
+    out = res->obj.mat()->opacity * out + (1.f - res->obj.mat()->opacity) * res->refractColor;
     // Specular highlight
     out = out + res->specularColor;
     

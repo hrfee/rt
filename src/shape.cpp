@@ -1,4 +1,5 @@
 #include "shape.hpp"
+#include "ray.hpp"
 #include "util.hpp"
 
 #include <iostream>
@@ -743,7 +744,7 @@ float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
     // normal->idx(normIdx) = 1.f;
 }
 
-bool AAB::intersect(Vec3 p0, Vec3 delta) {
+bool AAB::intersects(Vec3 p0, Vec3 delta) {
     return intersect(p0, delta, NULL) < -9990.f ? false : true;
 }
 
@@ -765,11 +766,19 @@ Shape AAB::applyTransform() {
 }
 
 void AAB::bakeTransform() {
+    if (!transform.needed()) return;
     Mat4 m = transform.build();
     min = min * m;
     max = max * m;
     transform.reset();
 };
+
+void AAB::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    *p1 = p0;
+    *delta1 = delta;
+    // FIXME: AAB opacity!
+    std::printf("FIXME: AAB opacity!\n");
+}
 
 void Sphere::bounds(Bound *bo) {
     bo->min = center - radius;
@@ -813,7 +822,7 @@ float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
     return t;
 }
 
-bool Sphere::intersect(Vec3 p0, Vec3 delta) {
+bool Sphere::intersects(Vec3 p0, Vec3 delta) {
     return intersect(p0, delta, NULL) >= 0;
 }
 
@@ -840,10 +849,97 @@ Shape Sphere::applyTransform() {
 }
 
 void Sphere::bakeTransform() {
+    if (!transform.needed()) return;
     Mat4 m = transform.build();
     center = center * m;
     radius = radius * transform.scale;
     transform.reset();
+}
+
+// Refracts through the sphere as if it were solid (i.e. ignoring thickness).
+void Sphere::refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    Vec3 normal = p0 - s->center;
+    bool tir = true;
+    Vec3 r = Refract(r0, r1, delta, normal, &tir);
+    if (tir) {
+        r = delta - 2.f*dot(delta, normal) * normal;
+        *delta1 = r;
+        *p1 = p0 + (EPSILON * r);
+        return;
+    }
+    tir = true;
+    while (tir) {
+        p0 = p0 + (EPSILON * r);
+        float t = meetsSphere(p0, r, s, NULL);
+        p0 = p0 + (t * r);
+        Vec3 n = -1.f*(p0 - s->center);
+        Vec3 r2 = Refract(r1, r0, r, n, &tir);
+        if (tir) {
+            r = r - 2.f*dot(r, n) * n;
+        } else {
+            r = r2;
+        }
+    }
+    *p1 = p0;
+    *delta1 = r;
+}
+
+void Sphere::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    float hollowness = 1.f - thickness;
+    if (hollowness = 1.f) {
+        ri = RI_AIR;
+        hollowness = 0.f;
+    }
+
+    if (hollowness = 0.f) {
+        refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
+        return;
+    }
+    // Into outer sphere (RI_AIR -> RI_SPHERE)
+    *p1 = p0;
+    Vec3 normal = *p1 - center;
+    bool tir = true;
+    Vec3 r = Refract(RI_AIR, ri, delta, normal, &tir);
+    if (tir) {
+        // Reflect off the sphere.
+        // FIXME: Put this reflection in a shared function!
+        *delta1 = delta - 2.f * dot(delta, normal) * normal;
+        return;
+    }
+    bool escaped = false;
+    *delta1 = r;
+    // Our smaller, inner sphere, filled with RI_AIR.
+    Sphere innerSphere(&this);
+    innerSphere.radius *= hollowness;
+    innerSphere.thickness = 1.f;
+    while (!escaped) {
+        // Hit the inner sphere
+        float t = innerSphere.intersect(*p1, *delta1);
+        if (t < 0) { // Missing the internal sphere means we can ignore it entirely.
+            refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
+            return;
+        }
+        *p1 = *p1 + (t * *delta1);
+        Vec3 p2; // Temp variable just in case
+        // Refract in and out of the inner sphere RI_SPHERE -> RI_AIR -> RI_SPHERE)
+        innerSphere.refractSolid(ri, RI_AIR, *p1, *delta1, &p2, &r);
+        *p1 = p2;
+        *delta1 = r;
+        // Hit the outer sphere
+        t = intersect(*p1, *delta1);
+        *p1 = *p1 + (t * *delta1)
+        normal = -1.f * (*p1 - center);
+        // Out of the outer sphere (RI_SPHERE -> RI_AIR)
+        r = Refract(ri, RI_AIR, *delta1, normal, &tir);
+        if (tir) {
+            // If we have TIR, reflect back into the sphere, and loop this process again.
+            // FIXME: Put this reflection in a shared function!
+            *delta1  = *delta1 - 2.f * dot(*delta1, normal) * normal;
+            continue;
+        }
+        *delta1 = r;
+        escaped = true;
+    }
 }
 
 void Triangle::bounds(Bound *bo) {
@@ -1041,7 +1137,7 @@ float Triangle::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
 #endif
 };
 
-bool Triangle::intersect(Vec3 p0, Vec3 delta) {
+bool Triangle::intersects(Vec3 p0, Vec3 delta) {
     return intersect(p0, delta, NULL, NULL) >= 0;
 }
 
@@ -1052,9 +1148,15 @@ Shape Triangle::applyTransform() {
 }
 
 void Triangle::bakeTransform() {
+    if (!transform.needed()) return;
     Mat4 m = transform.build();
     a = a * m;
     b = b * m;
     c = c * m;
     transform.reset();
+}
+
+void Triangle::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    *p1 = p0;
+    *delta1 = delta;
 }

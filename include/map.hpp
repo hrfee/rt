@@ -39,7 +39,7 @@ struct RenderConfig {
 
 struct RayResult {
     int collisions;
-    int potentialCollisions;
+    // int potentialCollisions;
     float t;
     float t1;
     Vec3 color;
@@ -51,11 +51,12 @@ struct RayResult {
     Vec3 p0;
     Vec3 normal;
     Vec3 norm;
-    Shape *obj;
+    Shape obj;
     RayResult() { resetObj(); };
+    bool hit() { return collisions > 0; };
     void resetObj() {
         collisions = 0;
-        potentialCollisions = 0;
+        // potentialCollisions = 0;
         t = 1e10;
         t1 = 1e10;
         color = {0,0,0};
@@ -66,7 +67,6 @@ struct RayResult {
         p0 = {0,0,0};
         normal = {0,0,0};
         norm = {0,0,0};
-        obj = NULL; 
     };
 };
 
