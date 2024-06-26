@@ -97,16 +97,8 @@ Material *emptyMaterial() {
     return m;
 }
 
-Shape *emptyShape(bool noMaterial) {
-    Shape *sh = (Shape*)alloc(sizeof(Shape));
-    std::memset(sh, 0, sizeof(Shape));
-    sh->trans.reset();
-    if (!noMaterial) sh->m = emptyMaterial();
-    return sh;
-}
-
 // FIXME: very out of date
-std::string encodeShape(Shape *sh) {
+/* std::string encodeShape(Shape *sh) {
     std::ostringstream fmt;
     fmt << encodeColour(sh->m->color) << " ";
     fmt << w_opacity << " ";
@@ -119,14 +111,13 @@ std::string encodeShape(Shape *sh) {
     fmt << sh->m->shininess << " ";
     fmt << std::endl;
     return fmt.str();
-}
+} */
 
-Shape *Decoder::decodeShape(std::string in) {
-    Shape *sh = emptyShape(true);
+void Decoder::decodeShape(Shape *sh, std::string in) {
     if (usedMaterial != NULL) {
-        sh->m = usedMaterial;
+        sh->material = usedMaterial;
     } else {
-        sh->m = decodeMaterial(in);
+        sh->material = decodeMaterial(in);
     }
     std::stringstream stream(in);
     do {
@@ -134,24 +125,23 @@ Shape *Decoder::decodeShape(std::string in) {
         stream >> w;
         if (w == w_translate) {
             stream >> w;
-            sh->trans.translate.x = std::stof(w);
+            sh->trans().translate.x = std::stof(w);
             stream >> w;
-            sh->trans.translate.y = std::stof(w);
+            sh->trans().translate.y = std::stof(w);
             stream >> w;
-            sh->trans.translate.z = std::stof(w);
+            sh->trans().translate.z = std::stof(w);
         } else if (w == w_rotate) {
             stream >> w;
-            sh->trans.rotate.x = std::stof(w);
+            sh->trans().rotate.x = std::stof(w);
             stream >> w;
-            sh->trans.rotate.y = std::stof(w);
+            sh->trans().rotate.y = std::stof(w);
             stream >> w;
-            sh->trans.rotate.z = std::stof(w);
+            sh->trans().rotate.z = std::stof(w);
         } else if (w == w_scale) {
             stream >> w;
-            sh->trans.scale = std::stof(w);
+            sh->trans().scale = std::stof(w);
         }
     } while (stream);
-    return sh;
 }
 
 #define NONULLMTL() if (m == NULL) { m = emptyMaterial(); newMaterial = true; }
@@ -228,7 +218,7 @@ Material *Decoder::decodeMaterial(std::string in, bool definition) {
     return m;
 }
 
-std::string Decoder::encodeSphere(Shape *sh) {
+/*std::string Decoder::encodeSphere(Shape *sh) {
     std::ostringstream fmt;
     fmt << "sphere ";
     fmt << w_center << " ";
@@ -240,35 +230,34 @@ std::string Decoder::encodeSphere(Shape *sh) {
     fmt << encodeShape(sh) << " ";
     fmt << std::endl;
     return fmt.str();
-}
+}*/
 
 Shape *Decoder::decodeSphere(std::string in) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in);
-    sh->s = (Sphere*)alloc(sizeof(Sphere));
-    sh->s->thickness = 1.f;
+    Sphere *sh = new Sphere();
+    decodeShape(sh, in);
     do {
         std::string w;
         stream >> w;
         if (w == w_center) {
             stream >> w;
-            sh->s->center.x = std::stof(w);
+            sh->oCenter.x = std::stof(w);
             stream >> w;
-            sh->s->center.y = std::stof(w);
+            sh->oCenter.y = std::stof(w);
             stream >> w;
-            sh->s->center.z = std::stof(w);
+            sh->oCenter.z = std::stof(w);
         } else if (w == w_radius) {
             stream >> w;
-            sh->s->radius = std::stof(w);
+            sh->oRadius = std::stof(w);
         } else if (w == w_thickness) {
             stream >> w;
-            sh->s->thickness = std::stof(w);
+            sh->thickness = std::stof(w);
         }
     } while (stream);
     return sh;
 }
 
-std::string Decoder::encodePointLight(PointLight *p) {
+/* std::string Decoder::encodePointLight(PointLight *p) {
     std::ostringstream fmt;
     fmt << "plight ";
     fmt << w_center << " ";
@@ -281,7 +270,7 @@ std::string Decoder::encodePointLight(PointLight *p) {
     fmt << encodeColour(p->specularColor) << " ";
     fmt << std::endl;
     return fmt.str();
-}
+} */
 
 PointLight Decoder::decodePointLight(std::string in) {
     std::stringstream stream(in);
@@ -318,7 +307,7 @@ PointLight Decoder::decodePointLight(std::string in) {
     return p;
 }
 
-std::string Decoder::encodeTriangle(Shape *sh) {
+/* std::string Decoder::encodeTriangle(Shape *sh) {
     std::ostringstream fmt;
     fmt << "triangle ";
     fmt << w_a << " ";
@@ -330,56 +319,57 @@ std::string Decoder::encodeTriangle(Shape *sh) {
     fmt << encodeShape(sh) << " ";
     fmt << std::endl;
     return fmt.str();
-}
+} */
 
 Shape *Decoder::decodeTriangle(std::string in) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in);
-    sh->t = (Triangle*)alloc(sizeof(Triangle));
-    sh->t->plane = false;
+    Triangle *sh = new Triangle();
+    decodeShape(sh, in);
 
     do {
         std::string w;
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            sh->t->a.x = std::stof(w);
+            sh->oA.x = std::stof(w);
             stream >> w;
-            sh->t->a.y = std::stof(w);
+            sh->oA.y = std::stof(w);
             stream >> w;
-            sh->t->a.z = std::stof(w);
+            sh->oA.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            sh->t->b.x = std::stof(w);
+            sh->oB.x = std::stof(w);
             stream >> w;
-            sh->t->b.y = std::stof(w);
+            sh->oB.y = std::stof(w);
             stream >> w;
-            sh->t->b.z = std::stof(w);
+            sh->oB.z = std::stof(w);
         } else if (w == w_c) {
             stream >> w;
-            sh->t->c.x = std::stof(w);
+            sh->oC.x = std::stof(w);
             stream >> w;
-            sh->t->c.y = std::stof(w);
+            sh->oC.y = std::stof(w);
             stream >> w;
-            sh->t->c.z = std::stof(w);
+            sh->oC.z = std::stof(w);
         } else if (w == w_plane) {
-            sh->t->plane = true;
+            sh->plane = true;
         }
     } while (stream);
 
-    if (sh->m->texId != -1 || sh->m->normId != -1 || sh->m->refId != -1) {
+    // FIXME: Maybe best to do this for all tris regardless of texture,
+    // since the user can now dynamically apply them.
+    if (sh->mat()->hasTexture()) {
         recalculateTriUVs(sh);
     }
 
     return sh;
 }
 
-void Decoder::recalculateTriUVs(Shape *sh) {
+void Decoder::recalculateTriUVs(Triangle *tri) {
     // Project onto 2D plane, any'll do for now
     float proj[3][2] = {
-        {sh->t->a.x, sh->t->a.y},
-        {sh->t->b.x, sh->t->b.y},
-        {sh->t->c.x, sh->t->c.y}
+        {tri->a.x, tri->a.y},
+        {tri->b.x, tri->b.y},
+        {tri->c.x, tri->c.y}
     };
     float min[2] = {9999.f, 9999.f};
     float max[2] = {-9999.f, -9999.f};
@@ -393,12 +383,12 @@ void Decoder::recalculateTriUVs(Shape *sh) {
     Texture *t = NULL;
     Vec2 scale = {1.f, 1.f};
     float iw = 0.f, ih = 0.f;
-    if (sh->m->texId != -1) {
-        t = tex->at(sh->m->texId);
-    } else if (sh->m->normId != -1) {
-        t = norm->at(sh->m->normId);
-    } else if (sh->m->refId != -1) {
-        t = ref->at(sh->m->refId);
+    if (tri->mat()->texId != -1) {
+        t = tex->at(tri->mat()->texId);
+    } else if (tri->mat()->normId != -1) {
+        t = norm->at(tri->mat()->normId);
+    } else if (tri->mat()->refId != -1) {
+        t = ref->at(tri->mat()->refId);
     }
     scale = t->scale;
     iw = t->img->w;
@@ -415,11 +405,11 @@ void Decoder::recalculateTriUVs(Shape *sh) {
     }
 
     for (int i = 0; i < 3; i++) {
-        sh->t->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
+        tri->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
     }
 }
 
-std::string Decoder::encodeAAB(Shape *sh) {
+/* std::string Decoder::encodeAAB(Shape *sh) {
     std::ostringstream fmt;
     fmt << "box ";
     fmt << w_a << " ";
@@ -429,36 +419,35 @@ std::string Decoder::encodeAAB(Shape *sh) {
     fmt << encodeShape(sh) << " ";
     fmt << std::endl;
     return fmt.str();
-}
+} */
 
 Shape *Decoder::decodeAAB(std::string in) {
     std::stringstream stream(in);
-    Shape *sh = decodeShape(in);
-    sh->b = (AAB*)alloc(sizeof(AAB));
+    AAB *sh = new AAB();
+    decodeShape(sh, in);
 
     do {
         std::string w;
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            sh->b->min.x = std::stof(w);
+            sh->oMin.x = std::stof(w);
             stream >> w;
-            sh->b->min.y = std::stof(w);
+            sh->oMin.y = std::stof(w);
             stream >> w;
-            sh->b->min.z = std::stof(w);
+            sh->oMin.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            sh->b->max.x = std::stof(w);
+            sh->oMax.x = std::stof(w);
             stream >> w;
-            sh->b->max.y = std::stof(w);
+            sh->oMax.y = std::stof(w);
             stream >> w;
-            sh->b->max.z = std::stof(w);
+            sh->oMax.z = std::stof(w);
         }
     } while (stream);
 
-    if (sh->m->texId != -1 || sh->m->normId != -1 || sh->m->refId != -1) {
-        // FIXME: AABB texture improvements?
-    }
+    // Potential FIXME: Texture mapping improvments for AABs
+    // if (sh->mat()->hasTexture()) { }
 
     return sh;
 }
@@ -536,53 +525,37 @@ Bound *emptyBound() {
     return bo;
 }
 
-Container *emptyContainer(bool plane) {
-    Container *c = (Container*)malloc(sizeof(Container));
-    c->a = {0, 0, 0};
-    c->b = {0, 0, 0};
-    c->c = {0, 0, 0};
-    c->d = {0, 0, 0};
-    c->plane = plane;
-    c->voxelSubdiv = 0;
-    c->start = NULL;
-    c->end = NULL;
-    c->size = 0;
-    c->splitAxis = -1;
-    c->id = 0;
-    return c;
-}
-
-int appendToContainer(Container *c, Bound *bo) {
-    if (c->start == NULL) c->start = bo;
-    if (c->end != NULL) c->end->next = bo;
-    c->end = bo;
-    /* if (c->plane == false) {
+int Container::append(Bound *bo) {
+    if (start == NULL) start = bo;
+    if (end != NULL) end->next = bo;
+    end = bo;
+    /* if (plane == false) {
         for (int i = 0; i < 3; i++) {
-            c->a(i) = std::min(c->a(i), bo->min(i));
-            c->b(i) = std::max(c->b(i), bo->max(i));
+            a(i) = std::min(a(i), bo->min(i));
+            b(i) = std::max(b(i), bo->max(i));
         }
     } */
-    c->size++;
+    size++;
     return 0;
 }
 
-int appendToContainer(Container *c, Bound bo) {
+int Container::append(Bound bo) {
     Bound *bptr = emptyBound();
     std::memcpy(bptr, &bo, sizeof(Bound));
-    return 1 + appendToContainer(c, bptr);
+    return 1 + append(bptr);
 }
 
-int appendToContainer(Container *c, Shape *sh) {
+int Container::append(Shape *sh) {
     auto bo = emptyBound();
     bo->s = sh;
-    return 1 + appendToContainer(c, bo);
+    return 1 + append(bo);
 }
 
-int appendToContainer(Container *cParent, Container *c) {
+int Container::append(Container *c) {
     auto bo = emptyBound(); // Alloc 
-    bo->s = emptyShape(); // Alloc
-    bo->s->c = c;
-    return 2 + appendToContainer(cParent, bo);
+    Container *nC = new Container(c); // Alloc
+    bo->s = nC;
+    return 2 + append(bo);
 }
 
 Bound *boundByIndex(Container *c, int i) {
@@ -596,47 +569,31 @@ Bound *boundByIndex(Container *c, int i) {
     return NULL;
 }
 
-int clearContainer(Container *c, bool clearChildShapes) {
-    if (c == NULL) return 0;
+int Container::clear(bool deleteShapes) {
     int freeCounter = 0;
-    Bound *bo = c->start;
-    Bound *end = NULL;
-    if (c->end != NULL) end = c->end->next;
+    Bound *bo = start;
+    Bound *e = NULL;
+    if (end != NULL) e = end->next;
     int boundCounter = 0;
-    int boundLimit = c->voxelSubdiv*c->voxelSubdiv*c->voxelSubdiv;
-    while (bo != end) {
+    int boundLimit = voxelSubdiv*voxelSubdiv*voxelSubdiv;
+    while (bo != e) {
         Shape *current = bo->s;
-        bool isContainer = current->c != NULL;
-        if (isContainer) {
-            freeCounter += clearContainer(current->c, clearChildShapes);
-            free(current->c);
-            current->c = NULL;
+        freeCounter += current->clear(deleteShapes);
+        if (
+            (dynamic_cast<Container*>(current) != nullptr) ||
+            deleteShapes ||
+            current->debug) {
+
+            delete current;
+            freeCounter ++;
+
+        } else if (deleteShapes || current->debug) {
+            delete current;
             freeCounter++;
         }
 
-        if (clearChildShapes || current->debug) {
-            if (current->s != NULL) {
-                free(current->s);
-                current->s = NULL;
-                freeCounter++;
-            }
-            if (current->t != NULL) {
-                free(current->t);
-                current->t = NULL;
-                freeCounter++;
-            }
-            if (current->b != NULL) {
-                free(current->b);
-                current->b = NULL;
-                freeCounter++;
-            }
-        }
-        if (isContainer || clearChildShapes || current->debug) {
-            free(current);
-            freeCounter++;
-        }
         Bound *next = bo->next;
-        if (c->voxelSubdiv != 0) {
+        if (voxelSubdiv != 0) {
             next = bo + 1;
             boundCounter++;
             if (boundCounter >= boundLimit) next = NULL;
@@ -646,12 +603,12 @@ int clearContainer(Container *c, bool clearChildShapes) {
         bo = next;
     }
     // Voxel containers have their "start" set to a voxelSubdiv^3 size array.
-    if (c->voxelSubdiv != 0) {
-        free(c->start);
+    if (voxelSubdiv != 0) {
+        free(start);
     }
-    c->size = 0;
-    c->start = NULL;
-    c->end = NULL;
+    size = 0;
+    start = NULL;
+    end = NULL;
     return freeCounter;
 }
 
@@ -731,30 +688,352 @@ void Decoder::usingMaterial(std::string name) {
     }
 }
 
-Sphere Transform::apply(Sphere *sphere) {
-    Mat4 m = build();
-    Sphere s;
-    std::memcpy(&s, sphere, sizeof(Sphere));
-    s.center = s.center * m;
-    s.radius = s.radius * scale;
-    return s;
+
+void AAB::bounds(Bound *bo) {
+    bo->min = min;
+    bo->max = max;
+    bo->centroid = centroid;
 }
 
-Triangle Transform::apply(Triangle *triangle) {
-    Mat4 m = build();
-    Triangle t;
-    std::memcpy(&t, triangle, sizeof(Triangle));
-    t.a = t.a * m;
-    t.b = t.b * m;
-    t.c = t.c * m;
+float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
+    // Based on the "slab method".
+    // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
+    // then select the largest distance to one of the nearer faces, and the shortest distance to one of the furthest faces.
+    // If the latter is negative, we're looking in the wrong direction.
+    // Where the ray actually intersects the AABB, the latter (furthest) should be greater than the former (nearest).
+    // and therefore if a nearer face appears to be closer than a farther face, we do not intersect.
+    
+    // Pre-divide, since multiplication is faster and we use it twice
+    float d[3] = {1.f/delta.x, 1.f/delta.y, 1.f/delta.z};
+    float tmin = -9999.f;
+    float tmax = 9999.f;
+    int nminIdx = -1, nmaxIdx = -1;
+    for (int i = 0; i < 3; i++) {
+        float t0 = (min(i) - p0(i)) * d[i];
+        float t1 = (max(i) - p0(i)) * d[i];
+        float mn = std::min(t0, t1);
+        if (mn >= tmin) {
+            tmin = mn;
+            nminIdx = i;
+        }
+        float mx = std::max(t0, t1);
+        if (mx <= tmax) {
+            tmax = mx;
+            nmaxIdx = i;
+        }
+    }
+
+    if (tmax < 0) return -9999.f;
+    if (tmin > tmax) return -9998.f;
+    if (normal == NULL) return tmin;
+    *normal = {0.f, 0.f, 0.f};
+    // Inside the box
+    if (tmin < 0.f) {
+        normal->idx(nmaxIdx) = delta(nmaxIdx) >= 0 ? -1.f : 1.f;
+        tmin = tmax;
+    // Outside the box
+    } else {
+        normal->idx(nminIdx) = delta(nminIdx) >= 0 ? -1.f : 1.f;
+    }
+    if (uv != NULL) {
+        Vec3 hit = p0 + (tmin * delta);
+        *uv = getUV(hit, *normal);
+    }
+    return tmin;
+    // normal->idx(normIdx) = 1.f;
+}
+
+bool AAB::intersect(Vec3 p0, Vec3 delta) {
+    return intersect(p0, delta, NULL) < -9990.f ? false : true;
+}
+
+Vec2 AAB::getUV(Vec3 hit, Vec3 normal) {
+    int uvIdx = 0;
+    Vec2 uv = {0.f, 0.f};
+    for (int i = 0; i < 3; i++) {
+        if (normal(i) != 0.f) continue;
+        uv(uvIdx) = (hit(i) - min(i)) / (max(i) - min(i));
+        uvIdx++;
+    }
+    return uv;
+}
+
+void AAB::reloadTransform() {
+    Mat4 m = transform.build();
+    min = oMin * m;
+    max = oMax * m;
+}
+
+void Sphere::bounds(Bound *bo) {
+    bo->min = center - radius;
+    bo->max = center + radius;
+    bo->centroid = center;
+};
+
+float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
+    // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
+    // substituted values for the camera position (x/y/z_0),
+    // pixel vec from camera (delta x/y/z),
+    // and normalized distance along pixel vector (t).
+    Vec3 originToSphere = p0 - center;
+    float a = dot(delta, delta);
+    float b = 2.f * dot(delta, originToSphere);
+    float c = dot(originToSphere, originToSphere) - radius*radius;
+    float discrim = b*b - 4.f*a*c;
+    if (discrim < 0) return -1;
+    float discrimRoot = std::sqrt(discrim);
+    float denom = 0.5f / a;
+    float t = (-b - discrimRoot) * denom;
+    if (discrim > 0 && t < 0) {
+        float t_1 = (-b + discrimRoot) * denom;
+        float t_ = 0.f;
+        if (t < 0 || (t > t_1 && t_1 > 0)) {
+            t_ = t;
+            t = t_1;
+            t_1 = t_;
+        }
+        /* if (t1 != NULL) {
+            *t1 = t_1;
+        } */
+    }
+    if (normal != NULL) {
+        Vec3 hit = p0 + (t * delta);
+        *normal = hit - center;
+        if (uv != NULL) {
+            *uv = getUV(hit);
+        }
+    }
     return t;
 }
 
-AAB Transform::apply(AAB *aab) {
-    Mat4 m = build();
-    AAB b;
-    std::memcpy(&b, aab, sizeof(AAB));
-    b.min = b.min * m;
-    b.max = b.max * m;
-    return b;
+bool Sphere::intersect(Vec3 p0, Vec3 delta) {
+    return intersect(p0, delta, NULL) >= 0;
+}
+
+Vec2 Sphere::getUV(Vec3 hit) {
+    // "Move" the sphere (and the point on it) to center O.
+    hit = hit - center;
+    // Get polar angles from O
+    float theta = std::atan2(hit.x, hit.z);
+    float phi = std::acos(hit.y / radius);
+
+    // Divide by 360deg so range is 1,
+    float rU = theta / (2.f*M_PI);
+
+    return Vec2{
+        1.f - (rU + 0.5f), // and shift upwards so between 0 & 1.
+        1.f - (phi / float(M_PI))
+    };
+}
+
+void Sphere::reloadTransform() {
+    Mat4 m = transform.build();
+    center = oCenter * m;
+    radius = oRadius * transform.scale;
+}
+
+void Triangle::bounds(Bound *bo) {
+    bo->min = {9999, 9999, 9999};
+    bo->max = {-9999, -9999, -9999};
+    bo->centroid = {0, 0, 0};
+    if (plane) return;
+    for (int i = 0; i < 3; i++) {
+        bo->min(i) = std::min(bo->min(i), a(i));
+        bo->min(i) = std::min(bo->min(i), b(i));
+        bo->min(i) = std::min(bo->min(i), c(i));
+        bo->max(i) = std::max(bo->max(i), a(i));
+        bo->max(i) = std::max(bo->max(i), b(i));
+        bo->max(i) = std::max(bo->max(i), c(i));
+    }
+    bo->centroid = 0.333f * (a + b + c);
+}
+
+// Finds the normal of a triangle (abc) that points towards given vector p0
+Vec3 Triangle::visibleNormal(Vec3 delta) {
+    /* Vec3 norms[2] = {cross(a - c, b - c), cross(c - a, b - a)};
+    float components[2] = {0, 0};
+    for (int i = 0; i < 2; i++) {
+        // Roughly computing component of each normal along vector delta,
+        // a.k.a (n_i \dot delta)/|delta|.
+        // but since we just want the lowest one (most negative), the denom. can be ignored.
+        components[i] = dot(norms[i], delta);
+    }
+    if (components[0] <= components[1])
+        return norms[0];
+    return norms[1]; */
+    Vec3 norm = cross(c-a, b-a);
+    if (dot(norm, delta) <= 0.f) return norm;
+    else return cross(a-c, b-c);
+}
+
+float Triangle::intersectsPlane(Vec3 p0, Vec3 delta, Vec3 normal) {
+    // dot product of a line on the plane with the normal is zero, hence (p - t.a) \dot norm = 0, where p is a random point (x, y, z)
+    // p \dot norm = t.a \dot norm
+    // (p0 + t(delta)) \dot norm = t.a \dot norm
+    // t(delta \dot norm) = (t.a - p0) \dot norm
+    // divide and get t!
+    float denom = dot(normal, delta);
+    if (denom == 0) { // Plane parallel to ray, ignore
+        return -1;
+    }
+    return dot((a - p0), normal) / denom;
+}
+
+bool Triangle::projectAndPiP(Vec3 normal, Vec3 hit) {
+    // Sign doesn't matter here as our triangles aren't single-faced.
+    Vec3 absNormal = {std::abs(normal.x), std::abs(normal.y), std::abs(normal.z)};
+    // project orthographically as big as possible
+    Vec2 projA, projB, projC, projHit;
+    if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
+        // std::printf("projecting onto x\n");
+        projA = Vec2{a.y, a.z};
+        projB = Vec2{b.y, b.z};
+        projC = Vec2{c.y, c.z};
+        projHit = Vec2{hit.y, hit.z};
+    } else if (absNormal.y >= absNormal.x && absNormal.y >= absNormal.z) {
+        // std::printf("projecting onto y\n");
+        projA = Vec2{a.x, a.z};
+        projB = Vec2{b.x, b.z};
+        projC = Vec2{c.x, c.z};
+        projHit = Vec2{hit.x, hit.z};
+    } else { 
+        // std::printf("projecting onto z\n");
+        projA = Vec2{a.x, a.y};
+        projB = Vec2{b.x, b.y};
+        projC = Vec2{c.x, c.y};
+        projHit = Vec2{hit.x, hit.y};
+    }
+
+    return PiP(projHit, projA, projB, projC);
+}
+
+// CGPaP in C p.339 Sect. 7.12.2 "PtInPolygon":
+// Cast a ray from our point in any direction.
+// If the ray hits an edge once, we're inside. If twice, we're outside.
+// Uses cramer's rule to find point where ray meets edge.
+bool Triangle::PiP(Vec2 projHit, Vec2 projA, Vec2 projB, Vec2 projC) {
+    // std::printf("tri %f %f %f %f %f %f\n", a.x, a.y, b.x, b.y, c.x, c.y);
+    // std::printf("point %f %f\n", p.x, p.y);
+    int collisions = 0;
+    float maxX = std::fmax(std::fmax(projA.x, projB.x), projC.x);
+    float minX = std::fmin(std::fmin(projA.x, projB.x), projC.x);
+    float maxY = std::fmax(std::fmax(projA.y, projB.y), projC.y);
+    float minY = std::fmin(std::fmin(projA.y, projB.y), projC.y);
+    // Easy case: point is outside triangle's bounding box.
+    // These aren't full-fledged polygons so they aren't gonna have
+    // a hole in the middle.
+    if (projHit.x < minX || projHit.x > maxX || projHit.y < minY || projHit.y > maxY) {
+        return false;
+    }
+    // Cast a ray across the x axis, p + q, where q=(maxX+1, p.y) - p:
+    Vec2 q = Vec2{maxX+1.f, projHit.y} - projHit;
+    Vec2 edges[3][2] = {{projA, projB}, {projB, projC}, {projC, projA}};
+    for (int i = 0; i < 3; i++) {
+        Vec2 r = edges[i][0];
+        Vec2 s = edges[i][1] - r;
+        // Find where p + tq = r + us, using cramer's rule:
+        Mat2 d = Mat2{
+            q.x, -s.x,
+            q.y, -s.y
+        };
+        Mat2 dt = Mat2{
+            r.x - projHit.x, -s.x,
+            r.y - projHit.y, -s.y
+        };
+        Mat2 du = Mat2{
+            q.x, r.x - projHit.x,
+            q.y, r.y - projHit.y
+        };
+        float detD = det(d);
+        float t = det(dt)/detD;
+        float u = det(du)/detD;
+        if (detD != 0 && t >= 0.f && u >= 0.f && t <= 1.f && u <= 1.f) {
+            // Vec2 g = p + (t * q);
+            // Vec2 j = r + (u * s);
+            // std::printf("collision on %d ((%f %f) + t(%f %f) = (%f %f) + u(%f %f))! t=%f (%f, %f), u=%f (%f, %f)\n", i, p.x, p.x, q.x, q.y, r.x, r.y, s.x, s.y, t, g.x, g.y, u, j.x, j.y);
+            collisions += 1;
+        }
+        if (collisions == 2) break;
+    }
+    // if (collisions == 1) {
+    //     std::printf("in triangle!\n");
+    // }
+    return collisions == 1;
+}
+
+// Default method: Muller-Trumbore
+// Faster triangle collision algorithm which calculates barycentric coordinates to determine t.
+// https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+float Triangle::intersectMT(Vec3 p0, Vec3 delta, Vec3 *bary) {
+    Vec3 e1 = b - a;
+    Vec3 e2 = c - a;
+    Vec3 rayEdge = cross(delta, e2);
+    float det = dot(e1, rayEdge);
+
+    // Uncomment for sided-ness
+    // if (det <= 0.f) return -1.f;
+
+    float invDet = 1.f / det;
+    Vec3 ap0 = p0 - a;
+    // u
+    bary->x = invDet * dot(ap0, rayEdge);
+
+    if (bary->x < 0.f || bary->x > 1.f) return -1.f;
+
+    Vec3 ap0Edge = cross(ap0, e1);
+    // v
+    bary->y = invDet * dot(delta, ap0Edge);
+
+    if (bary->y < 0.f || bary->x + bary->y > 1.f) return -1.f;
+
+    float t = invDet * dot(e2, ap0Edge);
+
+    // w
+    bary->z = 1.f - bary->x - bary->y;
+
+    return t;
+}
+
+#define PREFER_MT
+
+// FIXME: This new version removes the "potentialCollisions" mechanism entirely,
+// where collisions that were tris farther than an already intersected object were not fully
+// intersected, only their plane was, but the potential for a collision recorded and used too
+// decide whether to cast another ray through a transparent object.
+// While the old tri collision is mostly useless now, potentially add back?
+float Triangle::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
+    // FIXME: Normal calculation might not be necessary
+    Vec3 n = visibleNormal(delta);
+    if (normal != NULL) *normal = n;
+#ifdef PREFER_MT
+    if (!plane) {
+        Vec3 bary;
+        float t = intersectMT(p0, delta, &bary);
+        if (uv != NULL && material != NULL && material->hasTexture()) {
+            *uv = bary.z*UVs[0] + bary.x*UVs[1] + bary.y*UVs[2];
+        }
+        return t;
+    } else {
+#endif
+        float t = intersectsPlane(p0, delta, n);
+        if (t < 0) return t;
+        Vec3 hit = p0 + (t * delta);
+        if (plane || projectAndPiP(norm(n), hit)) {
+            return t;
+        }
+        return -1;
+#ifdef PREFER_MT
+    }
+#endif
+};
+
+bool Triangle::intersect(Vec3 p0, Vec3 delta) {
+    return intersect(p0, delta, NULL, NULL) >= 0;
+}
+
+void Triangle::reloadTransform() {
+    Mat4 m = transform.build();
+    a = oA * m;
+    b = oB * m;
+    c = oC * m;
 }

@@ -9,12 +9,13 @@
 #include <iostream>
 #include <sstream>
 
-struct Sphere;
-struct Triangle;
-struct Container;
-struct AAB;
+class Sphere;
+class Triangle;
+class Container;
+class AAB;
 struct Material;
-struct Shape;
+class Shape;
+struct Bound;
 
 struct Transform {
     Vec3 translate;
@@ -37,12 +38,32 @@ struct Transform {
         if (scale != 1.f) trans = trans * transformScale(scale);
         return trans;
     }
-    Sphere apply(Sphere *sphere);
-    Triangle apply(Triangle *triangle);
-    AAB apply(AAB *aab);
 };
 
-struct Shape {
+class Shape {
+    public:
+        Material *material;
+        Transform transform;
+        bool debug;
+        Shape() {
+            material = NULL;
+            debug = false;
+            transform.reset();
+        };
+        virtual Material *mat() { return material; };
+        virtual Transform& trans() { return transform; };
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual void reloadTransform();
+        virtual int clear(bool deleteShapes = true) { return 0; };
+        virtual ~Shape();
+    // Note no destructor for the dynamically allocated "material",
+    // This is because the material is allocated and given by a MaterialStore,
+    // which itself handles destruction in its clear() method.
+};
+
+/* struct Shape {
     Sphere *s;
     Triangle *t;
     Container *c;
@@ -50,7 +71,7 @@ struct Shape {
     Material *m;
     Transform trans;
     bool debug; // Whether to be hidden in normal output or not.
-};
+}; */
 
 struct Material {
     char *name;
@@ -62,6 +83,9 @@ struct Material {
     float specular; // 0-1
     float shininess;
     Material *next;
+    bool hasTexture() { 
+        return texId != -1 || normId != -1 || refId != -1;
+    };
 };
 
 class MaterialStore {
@@ -93,7 +117,7 @@ struct Bound {
 // Note: abcd must be arranged clockwise!
 // When plane is false, acts as an Axis-Aligned Bounding Box (AABB),
 // Where a and b are the corners.
-struct Container {
+/* struct Container {
     Vec3 a, b, c, d;
     Bound *start;
     Bound *end;
@@ -102,24 +126,112 @@ struct Container {
     bool voxelSubdiv;
     int size;
     int id;
+}; */
+
+class AAB: public Shape {
+    public:
+        Vec3 min, max, centroid;
+        Vec3 oMin, oMax; // Original, untransformed values
+        AAB() {
+            oMin = {0, 0, 0}, min = oMin;
+            oMax = {0, 0, 0}, max = oMax;
+            centroid = {0, 0, 0};
+        };
+
+        Vec2 getUV(Vec3 hit, Vec3 normal);
+        AAB(Vec3 mn, Vec3 mx): min(mn), max(mx), oMin(mn), oMax(mx) {
+            centroid = min + 0.5f * (max - min);
+        };
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual void reloadTransform();
 };
 
-struct AAB {
-    Vec3 min, max;
+class Container: public AAB {
+    public:
+        Bound *start;
+        Bound *end;
+        bool plane;
+        int splitAxis;
+        bool voxelSubdiv;
+        int size;
+        int id;
+        Container(bool isPlane = false) {
+            plane = isPlane;
+            voxelSubdiv = 0;
+            start = NULL;
+            end = NULL;
+            size = 0;
+            splitAxis = -1;
+            id = 0;
+        };
+        Container(Container *c) {
+            plane = c->plane;
+            voxelSubdiv = c->voxelSubdiv;
+            start = c->start;
+            end = c->end;
+            size = c->size;
+            splitAxis = c->splitAxis;
+            id = c->id;
+        };
+        int append(Bound *bo);
+        int append(Bound bo);
+        int append(Shape *sh);
+        int append(Container *c);
+        
+        int clear(bool deleteShapes = true);
+        ~Container() { clear(); };
 };
 
-struct Sphere {
+class Sphere: public Shape {
+    public:
+        Vec3 center, oCenter;
+        float radius, oRadius;
+        float thickness;
+        Vec2 getUV(Vec3 hit);
+        Sphere() {
+            center = {0.f, 0.f, 0.f}, oCenter = center;
+            radius = 0.f, oRadius = radius;
+            thickness = 1.f;
+        }
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual void reloadTransform();
+};
+
+/* struct Sphere {
     // (x-a^2) + (y-b^2) + (z-c^2) = r^2
     // CG:PaP 2nd ed. in C: p. 702
     Vec3 center; // a, b, c
     float radius; // r
     float thickness; // fraction of radius. 0 == hollow, 1 == filled.
-};
+}; */
 
-struct Triangle {
-    Vec3 a, b, c;
-    Vec2 UVs[3]; // UV coordinates of a, b, c respectively
-    bool plane; // Whether or not a plane defined by these points, or just a triangle
+class Triangle: public Shape {
+    public: 
+        Vec3 a, b, c, oA, oB, oC;
+        Vec2 UVs[3]; // UV coordinates of a, b, c respectively
+        bool plane; // Whether or not a plane defined by these points, or just a triangle
+        Triangle() {
+            a = {0, 0, 0}, b = a, c = a;
+            oA = a, oB = b, oC = c;
+            UVs[0] = {0,0};
+            UVs[1] = {0,0};
+            UVs[2] = {0,0};
+            plane = false;
+        };
+        Vec3 visibleNormal(Vec3 delta);
+        float intersectsPlane(Vec3 p0, Vec3 delta, Vec3 normal);
+        bool projectAndPiP(Vec3 normal, Vec3 hit);
+        bool PiP(Vec2 projHit, Vec2 projA, Vec2 projB, Vec2 projC);
+        float intersectMT(Vec3 p0, Vec3 delta, Vec3 *bary);
+        
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual bool intersect(Vec3 p0, Vec3 delta);
+        virtual void reloadTransform();
 };
 
 struct PointLight {
@@ -154,27 +266,27 @@ struct Decoder {
         ref = r;
         mat = m;
     }
-    Shape *decodeShape(std::string in);
+    void decodeShape(Shape *sh, std::string in);
 
     Material *decodeMaterial(std::string in, bool definition = false);
 
-    std::string encodePointLight(PointLight *p);
+    // std::string encodePointLight(PointLight *p);
 
     PointLight decodePointLight(std::string in);
 
-    std::string encodeSphere(Shape *sh);
+    // std::string encodeSphere(Shape *sh);
 
     Shape *decodeSphere(std::string in);
 
-    std::string encodeTriangle(Shape *sh);
+    // std::string encodeTriangle(Shape *sh);
 
     Shape *decodeTriangle(std::string in);
 
-    std::string encodeAAB(Shape *sh);
+    // std::string encodeAAB(Shape *sh);
 
     Shape *decodeAAB(std::string in);
     
-    void recalculateTriUVs(Shape *sh);
+    void recalculateTriUVs(Triangle *tri);
     
     Material *usedMaterial;
     void usingMaterial(std::string name);
@@ -186,21 +298,12 @@ std::string encodeColour(Vec3 c);
 
 Vec3 decodeColour(std::stringstream *in);
 
-Shape *emptyShape(bool noMaterial = false);
 Material *emptyMaterial();
 
 Bound *emptyBound();
 
-Container *emptyContainer(bool plane = false);
-
-int appendToContainer(Container *c, Bound *bo);
-int appendToContainer(Container *c, Bound bo);
-int appendToContainer(Container *c, Shape *sh);
-int appendToContainer(Container *cParent, Container *c);
 
 Bound *boundByIndex(Container *c, int i);
-
-int clearContainer(Container *c, bool clearChildShapes = true);
 
 CamPreset decodeCamPreset(std::string in);
 std::string encodeCamPreset(CamPreset *p);
