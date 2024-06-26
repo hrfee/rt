@@ -86,7 +86,7 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
 }
 
 // FIXME: Outdated!
-void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity, float reflectiveness, float specular, float shininess, float thickness) {
+/* void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity, float reflectiveness, float specular, float shininess, float thickness) {
     Shape *sh = emptyShape();
     sh->s = (Sphere*)alloc(sizeof(Sphere));
     sh->s->center = center;
@@ -98,10 +98,10 @@ void WorldMap::createSphere(Vec3 center, float radius, Vec3 color, float opacity
     sh->m->specular = specular;
     sh->m->shininess = shininess;
     appendToContainer(&unoptimizedObj, sh);
-}
+} */
 
 // FIXME: Outdated!
-void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity, float reflectiveness, float specular, float shininess) {
+/* void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity, float reflectiveness, float specular, float shininess) {
     Shape *sh = emptyShape();
     sh->t = (Triangle*)alloc(sizeof(Triangle));
     sh->t->a = a;
@@ -113,7 +113,7 @@ void WorldMap::createTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 color, float opacity,
     sh->m->specular = specular;
     sh->m->shininess = shininess;
     appendToContainer(&unoptimizedObj, sh);
-}
+} */
 
 void WorldMap::castReflectionRay(Vec3 p0, Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
     RayResult bounce = RayResult();

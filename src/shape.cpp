@@ -758,11 +758,18 @@ Vec2 AAB::getUV(Vec3 hit, Vec3 normal) {
     return uv;
 }
 
-void AAB::reloadTransform() {
-    Mat4 m = transform.build();
-    min = oMin * m;
-    max = oMax * m;
+Shape AAB::applyTransform() {
+    AAB b(&this);
+    b.bakeTransform();
+    return b;
 }
+
+void AAB::bakeTransform() {
+    Mat4 m = transform.build();
+    min = min * m;
+    max = max * m;
+    transform.reset();
+};
 
 void Sphere::bounds(Bound *bo) {
     bo->min = center - radius;
@@ -826,10 +833,17 @@ Vec2 Sphere::getUV(Vec3 hit) {
     };
 }
 
-void Sphere::reloadTransform() {
+Shape Sphere::applyTransform() {
+    Sphere s(&this);
+    s.bakeTransform();
+    return b;
+}
+
+void Sphere::bakeTransform() {
     Mat4 m = transform.build();
-    center = oCenter * m;
-    radius = oRadius * transform.scale;
+    center = center * m;
+    radius = radius * transform.scale;
+    transform.reset();
 }
 
 void Triangle::bounds(Bound *bo) {
@@ -1031,9 +1045,16 @@ bool Triangle::intersect(Vec3 p0, Vec3 delta) {
     return intersect(p0, delta, NULL, NULL) >= 0;
 }
 
-void Triangle::reloadTransform() {
+Shape Triangle::applyTransform() {
+    Triangle t(&this);
+    t.bakeTransform();
+    return b;
+}
+
+void Triangle::bakeTransform() {
     Mat4 m = transform.build();
-    a = oA * m;
-    b = oB * m;
-    c = oC * m;
+    a = a * m;
+    b = b * m;
+    c = c * m;
+    transform.reset();
 }

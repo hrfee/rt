@@ -8,6 +8,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <cstring>
 
 class Sphere;
 class Triangle;
@@ -55,7 +56,8 @@ class Shape {
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersect(Vec3 p0, Vec3 delta);
-        virtual void reloadTransform();
+        virtual Shape applyTransform();
+        virtual void bakeTransform();
         virtual int clear(bool deleteShapes = true) { return 0; };
         virtual ~Shape();
     // Note no destructor for the dynamically allocated "material",
@@ -131,21 +133,28 @@ struct Bound {
 class AAB: public Shape {
     public:
         Vec3 min, max, centroid;
-        Vec3 oMin, oMax; // Original, untransformed values
         AAB() {
-            oMin = {0, 0, 0}, min = oMin;
-            oMax = {0, 0, 0}, max = oMax;
+            min = {0, 0, 0};
+            max = {0, 0, 0};
             centroid = {0, 0, 0};
+        };
+        AAB(AAB *b) {
+            material = b->material;
+            transform = b->transform;
+            min = b->min;
+            max = b->max;
+            centroid = b->centroid;
         };
 
         Vec2 getUV(Vec3 hit, Vec3 normal);
-        AAB(Vec3 mn, Vec3 mx): min(mn), max(mx), oMin(mn), oMax(mx) {
+        AAB(Vec3 mn, Vec3 mx): min(mn), max(mx) {
             centroid = min + 0.5f * (max - min);
         };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersect(Vec3 p0, Vec3 delta);
-        virtual void reloadTransform();
+        virtual Shape applyTransform();
+        virtual void bakeTransform();
 };
 
 class Container: public AAB {
@@ -167,6 +176,8 @@ class Container: public AAB {
             id = 0;
         };
         Container(Container *c) {
+            material = c->material;
+            transform = c->transform;
             plane = c->plane;
             voxelSubdiv = c->voxelSubdiv;
             start = c->start;
@@ -181,24 +192,31 @@ class Container: public AAB {
         int append(Container *c);
         
         int clear(bool deleteShapes = true);
-        ~Container() { clear(); };
 };
 
 class Sphere: public Shape {
     public:
-        Vec3 center, oCenter;
-        float radius, oRadius;
+        Vec3 center;
+        float radius;
         float thickness;
         Vec2 getUV(Vec3 hit);
         Sphere() {
-            center = {0.f, 0.f, 0.f}, oCenter = center;
-            radius = 0.f, oRadius = radius;
+            center = {0.f, 0.f, 0.f};
+            radius = 0.f;
             thickness = 1.f;
         }
+        Sphere(Sphere *s) {
+            material = s->material;
+            transform = s->transform;
+            center = s->center;
+            radius = s->radius;
+            thickness = s->thickness;
+        };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersect(Vec3 p0, Vec3 delta);
-        virtual void reloadTransform();
+        virtual Shape applyTransform();
+        virtual void bakeTransform();
 };
 
 /* struct Sphere {
@@ -211,16 +229,24 @@ class Sphere: public Shape {
 
 class Triangle: public Shape {
     public: 
-        Vec3 a, b, c, oA, oB, oC;
+        Vec3 a, b, c;
         Vec2 UVs[3]; // UV coordinates of a, b, c respectively
         bool plane; // Whether or not a plane defined by these points, or just a triangle
         Triangle() {
             a = {0, 0, 0}, b = a, c = a;
-            oA = a, oB = b, oC = c;
             UVs[0] = {0,0};
             UVs[1] = {0,0};
             UVs[2] = {0,0};
             plane = false;
+        };
+        Triangle(Triangle *t) {
+            material = t->material;
+            transform = t->transform;
+            a = t->a;
+            b = t->b;
+            c = t->c;
+            std::memcpy(UVs, t->UVs, 3*sizeof(Vec2));
+            plane = t->plane;
         };
         Vec3 visibleNormal(Vec3 delta);
         float intersectsPlane(Vec3 p0, Vec3 delta, Vec3 normal);
@@ -231,7 +257,8 @@ class Triangle: public Shape {
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersect(Vec3 p0, Vec3 delta);
-        virtual void reloadTransform();
+        virtual Shape applyTransform();
+        virtual void bakeTransform();
 };
 
 struct PointLight {
