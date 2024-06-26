@@ -51,6 +51,7 @@ class Shape {
             debug = false;
             transform.reset();
         };
+        Shape(Shape *sh);
         virtual Material *mat() { return material; };
         virtual Transform& trans() { return transform; };
         virtual void bounds(Bound *bo);
@@ -60,6 +61,7 @@ class Shape {
         virtual void bakeTransform();
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
         virtual int clear(bool deleteShapes = true) { return 0; };
+        virtual std::string name();
         virtual ~Shape();
     // Note no destructor for the dynamically allocated "material",
     // This is because the material is allocated and given by a MaterialStore,
@@ -139,7 +141,8 @@ class AAB: public Shape {
             max = {0, 0, 0};
             centroid = {0, 0, 0};
         };
-        AAB(AAB *b) {
+        AAB(Shape *sh) {
+            AAB *b = static_cast<AAB*>(sh);
             material = b->material;
             transform = b->transform;
             min = b->min;
@@ -151,6 +154,7 @@ class AAB: public Shape {
         AAB(Vec3 mn, Vec3 mx): min(mn), max(mx) {
             centroid = min + 0.5f * (max - min);
         };
+        virtual std::string name() { return std::string("Box"); };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
@@ -177,9 +181,13 @@ class Container: public AAB {
             splitAxis = -1;
             id = 0;
         };
-        Container(Container *c) {
+        Container(Shape *sh) {
+            Container *c = static_cast<Container*>(sh);
             material = c->material;
             transform = c->transform;
+            min = c->min;
+            max = c->max;
+            centroid = c->centroid;
             plane = c->plane;
             voxelSubdiv = c->voxelSubdiv;
             start = c->start;
@@ -188,6 +196,7 @@ class Container: public AAB {
             splitAxis = c->splitAxis;
             id = c->id;
         };
+        virtual std::string name() { return std::string("Container"); };
         int append(Bound *bo);
         int append(Bound bo);
         int append(Shape *sh);
@@ -207,13 +216,15 @@ class Sphere: public Shape {
             radius = 0.f;
             thickness = 1.f;
         }
-        Sphere(Sphere *s) {
+        Sphere(Shape *sh) {
+            Sphere *s = static_cast<Sphere*>(sh);
             material = s->material;
             transform = s->transform;
             center = s->center;
             radius = s->radius;
             thickness = s->thickness;
         };
+        virtual std::string name() { return std::string("Sphere"); };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
@@ -244,7 +255,8 @@ class Triangle: public Shape {
             UVs[2] = {0,0};
             plane = false;
         };
-        Triangle(Triangle *t) {
+        Triangle(Shape *sh) {
+            Triangle *t = static_cast<Triangle*>(sh);
             material = t->material;
             transform = t->transform;
             a = t->a;
@@ -253,6 +265,7 @@ class Triangle: public Shape {
             std::memcpy(UVs, t->UVs, 3*sizeof(Vec2));
             plane = t->plane;
         };
+        virtual std::string name() { return plane ? std::string("Plane") : std::string("Triangle"); };
         Vec3 visibleNormal(Vec3 delta);
         float intersectsPlane(Vec3 p0, Vec3 delta, Vec3 normal);
         bool projectAndPiP(Vec3 normal, Vec3 hit);
@@ -309,15 +322,15 @@ struct Decoder {
 
     // std::string encodeSphere(Shape *sh);
 
-    Shape *decodeSphere(std::string in);
+    Sphere *decodeSphere(std::string in);
 
     // std::string encodeTriangle(Shape *sh);
 
-    Shape *decodeTriangle(std::string in);
+    Triangle *decodeTriangle(std::string in);
 
     // std::string encodeAAB(Shape *sh);
 
-    Shape *decodeAAB(std::string in);
+    AAB *decodeAAB(std::string in);
     
     void recalculateTriUVs(Triangle *tri);
     

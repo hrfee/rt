@@ -233,7 +233,7 @@ Material *Decoder::decodeMaterial(std::string in, bool definition) {
     return fmt.str();
 }*/
 
-Shape *Decoder::decodeSphere(std::string in) {
+Sphere *Decoder::decodeSphere(std::string in) {
     std::stringstream stream(in);
     Sphere *sh = new Sphere();
     decodeShape(sh, in);
@@ -242,14 +242,14 @@ Shape *Decoder::decodeSphere(std::string in) {
         stream >> w;
         if (w == w_center) {
             stream >> w;
-            sh->oCenter.x = std::stof(w);
+            sh->center.x = std::stof(w);
             stream >> w;
-            sh->oCenter.y = std::stof(w);
+            sh->center.y = std::stof(w);
             stream >> w;
-            sh->oCenter.z = std::stof(w);
+            sh->center.z = std::stof(w);
         } else if (w == w_radius) {
             stream >> w;
-            sh->oRadius = std::stof(w);
+            sh->radius = std::stof(w);
         } else if (w == w_thickness) {
             stream >> w;
             sh->thickness = std::stof(w);
@@ -322,7 +322,7 @@ PointLight Decoder::decodePointLight(std::string in) {
     return fmt.str();
 } */
 
-Shape *Decoder::decodeTriangle(std::string in) {
+Triangle *Decoder::decodeTriangle(std::string in) {
     std::stringstream stream(in);
     Triangle *sh = new Triangle();
     decodeShape(sh, in);
@@ -332,25 +332,25 @@ Shape *Decoder::decodeTriangle(std::string in) {
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            sh->oA.x = std::stof(w);
+            sh->a.x = std::stof(w);
             stream >> w;
-            sh->oA.y = std::stof(w);
+            sh->a.y = std::stof(w);
             stream >> w;
-            sh->oA.z = std::stof(w);
+            sh->a.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            sh->oB.x = std::stof(w);
+            sh->b.x = std::stof(w);
             stream >> w;
-            sh->oB.y = std::stof(w);
+            sh->b.y = std::stof(w);
             stream >> w;
-            sh->oB.z = std::stof(w);
+            sh->b.z = std::stof(w);
         } else if (w == w_c) {
             stream >> w;
-            sh->oC.x = std::stof(w);
+            sh->c.x = std::stof(w);
             stream >> w;
-            sh->oC.y = std::stof(w);
+            sh->c.y = std::stof(w);
             stream >> w;
-            sh->oC.z = std::stof(w);
+            sh->c.z = std::stof(w);
         } else if (w == w_plane) {
             sh->plane = true;
         }
@@ -422,7 +422,7 @@ void Decoder::recalculateTriUVs(Triangle *tri) {
     return fmt.str();
 } */
 
-Shape *Decoder::decodeAAB(std::string in) {
+AAB *Decoder::decodeAAB(std::string in) {
     std::stringstream stream(in);
     AAB *sh = new AAB();
     decodeShape(sh, in);
@@ -432,18 +432,18 @@ Shape *Decoder::decodeAAB(std::string in) {
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            sh->oMin.x = std::stof(w);
+            sh->min.x = std::stof(w);
             stream >> w;
-            sh->oMin.y = std::stof(w);
+            sh->min.y = std::stof(w);
             stream >> w;
-            sh->oMin.z = std::stof(w);
+            sh->min.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            sh->oMax.x = std::stof(w);
+            sh->max.x = std::stof(w);
             stream >> w;
-            sh->oMax.y = std::stof(w);
+            sh->max.y = std::stof(w);
             stream >> w;
-            sh->oMax.z = std::stof(w);
+            sh->max.z = std::stof(w);
         }
     } while (stream);
 

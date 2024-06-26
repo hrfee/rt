@@ -532,6 +532,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         if (res->collisions >= 1) {
             Vec3 p1, delta1;
             res->obj.refract(rc->refractiveIndex, res->p0, delta, &p1, &delta1);
+            p1 = p1 + (EPSILON * delta1);
             RayResult r = RayResult();
             castRay(&r, obj, p1, delta1, rc, callCount+1);
             res->refractColor = r.color;
@@ -618,8 +619,10 @@ namespace {
     const char* w_close = "}";
 }
 
+// FIXME: Reimplement!
 void WorldMap::encode(char const* path) {
-    std::ofstream out(path);
+    std::printf("FIXME: Reimplement!\n");
+    /* std::ofstream out(path);
     if (!path) {
         throw std::runtime_error("Failed to open " + std::string(path));
         return;
@@ -645,7 +648,7 @@ void WorldMap::encode(char const* path) {
     }
 
     out.close();
-    std::printf("Current map saved to %s\n", path);
+    std::printf("Current map saved to %s\n", path); */
 }
 
 WorldMap::WorldMap(char const* path) {
@@ -662,12 +665,7 @@ WorldMap::WorldMap(char const* path) {
     lastOptimizeTime = 0.f;
     lastLoadTime = 0.f;
     obj = &unoptimizedObj;
-    std::memset(&unoptimizedObj, 0, sizeof(Container));
-    std::memset(&unoptimizable, 0, sizeof(Container));
-    clearContainer(&unoptimizedObj, true);
-    clearContainer(&unoptimizable, true);
     flatObj = NULL;
-    clearContainer(flatObj, true);
     optimizedObj = NULL;
     camPresetNames = NULL;
     aaOffsetImage = NULL;
@@ -685,11 +683,11 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     optimizeLevel = level;
     accelIndex = accelIdx;
     std::printf("Optimizing map with accelerator %d, depth %d, extra params %d, %f\n", accelIndex, level, accelParam, accelFloatParam);
-    clearContainer(optimizedObj, false);
-    free(optimizedObj);
+    optimizedObj->clear(false);
+    delete optimizedObj;
     optimizedObj = NULL;
     if (flatObj == NULL) {
-        flatObj = emptyContainer();
+        flatObj = new Container();
         flattenRootContainer(flatObj, &unoptimizedObj);
         genObjectList(flatObj);
     }
@@ -709,8 +707,8 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
 
 void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     currentlyLoading = true;
-    std::printf("Frees: %d\n", clearContainer(&unoptimizedObj, true));
-    clearContainer(&unoptimizable, true);
+    std::printf("Frees: %d\n", unoptimizedObj.clear());
+    unoptimizable.clear();
     pointLights.clear();
     camPresets.clear();
     mapStats.clear();
@@ -718,10 +716,11 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     mapStats.name = std::string(path);
 
     free(camPresetNames);
-    clearContainer(optimizedObj, false);
-    free(optimizedObj);
+    optimizedObj->clear();
+    delete optimizedObj;
     optimizedObj = NULL;
-    clearContainer(flatObj, true);
+    flatObj->clear();
+    delete flatObj;
     flatObj = NULL;
     obj = &unoptimizedObj;
 
@@ -774,20 +773,12 @@ void WorldMap::genObjectList(Container *c) {
     // FIXME: This only works on the unoptimized object!
     Bound *bo = c->start;
     while (bo != c->end->next) {
-        std::string name = "#" + std::to_string(i) + ": ";
-        if (bo->s == NULL) continue;
-        objectPtrs[i] = bo->s;
-        if (bo->s->s != NULL) {
-            name += "Sphere";
-        } else if (bo->s->t != NULL) {
-            if (bo->s->t->plane) {
-                name += "Plane";
-            } else {
-                name += "Triangle";
-            }
-        } else if (bo->s->b != NULL) {
-            name += "Box";
+        if (bo->s == NULL) {
+            bo = bo->next;
+            continue;
         }
+        objectPtrs[i] = bo->s;
+        std::string name = "#" + std::to_string(i) + ": " + bo->s->name();
         objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
         strncpy(objectNames[i], name.c_str(), name.size()+1);
         bo = bo->next;
@@ -796,20 +787,12 @@ void WorldMap::genObjectList(Container *c) {
     if (unoptimizable.size == 0) return;
     bo = unoptimizable.start;
     while (bo != unoptimizable.end->next) {
-        std::string name = "#" + std::to_string(i) + ": ";
-        if (bo->s == NULL) continue;
-        objectPtrs[i] = bo->s;
-        if (bo->s->s != NULL) {
-            name += "Sphere";
-        } else if (bo->s->t != NULL) {
-            if (bo->s->t->plane) {
-                name += "Plane";
-            } else {
-                name += "Triangle";
-            }
-        } else if (bo->s->b != NULL) {
-            name += "Box";
+        if (bo->s == NULL) {
+            bo = bo->next;
+            continue;
         }
+        objectPtrs[i] = bo->s;
+        std::string name = "#" + std::to_string(i) + ": " + bo->s->name();
         objectNames[i] = (char*)malloc(sizeof(char)*(name.size()+1));
         strncpy(objectNames[i], name.c_str(), name.size()+1);
         bo = bo->next;
@@ -868,8 +851,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             } else {
                 throw std::runtime_error("Didn't find open brace");
             }
-        } else if (token == w_container) {
-            c = emptyContainer(true);
+        /*} else if (token == w_container) {
+            c = new Container(true);
             mapStats.allocs++;
             for (int i = 0; i < 4; i++) {
                 lstream >> token;
@@ -912,59 +895,60 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             } else {
                 throw std::runtime_error("Didn't find open brace");
             }
+        */
         } else if (token == w_close) {
             if (c != NULL) {
-                mapStats.allocs += appendToContainer(&unoptimizedObj, c);
+                mapStats.allocs += unoptimizedObj.append(c);
                 c = NULL;
             } else if (dec.isUsingMaterial()) {
                 dec.endUsingMaterial();
             }
         } else if (token == w_sphere || token == w_triangle || token == w_aab) {
             if (token == w_sphere) {
-                Shape *sphere = dec.decodeSphere(line);
+                Sphere *sphere = dec.decodeSphere(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
-                mapStats.allocs += 2; // Shape and sphere
-                sphere->s->center = sphere->s->center * transform;
+                mapStats.allocs += 1; // Sphere
+                sphere->center = sphere->center * transform;
                 if (c == NULL) {
-                    mapStats.allocs += appendToContainer(&unoptimizedObj, sphere);
+                    mapStats.allocs += unoptimizedObj.append(sphere);
                 } else {
-                    mapStats.allocs += appendToContainer(c, sphere);
+                    mapStats.allocs += c->append(sphere);
                 }
                 mapStats.spheres++;
             } else if (token == w_triangle) {
-                Shape *triangle = dec.decodeTriangle(line);
+                Triangle *triangle = dec.decodeTriangle(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
-                mapStats.allocs += 2; // Shape and triangle
-                triangle->t->a = triangle->t->a * transform;
-                triangle->t->b = triangle->t->b * transform;
-                triangle->t->c = triangle->t->c * transform;
-                if (triangle->t->plane) {
-                    mapStats.allocs += appendToContainer(&unoptimizable, triangle);
+                mapStats.allocs += 1; // Triangle
+                triangle->a = triangle->a * transform;
+                triangle->b = triangle->b * transform;
+                triangle->c = triangle->c * transform;
+                if (triangle->plane) {
+                    mapStats.allocs += unoptimizable.append(triangle);
                     mapStats.planes++;
                 } else {
                     if (c == NULL) {
-                        mapStats.allocs += appendToContainer(&unoptimizedObj, triangle);
+                        mapStats.allocs += unoptimizedObj.append(triangle);
                     } else {
-                        mapStats.allocs += appendToContainer(c, triangle);
+                        mapStats.allocs += c->append(triangle);
                     }
                     mapStats.tris++;
                 }
             } else if (token == w_aab) {
-                Shape *aab = dec.decodeAAB(line);
+                AAB *aab = dec.decodeAAB(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
-                mapStats.allocs += 2; // Shape and AAB
-                aab->b->min = aab->b->min * transform;
-                aab->b->max = aab->b->max * transform;
+                mapStats.allocs += 1; // AAB
+                aab->min = aab->min * transform;
+                aab->max = aab->max * transform;
                 if (c == NULL) {
-                    mapStats.allocs += appendToContainer(&unoptimizedObj, aab);
+                    mapStats.allocs += unoptimizedObj.append(aab);
                 } else {
-                    mapStats.allocs += appendToContainer(c, aab);
+                    mapStats.allocs += c->append(aab);
                 }
                 mapStats.aabs++;
             }
@@ -1020,60 +1004,25 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
 void flattenRootContainer(Container *dst, Container *src, bool root) {
     if (src == NULL || src->size == 0) return;
     if (root) {
-        dst->a = {1e10, 1e10, 1e30};
-        dst->b = {-1e10, -1e10, -1e30};
+        dst->min = {1e10, 1e10, 1e30};
+        dst->max = {-1e10, -1e10, -1e30};
     }
     Bound *bo = src->start;
     while (bo != src->end->next) {
         Shape *current = bo->s;
-        if (current->c != NULL) {
-            flattenRootContainer(dst, current->c, false);
+        Container *c = dynamic_cast<Container*>(current);
+        if (c != nullptr) {
+            flattenRootContainer(dst, c, false);
         } else {
             Bound *b = emptyBound();
-            b->s = emptyShape(true);
-            std::memcpy(b->s, current, sizeof(Shape));
-            if (current->s != NULL) {
-                b->min = current->s->center - current->s->radius;
-                b->max = current->s->center + current->s->radius;
-                b->centroid = current->s->center;
-                Sphere *s = (Sphere*)alloc(sizeof(Sphere));
-                std::memcpy(s, current->s, sizeof(Sphere));
-                b->s->s = s;
-            }
-            if (current->t != NULL) {
-                b->min = {9999, 9999, 9999};
-                b->max = {-9999, -9999, -9999};
-                if (current->t->plane) {
-                    // FIXME: Calculating a real bounding box: intersect plane with scene's AABB.
-                } else {
-                    for (int i = 0; i < 3; i++) {
-                        b->min(i) = std::min(b->min(i), current->t->a(i));
-                        b->min(i) = std::min(b->min(i), current->t->b(i));
-                        b->min(i) = std::min(b->min(i), current->t->c(i));
-                        b->max(i) = std::max(b->max(i), current->t->a(i));
-                        b->max(i) = std::max(b->max(i), current->t->b(i));
-                        b->max(i) = std::max(b->max(i), current->t->c(i));
-                    }
-                    b->centroid = 0.333f * (current->t->a + current->t->b + current->t->c);
-                }
-                Triangle *t = (Triangle*)alloc(sizeof(Triangle));
-                std::memcpy(t, current->t, sizeof(Triangle));
-                b->s->t = t;
-            }
-            if (current->b != NULL) {
-                b->min = current->b->min;
-                b->max = current->b->max;
-                b->centroid = b->min + 0.5f*(b->max - b->min);
-                AAB *bb = (AAB*)alloc(sizeof(AAB));
-                std::memcpy(bb, current->b, sizeof(AAB));
-                b->s->b = bb;
-            }
+            // FIXME: Make sure this works!
+            b->s = new Shape(current);
+            current->bounds(b);
             for (int i = 0; i < 3; i++) {
-                dst->a(i) = std::min(dst->a(i), b->min(i));
-                dst->b(i) = std::max(dst->b(i), b->max(i));
+                dst->min(i) = std::min(dst->min(i), b->min(i));
+                dst->max(i) = std::max(dst->max(i), b->max(i));
             }
-            
-            appendToContainer(dst, b);
+            dst->append(b);
         }
         bo = bo->next;
     }
@@ -1081,10 +1030,11 @@ void flattenRootContainer(Container *dst, Container *src, bool root) {
 
 WorldMap::~WorldMap() {
     delete cam;
-    clearContainer(&unoptimizedObj, true);
-    clearContainer(&unoptimizable, true);
-    // clearContainer(optimizedObj);
-    free(optimizedObj);
-    obj = NULL;
-    optimizedObj = NULL;
+    unoptimizedObj.clear();
+    unoptimizable.clear();
+    // FIXME: These might be issues?
+    flatObj->clear();
+    delete flatObj;
+    optimizedObj->clear();
+    delete optimizedObj;
 }
