@@ -561,6 +561,7 @@ void GLWindow::addUI() {
         
         vl(ImGui::Checkbox("Use/Generate KD/BVH Optimization", &(state.useOptimizedMap)));
         if (state.useOptimizedMap) {
+            ImGui::Text("note: un-baked transforms on objects will cause weirdness.");
             // vl(ImGui::Checkbox("Use proper BVH", &(state.useBVH)));
             vl(ImGui::SliderInt("Max hierarchy depth", &(state.accelDepth), 1, 100));
             vl(ImGui::Checkbox("Draw cube around volumes", &(state.rc.showDebugObjects)));
@@ -974,7 +975,14 @@ void GLWindow::showShapeEditor() {
                     ImGui::InputFloat3("Min Corner", (float*)&(sh->b->min));
                     ImGui::InputFloat3("Max Corner", (float*)&(sh->b->max));
                 }
+
+                ImGui::Text("transforms (relative to origin)");
+                vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans.translate)));
+                vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans.rotate), 0.f, 2.f*M_PI));
+                vl(ImGui::SliderFloat("Scale", &(sh->trans.scale), 0.f, 100.f));
+
                 // material params
+                ImGui::Text("material");
                 showMaterialEditor(sh->m);
             }
         }

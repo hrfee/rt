@@ -33,6 +33,9 @@ namespace {
     const char* w_phi = "phi";
     const char* w_theta = "theta";
     const char* w_fov = "fov";
+    const char* w_translate = "translate";
+    const char* w_rotate = "rotate";
+    const char* w_scale = "scale";
 }
 
 std::string encodeCamPreset(CamPreset *p) {
@@ -97,6 +100,7 @@ Material *emptyMaterial() {
 Shape *emptyShape(bool noMaterial) {
     Shape *sh = (Shape*)alloc(sizeof(Shape));
     std::memset(sh, 0, sizeof(Shape));
+    sh->trans.reset();
     if (!noMaterial) sh->m = emptyMaterial();
     return sh;
 }
@@ -124,6 +128,29 @@ Shape *Decoder::decodeShape(std::string in) {
     } else {
         sh->m = decodeMaterial(in);
     }
+    std::stringstream stream(in);
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_translate) {
+            stream >> w;
+            sh->trans.translate.x = std::stof(w);
+            stream >> w;
+            sh->trans.translate.y = std::stof(w);
+            stream >> w;
+            sh->trans.translate.z = std::stof(w);
+        } else if (w == w_rotate) {
+            stream >> w;
+            sh->trans.rotate.x = std::stof(w);
+            stream >> w;
+            sh->trans.rotate.y = std::stof(w);
+            stream >> w;
+            sh->trans.rotate.z = std::stof(w);
+        } else if (w == w_scale) {
+            stream >> w;
+            sh->trans.scale = std::stof(w);
+        }
+    } while (stream);
     return sh;
 }
 
@@ -702,4 +729,32 @@ void Decoder::usingMaterial(std::string name) {
     if (usedMaterial == NULL) {
         std::printf("WARNING: Couldn't resolve material \"%s\"\n", name.c_str());
     }
+}
+
+Sphere Transform::apply(Sphere *sphere) {
+    Mat4 m = build();
+    Sphere s;
+    std::memcpy(&s, sphere, sizeof(Sphere));
+    s.center = s.center * m;
+    s.radius = s.radius * scale;
+    return s;
+}
+
+Triangle Transform::apply(Triangle *triangle) {
+    Mat4 m = build();
+    Triangle t;
+    std::memcpy(&t, triangle, sizeof(Triangle));
+    t.a = t.a * m;
+    t.b = t.b * m;
+    t.c = t.c * m;
+    return t;
+}
+
+AAB Transform::apply(AAB *aab) {
+    Mat4 m = build();
+    AAB b;
+    std::memcpy(&b, aab, sizeof(AAB));
+    b.min = b.min * m;
+    b.max = b.max * m;
+    return b;
 }

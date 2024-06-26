@@ -200,8 +200,8 @@ void castThroughSolidSphere(float r0, float r1, Vec3 pb, Vec3 delta, Sphere *s, 
 
 void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, int callCount) {
     float ri = rc->refractiveIndex;
-    float thickness = res->obj->s->thickness;
-    Vec3 center = res->obj->s->center;
+    float thickness = res->sphere.thickness;
+    Vec3 center = res->sphere.center;;
     if (thickness == 0.f) {
         // Behave like a filled sphere of air.
         ri = RI_AIR;
@@ -211,7 +211,7 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
     Vec3 pb = res->p0;
     Vec3 refract;
     if (thickness == 1.f) {
-        castThroughSolidSphere(RI_AIR, ri, res->p0, delta, res->obj->s, &pb, &refract);
+        castThroughSolidSphere(RI_AIR, ri, res->p0, delta, &(res->sphere), &pb, &refract);
     } else {
         // Into outer sphere (RI_AIR -> RI_SPHERE)
         Vec3 normal = pb - center;
@@ -224,7 +224,7 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
             bool escaped = false;
             refract = r;
             // Our smaller, inner sphere, filled with RI_AIR.
-            Sphere innerSphere = {center, res->obj->s->radius*(1.f - res->obj->s->thickness), 1.f};
+            Sphere innerSphere = {center, res->sphere.radius*(1.f - res->sphere.thickness), 1.f};
             while (!escaped) {
                 // Hit the inner sphere
                 float t = meetsSphere(pb, refract, &innerSphere, NULL);
@@ -236,7 +236,7 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
                     pb = p2;
                     refract = r;
                     // Hit the outer sphere
-                    t = meetsSphere(pb, refract, res->obj->s, NULL);
+                    t = meetsSphere(pb, refract, &(res->sphere), NULL);
                     pb = pb + (t * refract);
                     normal = -1.f * (pb - center);
                     // Out of the outer sphere (RI_SPHERE -> RI_AIR)
@@ -250,7 +250,7 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
                         escaped = true;
                     }
                 } else { // Missing the internal sphere means we can ignore its existence.
-                    castThroughSolidSphere(RI_AIR, ri, res->p0, delta, res->obj->s, &pb, &refract);
+                    castThroughSolidSphere(RI_AIR, ri, res->p0, delta, &(res->sphere), &pb, &refract);
                     escaped = true;
                 }
             }
@@ -269,6 +269,7 @@ void WorldMap::castThroughSphere(Vec3 delta, RenderConfig *rc, RayResult *res, i
 // tag an object with the ID of the ray on intersection.
 // Then before intersecting an object, check if the object has been intersected by this rayID.
 // HOWEVER, unless we used a map per-ray to store intersections or something, this wouldn't work with multiple threads.
+// FIXME: Support transforms
 void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, RenderConfig *rc) {
     delta = norm(delta);
     int x = 0, y = 0, z = 0;
@@ -388,45 +389,60 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             continue;
         }
         if (current->s != NULL && rc->spheres) {
-            float t = meetsSphere(p0, delta, current->s, NULL);
+            Sphere *s = current->s;
+            Sphere tS;
+            if (current->trans.needed()) {
+                tS = current->trans.apply(s);
+                s = &tS;
+            }
+            float t = meetsSphere(p0, delta, s, NULL);
             if (t >= 0) {
                 res->collisions++;
                 res->potentialCollisions++;
                 if (t < res->t) {
                     res->obj = current;
+                    res->sphere = *s;
                     res->t = t;
                     res->p0 = p0 + (res->t * delta);
-                    res->normal = res->p0 - current->s->center;
+                    res->normal = res->p0 - s->center;
                     res->norm = norm(res->normal);
                 }
             }
         } else if (current->t != NULL && rc->triangles) {
-            Vec3 normal = getVisibleTriNormal(delta, current->t->a, current->t->b, current->t->c);
+            Triangle *tri = current->t;
+            Triangle tT;
+            if (current->trans.needed()) {
+                tT = current->trans.apply(tri);
+                tri = &tT;
+            }
+            Vec3 normal = getVisibleTriNormal(delta, tri->a, tri->b, tri->c);
             Vec3 nNormal = norm(normal);
-            if (rc->mtTriangleCollision && !current->t->plane) {
+            if (rc->mtTriangleCollision && !tri->plane) {
                 Vec3 bary;
-                float t = meetsTriangleMT(p0, delta, current->t, &bary);
+                float t = meetsTriangleMT(p0, delta, tri, &bary);
                 if (t >= 0 && t < res->t) {
                     if (current->m->texId != -1 || current->m->normId != -1) {
-                        res->uv = triUV(bary, current->t);
+                        res->uv = triUV(bary, tri);
                     }
                     res->potentialCollisions++;
                     res->collisions++;
                     res->obj = current;
+                    res->triangle = *tri;
                     res->t = t;
                     res->p0 = p0 + (t *delta);
                     res->normal = normal;
                     res->norm = nNormal;
                 }
             } else {
-                float t = meetsTrianglePlane(p0, delta, nNormal, current->t);
+                float t = meetsTrianglePlane(p0, delta, nNormal, tri);
                 if (t >= 0) {
                     res->potentialCollisions++;
                     if (t < res->t) {
                         Vec3 cPoint = p0 + (t * delta);
-                        if (current->t->plane || meetsTriangle(nNormal, cPoint, current->t)) {
+                        if (tri->plane || meetsTriangle(nNormal, cPoint, tri)) {
                             res->collisions++;
                             res->obj = current;
+                            res->triangle = *tri;
                             res->t = t;
                             res->p0 = cPoint;
                             res->normal = normal;
@@ -438,14 +454,21 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                 }
             }
         } else if (current->b != NULL && rc->aabs) {
+            AAB *b = current->b;
+            AAB tB;
+            if (current->trans.needed()) {
+                tB = current->trans.apply(b);
+                b = &tB;
+            }
             Vec3 normal;
-            // float t = meetAABB(p0, delta, current->b->min, current->b->max);
-            float t = meetAABBWithNormal(p0, delta, current->b->min, current->b->max, &normal);
+            // float t = meetAABB(p0, delta, b->min, b->max);
+            float t = meetAABBWithNormal(p0, delta, b->min, b->max, &normal);
             if (t >= 0) {
                 res->collisions++;
                 res->potentialCollisions++;
                 if (t < res->t) {
                     res->obj = current;
+                    res->box = *b;
                     res->t = t;
                     res->p0 = p0 + (res->t * delta);
                     res->normal = normal;
@@ -524,13 +547,13 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     if (rc->collisionsOnly) return;
 
     if (res->obj->s != NULL && res->obj->m->texId != -1) {
-        res->uv = sphereUV(res->obj->s, res->p0);
+        res->uv = sphereUV(&(res->sphere), res->p0);
         // res->color = Vec3{uv.x, uv.y, 0.5f};
         Texture *tx = tex.at(res->obj->m->texId);
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
     }
     if (res->obj->b != NULL && res->obj->m->texId != -1) {
-        res->uv = aabUV(res->p0, res->obj->b, res->norm);
+        res->uv = aabUV(res->p0, &(res->box), res->norm);
         // res->color = Vec3{uv.x, uv.y, 0.5f};
         Texture *tx = tex.at(res->obj->m->texId);
         // if (tx != NULL) res->color = {res->uv.x, res->uv.y, 0.f};
@@ -542,8 +565,8 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         // res->color = {res->uv.x, res->uv.y, 1.f};
     }
     if (rc->normalMapping && res->obj->m->normId != -1) {
-        if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(res->obj->s, res->p0);
-        else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, res->obj->b, res->norm);
+        if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(&(res->sphere), res->p0);
+        else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, &(res->box), res->norm);
 
         Texture *nm = norms.at(res->obj->m->normId);
         if (nm != NULL) {
@@ -596,8 +619,8 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     float reflectiveness = res->obj->m->reflectiveness;
     if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj->m->refId != -1))) {
         if (rc->reflectanceMapping && res->obj->m->refId != -1) {
-            if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(res->obj->s, res->p0);
-            else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, res->obj->b, res->norm);
+            if (res->obj->s != NULL && res->uv.x == -1.f) res->uv = sphereUV(&(res->sphere), res->p0);
+            else if (res->obj->b != NULL && res->uv.x == -1.f) res->uv = aabUV(res->p0, &(res->box), res->norm);
             
             Texture *rf = refs.at(res->obj->m->refId);
             if (rf != NULL) reflectiveness = rf->at(res->uv.x, res->uv.y)(0); // B&W map, so all channels are identical
@@ -699,6 +722,7 @@ namespace {
     const char* w_comment = "//";
     const char* w_container = "container";
     const char* w_material = "material";
+    const char* w_object = "object";
     const char* w_usingMaterial = "using";
     const char* w_campreset = "campreset";
     const char* w_a = "a";
@@ -1097,7 +1121,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                     trans = trans * rotateZ(std::stof(token));
                 } else if (token == w_scale) {
                     lstream >> token;
-                    trans = trans * scale(std::stof(token));
+                    trans = trans * transformScale(std::stof(token));
                 } else {
                     lstream << " " << token;
                     break;

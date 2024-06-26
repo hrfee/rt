@@ -52,6 +52,9 @@ struct RayResult {
     Vec3 normal;
     Vec3 norm;
     Shape *obj;
+    Sphere sphere;
+    Triangle triangle;
+    AAB box;
     RayResult() { resetObj(); };
     void resetObj() {
         collisions = 0;

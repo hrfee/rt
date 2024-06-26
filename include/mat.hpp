@@ -67,7 +67,7 @@ Mat4 rotateZ(float rad) noexcept {
 }
 
 inline
-Mat4 scale(float s) noexcept {
+Mat4 transformScale(float s) noexcept {
 	return Mat4{{
         s, 0, 0, 0,
         0, s, 0, 0,

@@ -1,6 +1,7 @@
 #ifndef SHAPE
 #define SHAPE
 
+#include "mat.hpp"
 #include "vec.hpp"
 #include "tex.hpp"
 #include <vector>
@@ -13,7 +14,33 @@ struct Triangle;
 struct Container;
 struct AAB;
 struct Material;
+struct Shape;
 
+struct Transform {
+    Vec3 translate;
+    Vec3 rotate;
+    float scale;
+    void reset() {
+        translate = {0,0,0};
+        rotate = {0,0,0};
+        scale = 1.f;
+    }
+    bool needed() {
+        return !(translate.x == 0.f && translate.y == 0.f && translate.z == 0.f && rotate.x == 0.f && rotate.y == 0.f && rotate.z == 0.f && scale == 1.f);
+    }
+    Mat4 build() {
+        Mat4 trans = mat44Identity;
+        trans = trans * translateMat(translate);
+        if (rotate.x != 0.f) trans = trans * rotateX(rotate.x);
+        if (rotate.y != 0.f) trans = trans * rotateY(rotate.y);
+        if (rotate.z != 0.f) trans = trans * rotateZ(rotate.z);
+        if (scale != 1.f) trans = trans * transformScale(scale);
+        return trans;
+    }
+    Sphere apply(Sphere *sphere);
+    Triangle apply(Triangle *triangle);
+    AAB apply(AAB *aab);
+};
 
 struct Shape {
     Sphere *s;
@@ -21,6 +48,7 @@ struct Shape {
     Container *c;
     AAB *b;
     Material *m;
+    Transform trans;
     bool debug; // Whether to be hidden in normal output or not.
 };
 

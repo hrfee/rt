@@ -1,3 +1,6 @@
+Fixsphere texturing when transformed
+transform "bake" feature
+epsilon too small or big when far away? noise appears again.
 Convex Hulls,
 The concept of models (integrating with materials feature)
 Ability to "possess" objects to move them
