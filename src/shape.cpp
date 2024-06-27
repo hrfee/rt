@@ -38,6 +38,7 @@ namespace {
     const char* w_translate = "translate";
     const char* w_rotate = "rotate";
     const char* w_scale = "scale";
+    const char* w_debug = "debug";
 }
 
 std::string encodeCamPreset(CamPreset *p) {
@@ -142,6 +143,8 @@ void Decoder::decodeShape(Shape *sh, std::string in) {
         } else if (w == w_scale) {
             stream >> w;
             sh->trans().scale = std::stof(w);
+        } else if (w == w_debug) {
+            sh->debug = true;
         }
     } while (stream);
 }
@@ -1121,6 +1124,7 @@ bool Triangle::PiP(Vec2 projHit, Vec2 projA, Vec2 projB, Vec2 projC) {
     return collisions == 1;
 }
 
+// FIXME: Issues when all components of the point A are the same??? (try with a 2 2 2)
 // Default method: Muller-Trumbore
 // Faster triangle collision algorithm which calculates barycentric coordinates to determine t.
 // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm

@@ -60,8 +60,8 @@ struct RayResult {
     void resetObj() {
         collisions = 0;
         // potentialCollisions = 0;
-        t = 1e10;
-        t1 = 1e10;
+        t = 1e30f;
+        t1 = 1e30f;
         color = {0,0,0};
         reflectionColor = {0,0,0};
         specularColor = {0,0,0};

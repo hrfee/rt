@@ -139,13 +139,15 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         Vec3 normDistance = distance / tLight;
         r.resetObj();
         ray(&r, obj, p0, normDistance, &simpleConfig);
-        bool noHit = r.collisions == 0 || r.t > tLight;
-        if (!noHit) continue;
+        bool hit = r.hit() && !(r.obj->debug) && r.t <= tLight;
+        if (hit) {
+            continue;
+        }
         float scaledDistance = tLight / rc->distanceDivisor;
         float lightBrightness = light.brightness / (scaledDistance*scaledDistance);
         lightColor = lightColor + (light.color * lightBrightness);
 
-        if (!rc->specular) continue;
+        // if (!rc->specular) continue;
         // PHONG : CGPaP in C p.730 Sect. 16.1.4
         // \hat{L} = normDistance,
         // \hat{N} = norm(res->normal),
@@ -400,7 +402,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
             // FIXME: Somehow store the if the transformation has been done already,
             // so we don't repeat per ray?
             current->applyTransform();
-            Vec3 normal;
+            Vec3 normal = {0, 0, 0};
             Vec2 uv;
             Vec2 *uvPtr = (current->mat() != NULL && current->mat()->hasTexture()) ? &uv : NULL;
             float t = current->intersect(p0, delta, &normal, uvPtr);

@@ -580,6 +580,8 @@ void GLWindow::addUI() {
             }
         } else {
             state.renderOptimizedHierarchy = false;
+            vl(ImGui::Checkbox("Show debug objects", &(state.rc.showDebugObjects)));
+
         }
 
         vl(ImGui::InputInt("Max ray bounces", &(state.rc.maxBounce), 1, 10));
