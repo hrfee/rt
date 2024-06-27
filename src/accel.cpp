@@ -631,20 +631,22 @@ void containerCube(Container *c, Vec3 color) {
             corners[2][axes[j]] -= width;
             corners[3][axes[j]] += width;
             Triangle *t0 = new Triangle();
-            t0->a = Vec3{corners[0][0], corners[0][1], corners[0][2]};
-            t0->b = Vec3{corners[1][0], corners[1][1], corners[1][2]};
-            t0->c = Vec3{corners[2][0], corners[2][1], corners[2][2]};
+            t0->oA = Vec3{corners[0][0], corners[0][1], corners[0][2]};
+            t0->oB = Vec3{corners[1][0], corners[1][1], corners[1][2]};
+            t0->oC = Vec3{corners[2][0], corners[2][1], corners[2][2]};
             t0->debug = true;
             t0->material = emptyMaterial();
             t0->mat()->color = color;
+            t0->applyTransform();
             c->append(t0);
             Triangle *t1 = new Triangle();
-            t1->a = Vec3{corners[2][0], corners[2][1], corners[2][2]};
-            t1->b = Vec3{corners[3][0], corners[3][1], corners[3][2]};
-            t1->c = Vec3{corners[0][0], corners[0][1], corners[0][2]};
+            t1->oA = Vec3{corners[2][0], corners[2][1], corners[2][2]};
+            t1->oB = Vec3{corners[3][0], corners[3][1], corners[3][2]};
+            t1->oC = Vec3{corners[0][0], corners[0][1], corners[0][2]};
             t1->debug = true;
             t1->material = emptyMaterial();
             t1->mat()->color = color;
+            t1->applyTransform();
             c->append(t1);
         }
     }

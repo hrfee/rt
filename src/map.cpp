@@ -682,9 +682,11 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     optimizeLevel = level;
     accelIndex = accelIdx;
     std::printf("Optimizing map with accelerator %d, depth %d, extra params %d, %f\n", accelIndex, level, accelParam, accelFloatParam);
-    optimizedObj->clear(false);
-    delete optimizedObj;
-    optimizedObj = NULL;
+    if (optimizedObj != NULL) {
+        optimizedObj->clear();
+        delete optimizedObj;
+        optimizedObj = NULL;
+    }
     if (flatObj == NULL) {
         flatObj = new Container();
         flattenRootContainer(flatObj, &unoptimizedObj);
