@@ -20,6 +20,24 @@
 
 #define MOVE_SPEED 1.f
 
+#define FONT_SIZE 18.f
+#define FONT_SIZE_HIDPI 15.f
+
+#define ICON_SAVE ""
+#define CHAR_SAVE u''
+#define ICON_REFRESH ""
+#define CHAR_REFRESH u''
+#define ICON_BIN ""
+#define CHAR_BIN u''
+
+// Another note: below might not be true, each pair in this array seems to be a range, so doing the same twice sorts it.
+// Note: Make sure these are in the right order when adding more!
+// an easy way to find it is to load the font in gnome-font-viewer,
+// the order of the icons should be matched here.
+namespace {
+    static const ImWchar16 icon_ranges[] = { CHAR_BIN, CHAR_BIN, CHAR_REFRESH, CHAR_REFRESH, CHAR_SAVE, CHAR_SAVE };
+};
+
 void SubImage::regen() {
     GLuint nTex = 0; 
     glGenTextures(1, &nTex);
@@ -211,12 +229,38 @@ GLWindow::GLWindow(int width, int height, float scale, const char *windowTitle) 
 }
 
 void GLWindow::loadUI() {
+
+    float xscale, yscale;
+    glfwGetWindowContentScale(window, &xscale, &yscale);
+    std::printf("Got window scale %f, %f\n", xscale, yscale);
+    int monitorCount;
+    GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
+    if (monitorCount > 0) {
+        float mxscale, myscale;
+        glfwGetMonitorContentScale(monitors[0], &mxscale, &myscale);
+        std::printf("Got monitor scale %f, %f, rounded to %d\n", xscale, yscale, int(xscale));
+        if (mxscale > xscale || myscale > yscale) {
+            xscale = mxscale;
+            yscale = myscale;
+        }
+    }
+
+    // xscale = 1.f;
+
     ui.ctx = ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // io.DisplayFramebufferScale = ImVec2(xscale, yscale);
+    ImFontConfig cfg;
+    float size = FONT_SIZE;
+    if (xscale > 1.5f) size = FONT_SIZE_HIDPI;
+    cfg.SizePixels = size * xscale;
+    io.Fonts->AddFontFromFileTTF("third_party/fonts/static/HankenGrotesk-SemiBold.ttf", cfg.SizePixels, &cfg);
+    cfg.MergeMode = true;
+    io.Fonts->AddFontFromFileTTF("third_party/fonts/icon/remixicon.ttf", cfg.SizePixels, &cfg, icon_ranges);
+    io.FontGlobalScale = 1.f / xscale;
     // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.Fonts->AddFontFromFileTTF("third_party/fonts/static/HankenGrotesk-SemiBold.ttf", 18.f);
-    // io.Fonts->AddFontFromFileTTF("third_party/fonts/HankenGrotesk-VariableFont_wght.ttf", 18.f);
+    // io.Fonts->AddFontFromFileTTF("third_party/fonts/HankenGrotesk-VariableFont_wght.ttf", size);
 
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 10.f;
@@ -230,6 +274,7 @@ void GLWindow::loadUI() {
     style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
     style.FramePadding = ImVec2(6.f, 4.5f);
 
+    // style.ScaleAllSizes(xscale);
 
     state.rc.threadStates = NULL;
     state.rc.renderOnChange = false;
@@ -440,7 +485,6 @@ bool GLWindow::vl(bool t) {
 #endif
 
 void GLWindow::addUI() {
-    ImGui::ShowDemoWindow();
     state.rc.renderNow = false;
     bool backgroundText = ui.hide;
     if (backgroundText) {
@@ -509,13 +553,18 @@ void GLWindow::addUI() {
         ImGui::Checkbox("Dump future render stats to CSV buffer", &(state.dumpToCsv));
 
         ImGui::Text("Dump render to .tga file");
+        ui.saveToTGA = ImGui::Button(ICON_SAVE);
+        ImGui::SameLine();
         ImGui::InputText(".tga path", &(state.filePath));
-        ui.saveToTGA = ImGui::Button("Save", ImVec2(90, 25));
+      
         ImGui::Text("Map Loading");
+        disable();
+        bool reloadMap = ImGui::Button(ICON_REFRESH);
+        ImGui::SameLine();
+        enable();
         ImGui::InputText(".map path", &(state.mapPath));
 
         disable();
-        bool reloadMap = ImGui::Button((state.reloadMap ? "Loading..." : "Reload Map (50/50 SEGV)"), ImVec2(180, 25));
         if (reloadMap) {
             state.reloadMap = true;
         }
@@ -924,19 +973,19 @@ void GLWindow::showMaterialEditor(Material *m) {
     vl(ImGui::SliderFloat("Shininess (n)", &(m->shininess), 0, 100.f));
     vl(ImGui::Checkbox("Disable Lighting", &(m->noLighting)));
 
-    if (vl(ImGui::Button("X##1"))) {
+    if (vl(ImGui::Button(ICON_BIN "##1"))) {
         m->texId = -1;
     }
     ImGui::SameLine();
     vl(ImGui::Combo("Texture", &(m->texId), state.tex->names, state.tex->texes.size()));
     
-    if (vl(ImGui::Button("X##2"))) {
+    if (vl(ImGui::Button(ICON_BIN "##2"))) {
         m->normId = -1;
     }
     ImGui::SameLine();
     vl(ImGui::Combo("Normal Map", &(m->normId), state.norms->names, state.norms->texes.size()));
     
-    if (vl(ImGui::Button("X##3"))) {
+    if (vl(ImGui::Button(ICON_BIN "##3"))) {
         m->refId = -1;
     }
     ImGui::SameLine();
