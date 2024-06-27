@@ -15,11 +15,6 @@
 #include <filesystem>
 #include <thread>
 
-#define RI_AIR 1.f
-#define RI_GLASS 1.52f
-
-#define EPSILON 0.00001f
-
 const char *modes[3] = {"Raycasting", "Raycasting w/ Reflections", "Lighting w/ Phong Specular"};
 
 double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void), int nthreads) {
@@ -160,11 +155,11 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         // k_s = res->specular,
         // O_{s\varlambda} (Specular Colour) = light.specular * light.specularColor,
         // n (shininess):
-        float n = (res->obj.mat()->shininess == -1.f) ? globalShininess : res->obj.mat()->shininess;
+        float n = (res->obj->mat()->shininess == -1.f) ? globalShininess : res->obj->mat()->shininess;
         float rDotV = std::fmax(std::pow(dot(rNorm, norm(viewDelta)), n), 0);
         // std::printf("got rDotV %f\n", rDotV);
         // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
-        specularColor = specularColor + (res->obj.mat()->specular * (light.specular * light.specularColor) * rDotV);
+        specularColor = specularColor + (res->obj->mat()->specular * (light.specular * light.specularColor) * rDotV);
     }
     res->specularColor = specularColor;
     // std::printf("%f,%f,%f * %f,%f,%f\n", res->color.x, res->color.y, res->color.z, lightColor.x, lightColor.y, lightColor.z);
@@ -303,7 +298,7 @@ void WorldMap::voxelRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Rende
         if (!empty) {
             traversalRay(res, c, p0, delta, rc);
             // the caller, castRay, only casts additional transparency rays if we hit anything behind (i.e. res->collisions > 1), therefore we can only quit if we've hit something solid, or more than 1 object.
-            if (res->hit() && (res->obj.mat()->opacity == 1.f || res->collisions > 1)) {
+            if (res->hit() && (res->obj->mat()->opacity == 1.f || res->collisions > 1)) {
                 o = NULL;
                 break;
             }
@@ -402,16 +397,18 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                 ray(res, c, p0, delta, rc);
             }
         } else {
-            Shape transformedShape = current->applyTransform();
+            // FIXME: Somehow store the if the transformation has been done already,
+            // so we don't repeat per ray?
+            current->applyTransform();
             Vec3 normal;
             Vec2 uv;
-            Vec2 *uvPtr = (current->mat() != NULL && transformedShape.mat()->hasTexture()) ? &uv : NULL;
-            float t = transformedShape.intersect(p0, delta, &normal, uvPtr);
+            Vec2 *uvPtr = (current->mat() != NULL && current->mat()->hasTexture()) ? &uv : NULL;
+            float t = current->intersect(p0, delta, &normal, uvPtr);
             if (t >= 0) {
                 res->collisions++;
                 // res->potentialCollisions++;
-                if (t <= res->t) {
-                    res->obj = transformedShape;
+                if (t < res->t) {
+                    res->obj = current;
                     res->t = t;
                     res->p0 = p0 + (res->t * delta);
                     res->normal = normal;
@@ -442,11 +439,11 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
 
     // Collision Detection
     ray(res, c, p0, delta, rc);
-
+    
     if (!res->hit()) return;
 
     // Shading
-    res->color = res->obj.mat()->color;
+    res->color = res->obj->mat()->color;
     
     // Uncomment to visualize normals
     // res->color = (res->norm + 1) / 2.f;
@@ -454,12 +451,12 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // std::printf("looped over %d objects\n", size);
     if (rc->collisionsOnly) return;
 
-    if (res->obj.mat()->texId != -1) {
-        Texture *tx = tex.at(res->obj.mat()->texId);
+    if (res->obj->mat()->texId != -1) {
+        Texture *tx = tex.at(res->obj->mat()->texId);
         if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
     }
-    if (rc->normalMapping && res->obj.mat()->normId != -1) {
-        Texture *nm = norms.at(res->obj.mat()->normId);
+    if (rc->normalMapping && res->obj->mat()->normId != -1) {
+        Texture *nm = norms.at(res->obj->mat()->normId);
         if (nm != NULL) {
             Vec3 ts = nm->at(res->uv.x, res->uv.y); // (0,0,1) is pointing towards the normal
             // Change from 0-1 to -1-1
@@ -507,10 +504,10 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
    
     // Epsilon (small number) bias so we don't accidentally hit ourselves due to f.p. 
     Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm);
-    float reflectiveness = res->obj.mat()->reflectiveness;
-    if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj.mat()->refId != -1))) {
-        if (rc->reflectanceMapping && res->obj.mat()->refId != -1) {
-            Texture *rf = refs.at(res->obj.mat()->refId);
+    float reflectiveness = res->obj->mat()->reflectiveness;
+    if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj->mat()->refId != -1))) {
+        if (rc->reflectanceMapping && res->obj->mat()->refId != -1) {
+            Texture *rf = refs.at(res->obj->mat()->refId);
             if (rf != NULL) reflectiveness = rf->at(res->uv.x, res->uv.y)(0); // B&W map, so all channels are identical
         }
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
@@ -519,19 +516,19 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
         castReflectionRay(p0PlusABit, reflection, rc, res, callCount+1);
     }
 
-    if (rc->lighting && !(res->obj.mat()->noLighting)) {//  && res->obj->reflectiveness != 0) {
+    if (rc->lighting && !(res->obj->mat()->noLighting)) {//  && res->obj->reflectiveness != 0) {
         castShadowRays(-1.f*delta, p0PlusABit, rc, res);
     } else {
         res->lightColor = {1.f, 1.f, 1.f};
     }
 
     // FIXME: AAB opacity and refraction!
-    if (res->obj.mat()->opacity != 1.f) {
+    if (res->obj->mat()->opacity != 1.f) {
         // FIXME: Make this more efficient. Maybe don't cast another ray, and just store all collisions data?
         // if (res->collisions >= 1 && res->potentialCollisions > 1) {
         if (res->collisions >= 1) {
             Vec3 p1, delta1;
-            res->obj.refract(rc->refractiveIndex, res->p0, delta, &p1, &delta1);
+            res->obj->refract(rc->refractiveIndex, res->p0, delta, &p1, &delta1);
             p1 = p1 + (EPSILON * delta1);
             RayResult r = RayResult();
             castRay(&r, obj, p1, delta1, rc, callCount+1);
@@ -545,7 +542,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     // Diffuse lighting and specular reflection
     Vec3 out = (res->color * res->lightColor) * (1.f - reflectiveness) + reflectiveness*res->reflectionColor;
     // Interpolated trasnparency (CGPaP 16.25), but not for the specular component
-    out = res->obj.mat()->opacity * out + (1.f - res->obj.mat()->opacity) * res->refractColor;
+    out = res->obj->mat()->opacity * out + (1.f - res->obj->mat()->opacity) * res->refractColor;
     // Specular highlight
     out = out + res->specularColor;
     
@@ -716,12 +713,16 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     mapStats.name = std::string(path);
 
     free(camPresetNames);
-    optimizedObj->clear();
-    delete optimizedObj;
-    optimizedObj = NULL;
-    flatObj->clear();
-    delete flatObj;
-    flatObj = NULL;
+    if (optimizedObj != NULL) {
+        optimizedObj->clear();
+        delete optimizedObj;
+        optimizedObj = NULL;
+    }
+    if (flatObj != NULL) {
+        flatObj->clear();
+        delete flatObj;
+        flatObj = NULL;
+    }
     obj = &unoptimizedObj;
 
     tex.clear();
@@ -910,7 +911,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
                 mapStats.allocs += 1; // Sphere
-                sphere->center = sphere->center * transform;
+                // FIXME: Scale isn't applied to the radius!
+                sphere->oCenter = sphere->oCenter * transform;
                 if (c == NULL) {
                     mapStats.allocs += unoptimizedObj.append(sphere);
                 } else {
@@ -923,9 +925,9 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
                 mapStats.allocs += 1; // Triangle
-                triangle->a = triangle->a * transform;
-                triangle->b = triangle->b * transform;
-                triangle->c = triangle->c * transform;
+                triangle->oA = triangle->oA * transform;
+                triangle->oB = triangle->oB * transform;
+                triangle->oC = triangle->oC * transform;
                 if (triangle->plane) {
                     mapStats.allocs += unoptimizable.append(triangle);
                     mapStats.planes++;
@@ -943,8 +945,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 if (norms.lastLoadFail) mapStats.missingNorm += 1;
                 if (refs.lastLoadFail) mapStats.missingRef += 1;
                 mapStats.allocs += 1; // AAB
-                aab->min = aab->min * transform;
-                aab->max = aab->max * transform;
+                aab->oMin = aab->oMin * transform;
+                aab->oMax = aab->oMax * transform;
                 if (c == NULL) {
                     mapStats.allocs += unoptimizedObj.append(aab);
                 } else {
@@ -1016,7 +1018,7 @@ void flattenRootContainer(Container *dst, Container *src, bool root) {
         } else {
             Bound *b = emptyBound();
             // FIXME: Make sure this works!
-            b->s = new Shape(current);
+            b->s = current->clone();
             current->bounds(b);
             for (int i = 0; i < 3; i++) {
                 dst->min(i) = std::min(dst->min(i), b->min(i));

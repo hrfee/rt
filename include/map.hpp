@@ -51,9 +51,12 @@ struct RayResult {
     Vec3 p0;
     Vec3 normal;
     Vec3 norm;
-    Shape obj;
+    Shape *obj;
     RayResult() { resetObj(); };
-    bool hit() { return collisions > 0; };
+    bool hit() {
+        return obj != NULL;
+        // return collisions > 0;
+    };
     void resetObj() {
         collisions = 0;
         // potentialCollisions = 0;
@@ -67,6 +70,7 @@ struct RayResult {
         p0 = {0,0,0};
         normal = {0,0,0};
         norm = {0,0,0};
+        obj = NULL;
     };
 };
 

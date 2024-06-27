@@ -846,8 +846,8 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, 1.f));
         ImGui::Text("root(%d, (%.3f, %.3f %.3f), (%.3f, %.3f, %.3f));\n",
                 size,
-                c->a.x, c->a.y, c->a.z,
-                c->b.x, c->b.y, c->b.z
+                c->min.x, c->min.y, c->min.z,
+                c->max.x, c->max.y, c->max.z
         );
         ImGui::PopStyleColor();
     } else {
@@ -855,8 +855,9 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
         Bound *bo = c->start;
         while (bo != end) {
             Shape *current = bo->s;
-            if (current->t != NULL && current->debug) {
-                containerColor = ImVec4(current->m->color.x, current->m->color.y, current->m->color.z, 1.f);
+            Triangle *t = dynamic_cast<Triangle*>(current);
+            if (t != nullptr && current->debug) {
+                containerColor = ImVec4(current->mat()->color.x, current->mat()->color.y, current->mat()->color.z, 1.f);
                 break;
             }
             if (c->voxelSubdiv != 0) {
@@ -871,8 +872,8 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
         ImGui::PushStyleColor(ImGuiCol_Text, containerColor);
         ImGui::Text("%s node(%d%c, (%.3f, %.3f %.3f), (%.3f, %.3f, %.3f));\n",
                 prefix.c_str(), size, splitAxis,
-                c->a.x, c->a.y, c->a.z,
-                c->b.x, c->b.y, c->b.z
+                c->min.x, c->min.y, c->min.z,
+                c->max.x, c->max.y, c->max.z
         );
         ImGui::PopStyleColor();
     }
@@ -881,8 +882,9 @@ void GLWindow::renderTree(Container *c, int tabIndex) {
     int children = 0;
     while (bo != end) {
         Shape *current = bo->s;
-        if (current->c != NULL) {
-            renderTree(current->c, tabIndex+1);
+        Container *subContainer = dynamic_cast<Container*>(current);
+        if (subContainer != nullptr) {
+            renderTree(subContainer, tabIndex+1);
         } else if (!(current->debug)) {
             children++;
         }
@@ -953,37 +955,37 @@ void GLWindow::showShapeEditor() {
                 vl(ImGui::ColorEdit3("Color", (float*)&(pl->color)));
                 vl(ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f));
             } else {
-                if (sh->s != NULL) {
-                    ImGui::Text("Selected: Sphere");
-                    ImGui::InputFloat3("Position", (float*)&(sh->s->center));
-                    vl(ImGui::SliderFloat("Radius", &(sh->s->radius), 0, 20.f));
-                    vl(ImGui::SliderFloat("\"Thickness\"", &(sh->s->thickness), 0, 1.f));
-                } else if (sh->t != NULL) {
-                    if (sh->t->plane) {
-                        ImGui::Text("Selected: Plane");
-                    } else {
-                        ImGui::Text("Selected: Tri");
-                    }
-                    ImGui::InputFloat3("Pos A", (float*)&(sh->t->a));
-                    ImGui::InputFloat3("Pos B", (float*)&(sh->t->b));
-                    ImGui::InputFloat3("Pos C", (float*)&(sh->t->c));
+                std::string sel = "selected: " + sh->name();
+                ImGui::Text(sel.c_str());
+                Sphere *s = dynamic_cast<Sphere*>(sh);
+                Triangle *t = dynamic_cast<Triangle*>(sh);
+                AAB *b = dynamic_cast<AAB*>(sh);
+
+                if (s != nullptr) {
+                    ImGui::InputFloat3("Position", (float*)&(s->oCenter));
+                    vl(ImGui::SliderFloat("Radius", &(s->oRadius), 0, 20.f));
+                    vl(ImGui::SliderFloat("\"Thickness\"", &(s->thickness), 0, 1.f));
+                } else if (t != nullptr) {
+                    ImGui::InputFloat3("Pos A", (float*)&(t->oA));
+                    ImGui::InputFloat3("Pos B", (float*)&(t->oB));
+                    ImGui::InputFloat3("Pos C", (float*)&(t->oC));
 
                     if (ImGui::Button("Recalculate UVs")) {
                         state.recalcUVs = true;
                     }
-                } else if (sh->b != NULL) {
-                    ImGui::InputFloat3("Min Corner", (float*)&(sh->b->min));
-                    ImGui::InputFloat3("Max Corner", (float*)&(sh->b->max));
+                } else if (b != nullptr) {
+                    ImGui::InputFloat3("Min Corner", (float*)&(b->oMin));
+                    ImGui::InputFloat3("Max Corner", (float*)&(b->oMax));
                 }
 
                 ImGui::Text("transforms (relative to origin)");
-                vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans.translate)));
-                vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans.rotate), 0.f, 2.f*M_PI));
-                vl(ImGui::SliderFloat("Scale", &(sh->trans.scale), 0.f, 100.f));
+                vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans().translate)));
+                vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans().rotate), 0.f, 2.f*M_PI));
+                vl(ImGui::SliderFloat("Scale", &(sh->trans().scale), 0.f, 100.f));
 
                 // material params
                 ImGui::Text("material");
-                showMaterialEditor(sh->m);
+                showMaterialEditor(sh->mat());
             }
         }
         IMGUIEND();

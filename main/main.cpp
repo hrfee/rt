@@ -133,7 +133,7 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.recalcUVs) {
         Shape *sh = window->getShapePointer();
         if (sh != NULL) {
-            map->dec.recalculateTriUVs(sh);
+            map->dec.recalculateTriUVs(dynamic_cast<Triangle*>(sh));
         }
         window->state.recalcUVs = false;
     }

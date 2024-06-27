@@ -18,6 +18,17 @@ struct Material;
 class Shape;
 struct Bound;
 
+namespace ShapeType {
+    const int Sphere = 0;
+    const int Triangle = 1;
+    const int AAB = 2;
+}
+
+inline const float EPSILON = 0.00001f;
+inline const float RI_AIR = 1.f;
+inline const float RI_GLASS = 1.52f;
+
+
 struct Transform {
     Vec3 translate;
     Vec3 rotate;
@@ -41,6 +52,13 @@ struct Transform {
     }
 };
 
+struct Bound {
+    Vec3 min, max, centroid; // Bounding box
+    Shape *s;
+    Bound *next;
+    void grow(Bound *src);
+};
+
 class Shape {
     public:
         Material *material;
@@ -51,18 +69,22 @@ class Shape {
             debug = false;
             transform.reset();
         };
+        virtual Shape *clone() = 0;
         Shape(Shape *sh);
         virtual Material *mat() { return material; };
         virtual Transform& trans() { return transform; };
-        virtual void bounds(Bound *bo);
-        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
-        virtual bool intersects(Vec3 p0, Vec3 delta);
-        virtual Shape applyTransform();
-        virtual void bakeTransform();
-        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual void bounds(Bound *bo) = 0;
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL) = 0;
+        virtual bool intersects(Vec3 p0, Vec3 delta) = 0;
+        virtual void applyTransform() = 0;
+        virtual void bakeTransform() = 0;
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) = 0;
+        virtual bool envelops(Vec3 mn, Vec3 mx) { return false; };
+        virtual bool envelops(Bound& bo) { return envelops(bo.min, bo.max); };
         virtual int clear(bool deleteShapes = true) { return 0; };
-        virtual std::string name();
-        virtual ~Shape();
+        virtual std::string name() = 0;
+        virtual int type() = 0;
+        virtual ~Shape() {};
     // Note no destructor for the dynamically allocated "material",
     // This is because the material is allocated and given by a MaterialStore,
     // which itself handles destruction in its clear() method.
@@ -108,11 +130,8 @@ class MaterialStore {
         void clearLists();
 };
 
-struct Bound {
-    Vec3 min, max, centroid; // Bounding box
-    Shape *s;
-    Bound *next;
-};
+// Bound with large min and low max to be used when find bounds of objects.
+inline constexpr Bound growingBound = {{1e30f, 1e30f, 1e30f}, {-1e30f, -1e30f, -1e30f}, {0, 0, 0}, NULL, NULL};
 
 // When plane is true, acts as a very simple optimization.
 // Defined in .map file as:
@@ -135,11 +154,12 @@ struct Bound {
 
 class AAB: public Shape {
     public:
-        Vec3 min, max, centroid;
+        Vec3 min, max, oMin, oMax;
         AAB() {
             min = {0, 0, 0};
             max = {0, 0, 0};
-            centroid = {0, 0, 0};
+            oMin = min;
+            oMax = max;
         };
         AAB(Shape *sh) {
             AAB *b = static_cast<AAB*>(sh);
@@ -147,21 +167,27 @@ class AAB: public Shape {
             transform = b->transform;
             min = b->min;
             max = b->max;
-            centroid = b->centroid;
+            oMin = b->oMin;
+            oMax = b->oMax;
+        };
+        virtual Shape *clone() {
+            return new AAB(this);
         };
 
         Vec2 getUV(Vec3 hit, Vec3 normal);
-        AAB(Vec3 mn, Vec3 mx): min(mn), max(mx) {
-            centroid = min + 0.5f * (max - min);
-        };
+        AAB(Vec3 mn, Vec3 mx): min(mn), max(mx) {};
         virtual std::string name() { return std::string("Box"); };
+        virtual int type() { return ShapeType::AAB; };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
-        virtual Shape applyTransform();
+        virtual void applyTransform();
         virtual void bakeTransform();
+        virtual bool envelops(Vec3 mn, Vec3 mx);
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
+// See note in shape.cpp for why this is here.
+float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b);
 
 class Container: public AAB {
     public:
@@ -187,7 +213,8 @@ class Container: public AAB {
             transform = c->transform;
             min = c->min;
             max = c->max;
-            centroid = c->centroid;
+            oMin = c->oMin;
+            oMax = c->oMax;
             plane = c->plane;
             voxelSubdiv = c->voxelSubdiv;
             start = c->start;
@@ -196,24 +223,31 @@ class Container: public AAB {
             splitAxis = c->splitAxis;
             id = c->id;
         };
+        virtual Shape *clone() {
+            return new Container(this);
+        };
         virtual std::string name() { return std::string("Container"); };
         int append(Bound *bo);
         int append(Bound bo);
         int append(Shape *sh);
         int append(Container *c);
-        
+       
+        Bound *at(int i);
+
         int clear(bool deleteShapes = true);
 };
 
 class Sphere: public Shape {
     public:
-        Vec3 center;
-        float radius;
+        Vec3 center, oCenter;
+        float radius, oRadius;
         float thickness;
         Vec2 getUV(Vec3 hit);
         Sphere() {
             center = {0.f, 0.f, 0.f};
+            oCenter = center;
             radius = 0.f;
+            oRadius = radius;
             thickness = 1.f;
         }
         Sphere(Shape *sh) {
@@ -221,15 +255,22 @@ class Sphere: public Shape {
             material = s->material;
             transform = s->transform;
             center = s->center;
+            oCenter = s->oCenter;
             radius = s->radius;
+            oRadius = s->oRadius;
             thickness = s->thickness;
         };
+        virtual Shape *clone() {
+            return new Sphere(this);
+        };
         virtual std::string name() { return std::string("Sphere"); };
+        virtual int type() { return ShapeType::Sphere; };
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
-        virtual Shape applyTransform();
+        virtual void applyTransform();
         virtual void bakeTransform();
+        virtual bool envelops(Vec3 mn, Vec3 mx);
 
         void refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
@@ -245,11 +286,12 @@ class Sphere: public Shape {
 
 class Triangle: public Shape {
     public: 
-        Vec3 a, b, c;
+        Vec3 a, b, c, oA, oB, oC;
         Vec2 UVs[3]; // UV coordinates of a, b, c respectively
         bool plane; // Whether or not a plane defined by these points, or just a triangle
         Triangle() {
             a = {0, 0, 0}, b = a, c = a;
+            oA = a, oB = b, oC = c;
             UVs[0] = {0,0};
             UVs[1] = {0,0};
             UVs[2] = {0,0};
@@ -262,10 +304,17 @@ class Triangle: public Shape {
             a = t->a;
             b = t->b;
             c = t->c;
+            oA = t->oA;
+            oB = t->oB;
+            oC = t->oC;
             std::memcpy(UVs, t->UVs, 3*sizeof(Vec2));
             plane = t->plane;
         };
+        virtual Shape *clone() {
+            return new Triangle(this);
+        };
         virtual std::string name() { return plane ? std::string("Plane") : std::string("Triangle"); };
+        virtual int type() { return ShapeType::Triangle; };
         Vec3 visibleNormal(Vec3 delta);
         float intersectsPlane(Vec3 p0, Vec3 delta, Vec3 normal);
         bool projectAndPiP(Vec3 normal, Vec3 hit);
@@ -275,8 +324,9 @@ class Triangle: public Shape {
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
-        virtual Shape applyTransform();
+        virtual void applyTransform();
         virtual void bakeTransform();
+        // A triangle can't envelop a 3d object, so envelops() is left empty (returning false).
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
 

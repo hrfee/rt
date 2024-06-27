@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
+#include <new>
 
 namespace {
     const char* w_center = "center";
@@ -242,14 +243,14 @@ Sphere *Decoder::decodeSphere(std::string in) {
         stream >> w;
         if (w == w_center) {
             stream >> w;
-            sh->center.x = std::stof(w);
+            sh->oCenter.x = std::stof(w);
             stream >> w;
-            sh->center.y = std::stof(w);
+            sh->oCenter.y = std::stof(w);
             stream >> w;
-            sh->center.z = std::stof(w);
+            sh->oCenter.z = std::stof(w);
         } else if (w == w_radius) {
             stream >> w;
-            sh->radius = std::stof(w);
+            sh->oRadius = std::stof(w);
         } else if (w == w_thickness) {
             stream >> w;
             sh->thickness = std::stof(w);
@@ -332,25 +333,25 @@ Triangle *Decoder::decodeTriangle(std::string in) {
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            sh->a.x = std::stof(w);
+            sh->oA.x = std::stof(w);
             stream >> w;
-            sh->a.y = std::stof(w);
+            sh->oA.y = std::stof(w);
             stream >> w;
-            sh->a.z = std::stof(w);
+            sh->oA.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            sh->b.x = std::stof(w);
+            sh->oB.x = std::stof(w);
             stream >> w;
-            sh->b.y = std::stof(w);
+            sh->oB.y = std::stof(w);
             stream >> w;
-            sh->b.z = std::stof(w);
+            sh->oB.z = std::stof(w);
         } else if (w == w_c) {
             stream >> w;
-            sh->c.x = std::stof(w);
+            sh->oC.x = std::stof(w);
             stream >> w;
-            sh->c.y = std::stof(w);
+            sh->oC.y = std::stof(w);
             stream >> w;
-            sh->c.z = std::stof(w);
+            sh->oC.z = std::stof(w);
         } else if (w == w_plane) {
             sh->plane = true;
         }
@@ -432,18 +433,18 @@ AAB *Decoder::decodeAAB(std::string in) {
         stream >> w;
         if (w == w_a) {
             stream >> w;
-            sh->min.x = std::stof(w);
+            sh->oMin.x = std::stof(w);
             stream >> w;
-            sh->min.y = std::stof(w);
+            sh->oMin.y = std::stof(w);
             stream >> w;
-            sh->min.z = std::stof(w);
+            sh->oMin.z = std::stof(w);
         } else if (w == w_b) {
             stream >> w;
-            sh->max.x = std::stof(w);
+            sh->oMax.x = std::stof(w);
             stream >> w;
-            sh->max.y = std::stof(w);
+            sh->oMax.y = std::stof(w);
             stream >> w;
-            sh->max.z = std::stof(w);
+            sh->oMax.z = std::stof(w);
         }
     } while (stream);
 
@@ -559,10 +560,10 @@ int Container::append(Container *c) {
     return 2 + append(bo);
 }
 
-Bound *boundByIndex(Container *c, int i) {
+Bound *Container::at(int i) {
     int idx = 0;
-    Bound *bo = c->start;
-    while (bo != c->end->next) {
+    Bound *bo = start;
+    while (bo != end->next) {
         if (idx == i) return bo;
         idx++;
         bo = bo->next;
@@ -693,7 +694,7 @@ void Decoder::usingMaterial(std::string name) {
 void AAB::bounds(Bound *bo) {
     bo->min = min;
     bo->max = max;
-    bo->centroid = centroid;
+    bo->centroid = min + 0.5f * (max - min);
 }
 
 float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
@@ -744,6 +745,32 @@ float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
     // normal->idx(normIdx) = 1.f;
 }
 
+// Note: this is essentially the same impl as above, except with no normal/UV stuff. Used for BVHs and such.
+// Putting it here rather than "ray" or something so that the two versions are centralised.
+float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
+    // Based on the "slab method".
+    // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
+    // then select the largest distance to one of the nearer faces, and the shortest distance to one of the furthest faces.
+    // If the latter is negative, we're looking in the wrong direction.
+    // Where the ray actually intersects the AABB, the latter (furthest) should be greater than the former (nearest).
+    // and therefore if a nearer face appears to be closer than a farther face, we do not intersect.
+    
+    // Pre-divide, since multiplication is faster and we have a loop
+    float d[3] = {1.f/delta.x, 1.f/delta.y, 1.f/delta.z};
+    float tmin = -9999.f;
+    float tmax = 9999.f;
+    for (int i = 0; i < 3; i++) {
+        float t0 = (a(i) - p0(i)) * d[i];
+        float t1 = (b(i) - p0(i)) * d[i];
+        tmin = std::max(tmin, std::min(t0, t1));
+        tmax = std::min(tmax, std::max(t0, t1));
+    }
+
+    if (tmax < 0) return -9999.f;
+    if (tmin > tmax) return -9998.f;
+    return tmin;
+}
+
 bool AAB::intersects(Vec3 p0, Vec3 delta) {
     return intersect(p0, delta, NULL) < -9990.f ? false : true;
 }
@@ -759,19 +786,31 @@ Vec2 AAB::getUV(Vec3 hit, Vec3 normal) {
     return uv;
 }
 
-Shape AAB::applyTransform() {
-    AAB b(&this);
-    b.bakeTransform();
-    return b;
+void AAB::applyTransform() {
+    if (!transform.needed()) {
+        min = oMin;
+        max = oMax;
+        return;
+    }
+    Mat4 m = transform.build();
+    min = oMin * m;
+    max = oMax * m;
 }
 
 void AAB::bakeTransform() {
-    if (!transform.needed()) return;
-    Mat4 m = transform.build();
-    min = min * m;
-    max = max * m;
+    oMin = min;
+    oMax = max;
     transform.reset();
 };
+
+bool AAB::envelops(Vec3 mn, Vec3 mx) {
+    for (int i = 0; i < 3; i++) {
+        if ((mn(i) < min(i)) || mx(i) > max(i)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 void AAB::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     *p1 = p0;
@@ -842,23 +881,32 @@ Vec2 Sphere::getUV(Vec3 hit) {
     };
 }
 
-Shape Sphere::applyTransform() {
-    Sphere s(&this);
-    s.bakeTransform();
-    return b;
+void Sphere::applyTransform() {
+    if (!transform.needed()) {
+        center = oCenter;
+        radius = oRadius;
+        return;
+    }
+    Mat4 m = transform.build();
+    center = oCenter * m;
+    radius = oRadius * transform.scale;
 }
 
 void Sphere::bakeTransform() {
-    if (!transform.needed()) return;
-    Mat4 m = transform.build();
-    center = center * m;
-    radius = radius * transform.scale;
+    oCenter = center;
+    oRadius = radius;
     transform.reset();
+}
+
+bool Sphere::envelops(Vec3 mn, Vec3 mx) {
+    float minDistance = mag(mn - center);
+    float maxDistance = mag(mx - center);
+    return (minDistance <= radius && maxDistance <= radius);
 }
 
 // Refracts through the sphere as if it were solid (i.e. ignoring thickness).
 void Sphere::refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
-    Vec3 normal = p0 - s->center;
+    Vec3 normal = p0 - center;
     bool tir = true;
     Vec3 r = Refract(r0, r1, delta, normal, &tir);
     if (tir) {
@@ -870,9 +918,9 @@ void Sphere::refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec
     tir = true;
     while (tir) {
         p0 = p0 + (EPSILON * r);
-        float t = meetsSphere(p0, r, s, NULL);
+        float t = intersect(p0, r);
         p0 = p0 + (t * r);
-        Vec3 n = -1.f*(p0 - s->center);
+        Vec3 n = -1.f*(p0 - center);
         Vec3 r2 = Refract(r1, r0, r, n, &tir);
         if (tir) {
             r = r - 2.f*dot(r, n) * n;
@@ -886,12 +934,12 @@ void Sphere::refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec
 
 void Sphere::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     float hollowness = 1.f - thickness;
-    if (hollowness = 1.f) {
+    if (hollowness == 1.f) {
         ri = RI_AIR;
         hollowness = 0.f;
     }
 
-    if (hollowness = 0.f) {
+    if (hollowness == 0.f) {
         refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
         return;
     }
@@ -909,7 +957,7 @@ void Sphere::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     bool escaped = false;
     *delta1 = r;
     // Our smaller, inner sphere, filled with RI_AIR.
-    Sphere innerSphere(&this);
+    Sphere innerSphere(this);
     innerSphere.radius *= hollowness;
     innerSphere.thickness = 1.f;
     while (!escaped) {
@@ -927,7 +975,7 @@ void Sphere::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
         *delta1 = r;
         // Hit the outer sphere
         t = intersect(*p1, *delta1);
-        *p1 = *p1 + (t * *delta1)
+        *p1 = *p1 + (t * *delta1);
         normal = -1.f * (*p1 - center);
         // Out of the outer sphere (RI_SPHERE -> RI_AIR)
         r = Refract(ri, RI_AIR, *delta1, normal, &tir);
@@ -1141,18 +1189,23 @@ bool Triangle::intersects(Vec3 p0, Vec3 delta) {
     return intersect(p0, delta, NULL, NULL) >= 0;
 }
 
-Shape Triangle::applyTransform() {
-    Triangle t(&this);
-    t.bakeTransform();
-    return b;
+void Triangle::applyTransform() {
+    if (!transform.needed()) {
+        a = oA;
+        b = oB;
+        c = oC;
+        return;
+    }
+    Mat4 m = transform.build();
+    a = oA * m;
+    b = oB * m;
+    c = oC * m;
 }
 
 void Triangle::bakeTransform() {
-    if (!transform.needed()) return;
-    Mat4 m = transform.build();
-    a = a * m;
-    b = b * m;
-    c = c * m;
+    oA = a;
+    oB = b;
+    oC = c;
     transform.reset();
 }
 
@@ -1160,3 +1213,11 @@ void Triangle::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     *p1 = p0;
     *delta1 = delta;
 }
+
+void Bound::grow(Bound *src) {
+    for (int i = 0; i < 3; i++) {
+        min(i) = std::min(min(i), src->min(i));
+        max(i) = std::max(max(i), src->max(i));
+    }
+}
+
