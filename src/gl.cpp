@@ -981,9 +981,11 @@ void GLWindow::showShapeEditor() {
                 }
 
                 ImGui::Text("transforms (relative to origin)");
-                vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans().translate)));
-                vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans().rotate), 0.f, 2.f*M_PI));
-                vl(ImGui::SliderFloat("Scale", &(sh->trans().scale), 0.f, 100.f));
+                if (vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans().translate))) ||
+                    vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans().rotate), 0.f, 2.f*M_PI)) ||
+                    vl(ImGui::SliderFloat("Scale", &(sh->trans().scale), 0.f, 100.f))) {
+                    sh->transformDirty = true;
+                }
 
                 // material params
                 ImGui::Text("material");

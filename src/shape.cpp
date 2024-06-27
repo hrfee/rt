@@ -792,14 +792,17 @@ Vec2 AAB::getUV(Vec3 hit, Vec3 normal) {
 }
 
 void AAB::applyTransform() {
+    if (!transformDirty) return;
     if (!transform.needed()) {
         min = oMin;
         max = oMax;
+        transformDirty = false;
         return;
     }
     Mat4 m = transform.build();
     min = oMin * m;
     max = oMax * m;
+    transformDirty = false;
 }
 
 void AAB::bakeTransform() {
@@ -887,14 +890,17 @@ Vec2 Sphere::getUV(Vec3 hit) {
 }
 
 void Sphere::applyTransform() {
+    if (!transformDirty) return;
     if (!transform.needed()) {
         center = oCenter;
         radius = oRadius;
+        transformDirty = false;
         return;
     }
     Mat4 m = transform.build();
     center = oCenter * m;
     radius = oRadius * transform.scale;
+    transformDirty = false;
 }
 
 void Sphere::bakeTransform() {
@@ -1196,16 +1202,19 @@ bool Triangle::intersects(Vec3 p0, Vec3 delta) {
 }
 
 void Triangle::applyTransform() {
+    if (!transformDirty) return;
     if (!transform.needed()) {
         a = oA;
         b = oB;
         c = oC;
+        transformDirty = false;
         return;
     }
     Mat4 m = transform.build();
     a = oA * m;
     b = oB * m;
     c = oC * m;
+    transformDirty = false;
 }
 
 void Triangle::bakeTransform() {

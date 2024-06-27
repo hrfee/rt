@@ -63,10 +63,12 @@ class Shape {
     public:
         Material *material;
         Transform transform;
+        bool transformDirty;
         bool debug;
         Shape() {
             material = NULL;
             debug = false;
+            transformDirty = true;
             transform.reset();
         };
         virtual Shape *clone() = 0;
