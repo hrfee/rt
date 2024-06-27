@@ -367,6 +367,8 @@ Triangle *Decoder::decodeTriangle(std::string in) {
 }
 
 void Decoder::recalculateTriUVs(Triangle *tri) {
+    // Ensure coordinates are loaded
+    tri->applyTransform();
     // Project onto 2D plane, any'll do for now
     float proj[3][2] = {
         {tri->a.x, tri->a.y},
