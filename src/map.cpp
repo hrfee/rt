@@ -37,7 +37,7 @@ double WorldMap::castRays(Image *img, RenderConfig *rc, double (*getTime)(void),
     }
     // Generate AA offset array
     int nOffsets = rc->samplesPerPx * rc->samplesPerPx;
-    Vec2 *offsets = (Vec2*)alloc(sizeof(Vec2)*nOffsets);
+    Vec2 *offsets = new Vec2[nOffsets];
     generateOffsets(offsets, rc->samplesPerPx, rc->sampleMode);
     if (aaOffsetImage != NULL) {
         visualizeOffsets(offsets, rc->samplesPerPx, aaOffsetImage);
@@ -683,13 +683,13 @@ void WorldMap::optimizeMap(double (*getTime)(void), int level, int accelIdx) {
     accelIndex = accelIdx;
     std::printf("Optimizing map with accelerator %d, depth %d, extra params %d, %f\n", accelIndex, level, accelParam, accelFloatParam);
     if (optimizedObj != NULL) {
-        optimizedObj->clear();
+        optimizedObj->clear(false);
         delete optimizedObj;
         optimizedObj = NULL;
     }
     if (flatObj == NULL) {
         flatObj = new Container();
-        flattenRootContainer(flatObj, &unoptimizedObj);
+        unoptimizedObj.flattenTo(flatObj);
         genObjectList(flatObj);
     }
     lastOptimizeTime = getTime();
@@ -716,7 +716,7 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     materials.clear();
     mapStats.name = std::string(path);
 
-    free(camPresetNames);
+    if (camPresetNames != NULL) delete[] camPresetNames;
     if (optimizedObj != NULL) {
         optimizedObj->clear();
         delete optimizedObj;
@@ -736,7 +736,7 @@ void WorldMap::loadFile(char const* path, double (*getTime)(void)) {
     if (getTime != NULL) lastLoadTime = getTime();
     loadObjFile(path);
     std::printf("Allocations: %d\n", mapStats.allocs);
-    camPresetNames = (const char**)malloc(sizeof(char*)*camPresets.size());
+    camPresetNames = new const char*[camPresets.size()];
     for (size_t i = 0; i < camPresets.size(); i++) {
         camPresetNames[i] = camPresets.at(i).name.c_str();
     }
@@ -1007,40 +1007,16 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
     }
 }
 
-void flattenRootContainer(Container *dst, Container *src, bool root) {
-    if (src == NULL || src->size == 0) return;
-    if (root) {
-        dst->min = {1e10, 1e10, 1e30};
-        dst->max = {-1e10, -1e10, -1e30};
-    }
-    Bound *bo = src->start;
-    while (bo != src->end->next) {
-        Shape *current = bo->s;
-        Container *c = dynamic_cast<Container*>(current);
-        if (c != nullptr) {
-            flattenRootContainer(dst, c, false);
-        } else {
-            Bound *b = emptyBound();
-            // FIXME: Make sure this works!
-            b->s = current->clone();
-            current->bounds(b);
-            for (int i = 0; i < 3; i++) {
-                dst->min(i) = std::min(dst->min(i), b->min(i));
-                dst->max(i) = std::max(dst->max(i), b->max(i));
-            }
-            dst->append(b);
-        }
-        bo = bo->next;
-    }
-}
-
 WorldMap::~WorldMap() {
     delete cam;
     unoptimizedObj.clear();
     unoptimizable.clear();
-    // FIXME: These might be issues?
-    flatObj->clear();
-    delete flatObj;
-    optimizedObj->clear();
-    delete optimizedObj;
+    if (optimizedObj != NULL) {
+        optimizedObj->clear(false);
+        delete optimizedObj;
+    }
+    if (flatObj != NULL) {
+        flatObj->clear();
+        delete flatObj;
+    }
 }

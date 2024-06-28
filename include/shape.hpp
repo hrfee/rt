@@ -12,11 +12,11 @@
 
 class Sphere;
 class Triangle;
+struct Bound;
 class Container;
 class AAB;
-struct Material;
+class Material;
 class Shape;
-struct Bound;
 
 namespace ShapeType {
     const int Sphere = 0;
@@ -26,6 +26,8 @@ namespace ShapeType {
 
 inline const float EPSILON = 0.00001f;
 inline const float RI_AIR = 1.f;
+
+
 inline const float RI_GLASS = 1.52f;
 
 
@@ -57,6 +59,22 @@ struct Bound {
     Shape *s;
     Bound *next;
     void grow(Bound *src);
+    Bound(Vec3 min = {0, 0, 0}, Vec3 max = {0, 0, 0}, Vec3 centroid = {0, 0, 0}, Shape *s = NULL, Bound *next = NULL):
+        min(min),
+        max(max),
+        centroid(centroid),
+        s(s),
+        next(next)
+    {};
+    void reset() {
+        min = {0, 0, 0}, max = {0, 0, 0}, centroid = {0, 0, 0};
+        s = NULL;
+        next = NULL;
+    };
+    // Bound with large min and low max to be used when find bounds of objects.
+    static Bound forGrowing() {
+        return Bound({1e30f, 1e30f, 1e30f}, {-1e30f, -1e30f, -1e30f}, {0, 0, 0});
+    }
 };
 
 class Shape {
@@ -71,8 +89,13 @@ class Shape {
             transformDirty = true;
             transform.reset();
         };
-        virtual Shape *clone() = 0;
-        Shape(Shape *sh);
+        Shape(Shape *sh) {
+            material = sh->material;
+            transform = sh->transform;
+            transformDirty = sh->transformDirty;
+            debug = sh->debug;
+        };
+        virtual Shape *clone() { return NULL; };
         virtual Material *mat() { return material; };
         virtual Transform& trans() { return transform; };
         virtual void bounds(Bound *bo) = 0;
@@ -81,11 +104,12 @@ class Shape {
         virtual void applyTransform() = 0;
         virtual void bakeTransform() = 0;
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) = 0;
-        virtual bool envelops(Vec3 mn, Vec3 mx) { return false; };
+        virtual bool envelops(Vec3 /*min*/, Vec3 /*max*/) { return false; };
         virtual bool envelops(Bound& bo) { return envelops(bo.min, bo.max); };
-        virtual int clear(bool deleteShapes = true) { return 0; };
+        virtual int clear(bool /*deleteShapes*/ = true) { return 0; };
         virtual std::string name() = 0;
         virtual int type() = 0;
+        virtual void flattenTo(Container *dst, bool root = true); // Defined in shape.cpp due to Container usage
         virtual ~Shape() {};
     // Note no destructor for the dynamically allocated "material",
     // This is because the material is allocated and given by a MaterialStore,
@@ -102,19 +126,31 @@ class Shape {
     bool debug; // Whether to be hidden in normal output or not.
 }; */
 
-struct Material {
-    char *name;
-    Vec3 color;
-    int texId, normId, refId;
-    bool noLighting;
-    float opacity;
-    float reflectiveness; // 0-1
-    float specular; // 0-1
-    float shininess;
-    Material *next;
-    bool hasTexture() { 
-        return texId != -1 || normId != -1 || refId != -1;
-    };
+class Material {
+    public:
+        char *name;
+        Vec3 color;
+        int texId, normId, refId;
+        bool noLighting;
+        float opacity;
+        float reflectiveness; // 0-1
+        float specular; // 0-1
+        float shininess;
+        Material *next;
+        bool hasTexture() { 
+            return texId != -1 || normId != -1 || refId != -1;
+        };
+        Material() {
+            name = NULL;
+            color = {0, 0, 0};
+            texId = -1, normId = -1, refId = -1;
+            noLighting = false;
+            opacity = 1.f;
+            reflectiveness = 0;
+            specular = 1;
+            shininess = -1.f;
+            next = NULL;
+        }
 };
 
 class MaterialStore {
@@ -131,9 +167,6 @@ class MaterialStore {
     private:
         void clearLists();
 };
-
-// Bound with large min and low max to be used when find bounds of objects.
-inline constexpr Bound growingBound = {{1e30f, 1e30f, 1e30f}, {-1e30f, -1e30f, -1e30f}, {0, 0, 0}, NULL, NULL};
 
 // When plane is true, acts as a very simple optimization.
 // Defined in .map file as:
@@ -163,10 +196,8 @@ class AAB: public Shape {
             oMin = min;
             oMax = max;
         };
-        AAB(Shape *sh) {
+        AAB(Shape *sh): Shape(sh) {
             AAB *b = static_cast<AAB*>(sh);
-            material = b->material;
-            transform = b->transform;
             min = b->min;
             max = b->max;
             oMin = b->oMin;
@@ -209,14 +240,8 @@ class Container: public AAB {
             splitAxis = -1;
             id = 0;
         };
-        Container(Shape *sh) {
+        Container(Shape *sh): AAB(sh) {
             Container *c = static_cast<Container*>(sh);
-            material = c->material;
-            transform = c->transform;
-            min = c->min;
-            max = c->max;
-            oMin = c->oMin;
-            oMax = c->oMax;
             plane = c->plane;
             voxelSubdiv = c->voxelSubdiv;
             start = c->start;
@@ -235,6 +260,8 @@ class Container: public AAB {
         int append(Container *c);
        
         Bound *at(int i);
+        void grow(Bound *src);
+        virtual void flattenTo(Container *dst, bool root = true);
 
         int clear(bool deleteShapes = true);
 };
@@ -252,10 +279,8 @@ class Sphere: public Shape {
             oRadius = radius;
             thickness = 1.f;
         }
-        Sphere(Shape *sh) {
+        Sphere(Shape *sh): Shape(sh) {
             Sphere *s = static_cast<Sphere*>(sh);
-            material = s->material;
-            transform = s->transform;
             center = s->center;
             oCenter = s->oCenter;
             radius = s->radius;
@@ -299,10 +324,8 @@ class Triangle: public Shape {
             UVs[2] = {0,0};
             plane = false;
         };
-        Triangle(Shape *sh) {
+        Triangle(Shape *sh): Shape(sh) {
             Triangle *t = static_cast<Triangle*>(sh);
-            material = t->material;
-            transform = t->transform;
             a = t->a;
             b = t->b;
             c = t->c;
@@ -395,13 +418,6 @@ struct Decoder {
 std::string encodeColour(Vec3 c);
 
 Vec3 decodeColour(std::stringstream *in);
-
-Material *emptyMaterial();
-
-Bound *emptyBound();
-
-
-Bound *boundByIndex(Container *c, int i);
 
 CamPreset decodeCamPreset(std::string in);
 std::string encodeCamPreset(CamPreset *p);

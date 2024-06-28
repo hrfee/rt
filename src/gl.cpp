@@ -602,7 +602,10 @@ void GLWindow::addUI() {
         vl(ImGui::Checkbox("Render spheres", &(state.rc.spheres)));
         vl(ImGui::Checkbox("Render triangles", &(state.rc.triangles)));
         vl(ImGui::Checkbox("Render AABs (boxes)", &(state.rc.aabs)));
+        /* This option is no longer exposed, MT is used by default except for planes.
+         * Can be modified with #define PREFER_MT in shape.cpp.
         vl(ImGui::Checkbox("Möller-Trumbore tri collision (faster, allows textures)", &(state.rc.mtTriangleCollision)));
+        */
         vl(ImGui::Checkbox("Normal mapping", &(state.rc.normalMapping)));
         vl(ImGui::Checkbox("Reflectance mapping", &(state.rc.reflectanceMapping)));
 

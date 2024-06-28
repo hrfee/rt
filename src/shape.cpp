@@ -5,7 +5,6 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
-#include <new>
 
 namespace {
     const char* w_center = "center";
@@ -87,19 +86,6 @@ CamPreset decodeCamPreset(std::string in) {
     return p;
 }
 
-Material *emptyMaterial() {
-    Material *m = (Material*)alloc(sizeof(Material));
-    std::memset(m, 0, sizeof(Material));
-    m->shininess = -1.f; // -1 Indicates global shininess param takes precedence
-    m->opacity = 1.f;
-    m->texId = -1; // No texture
-    m->normId = -1; // No normalmap
-    m->refId = -1; // No reflectance map
-    m->name = NULL;
-    m->next = NULL; // Nothing after it
-    return m;
-}
-
 // FIXME: very out of date
 /* std::string encodeShape(Shape *sh) {
     std::ostringstream fmt;
@@ -149,7 +135,7 @@ void Decoder::decodeShape(Shape *sh, std::string in) {
     } while (stream);
 }
 
-#define NONULLMTL() if (m == NULL) { m = emptyMaterial(); newMaterial = true; }
+#define NONULLMTL() if (m == NULL) { m = new Material(); newMaterial = true; }
 
 Material *Decoder::decodeMaterial(std::string in, bool definition) {
     if (tex != NULL) tex->lastLoadFail = false;
@@ -526,10 +512,28 @@ Vec3 decodeColour(std::stringstream *stream) {
     return c;
 }
 
-Bound *emptyBound() {
-    Bound *bo = (Bound*)malloc(sizeof(Bound));
-    std::memset(bo, 0, sizeof(Bound));
-    return bo;
+void Shape::flattenTo(Container *dst, bool /*root*/) { 
+    Bound *b = new Bound();
+    bounds(b);
+    b->s = clone();
+    dst->grow(b);
+    dst->append(b);
+}
+
+void Container::flattenTo(Container *dst, bool root) {
+    if (root) {
+        dst->min = {1e10, 1e10, 1e30};
+        dst->max = {-1e10, -1e10, -1e30};
+    }
+    Bound *bo = start;
+    Bound *e = NULL;
+    if (end != NULL) e = end->next;
+    while (bo != e) {
+        Shape *current = bo->s;
+        current->applyTransform();
+        current->flattenTo(dst, false);
+        bo = bo->next;
+    }
 }
 
 int Container::append(Bound *bo) {
@@ -547,19 +551,19 @@ int Container::append(Bound *bo) {
 }
 
 int Container::append(Bound bo) {
-    Bound *bptr = emptyBound();
+    Bound *bptr = new Bound();
     std::memcpy(bptr, &bo, sizeof(Bound));
     return 1 + append(bptr);
 }
 
 int Container::append(Shape *sh) {
-    auto bo = emptyBound();
+    auto bo = new Bound();
     bo->s = sh;
     return 1 + append(bo);
 }
 
 int Container::append(Container *c) {
-    auto bo = emptyBound(); // Alloc 
+    auto bo = new Bound(); // Alloc 
     Container *nC = new Container(c); // Alloc
     bo->s = nC;
     return 2 + append(bo);
@@ -577,6 +581,7 @@ Bound *Container::at(int i) {
 }
 
 int Container::clear(bool deleteShapes) {
+    if (size == 0 || start == NULL) return 0;
     int freeCounter = 0;
     Bound *bo = start;
     Bound *e = NULL;
@@ -592,10 +597,8 @@ int Container::clear(bool deleteShapes) {
             current->debug) {
 
             delete current;
-            freeCounter ++;
-
-        } else if (deleteShapes || current->debug) {
-            delete current;
+            current = NULL;
+            bo->s = NULL;
             freeCounter++;
         }
 
@@ -605,13 +608,13 @@ int Container::clear(bool deleteShapes) {
             boundCounter++;
             if (boundCounter >= boundLimit) next = NULL;
         } else {
-            free(bo);
+            delete bo;
         }
         bo = next;
     }
     // Voxel containers have their "start" set to a voxelSubdiv^3 size array.
     if (voxelSubdiv != 0) {
-        free(start);
+        delete[] start;
     }
     size = 0;
     start = NULL;
@@ -633,7 +636,7 @@ void MaterialStore::clear() {
     if (end != NULL) e = end->next;
     while (m != e) {
         Material *n = m->next;
-        free(m);
+        delete m;
         m = n;
     }
     clearLists();
@@ -820,7 +823,7 @@ bool AAB::envelops(Vec3 mn, Vec3 mx) {
     return true;
 }
 
-void AAB::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+void AAB::refract(float /*ri*/, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     *p1 = p0;
     *delta1 = delta;
     // FIXME: AAB opacity!
@@ -849,11 +852,11 @@ float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
     float t = (-b - discrimRoot) * denom;
     if (discrim > 0 && t < 0) {
         float t_1 = (-b + discrimRoot) * denom;
-        float t_ = 0.f;
+        /*float t_ = 0.f;*/
         if (t < 0 || (t > t_1 && t_1 > 0)) {
-            t_ = t;
+            /*t_ = t;*/
             t = t_1;
-            t_1 = t_;
+            /*t_1 = t_;*/
         }
         /* if (t1 != NULL) {
             *t1 = t_1;
@@ -1224,7 +1227,7 @@ void Triangle::bakeTransform() {
     transform.reset();
 }
 
-void Triangle::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+void Triangle::refract(float /*ri*/, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     *p1 = p0;
     *delta1 = delta;
 }
@@ -1236,3 +1239,9 @@ void Bound::grow(Bound *src) {
     }
 }
 
+void Container::grow(Bound *src) {
+    for (int i = 0; i < 3; i++) {
+        min(i) = std::min(min(i), src->min(i));
+        max(i) = std::max(max(i), src->max(i));
+    }
+}

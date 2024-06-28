@@ -87,12 +87,11 @@ double traverseAll(Triangle *t, int n) {
     }
 
     auto start = std::chrono::high_resolution_clock::now();
-    float t_ = 0;
     for (int i = 0; i < n; i++) {
         Triangle *tri  = t+i;
         Vec3 ray = rays.at(i);
         Vec3 normal;
-        float t = tri->intersect({0,0,0}, ray, &normal);
+        /*float t = */tri->intersect({0,0,0}, ray, &normal);
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> ms = end - start;
@@ -126,7 +125,7 @@ double traverseAll(Sphere *s, int n) {
         Sphere *sphere = s+i;
         Vec3 ray = rays.at(i);
         Vec3 normal;
-        float t = sphere->intersect({0,0,0}, ray, &normal);
+        /*float t = */sphere->intersect({0,0,0}, ray, &normal);
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> ms = end - start;

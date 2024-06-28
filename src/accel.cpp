@@ -270,8 +270,8 @@ int splitEqually(Container *o, float *split, Bound *b0, Bound *b1, int *splitAxi
             
             Bound splitBounds[2];
             std::memset(&splitBounds, 0, sizeof(Bound)*2);
-            splitBounds[0] = growingBound;
-            splitBounds[1] = growingBound;
+            splitBounds[0] = Bound::forGrowing();
+            splitBounds[1] = Bound::forGrowing();
 
             int h0 = 0, h1 = 0;
             Bound *bo = o->start;
@@ -635,7 +635,7 @@ void containerCube(Container *c, Vec3 color) {
             t0->oB = Vec3{corners[1][0], corners[1][1], corners[1][2]};
             t0->oC = Vec3{corners[2][0], corners[2][1], corners[2][2]};
             t0->debug = true;
-            t0->material = emptyMaterial();
+            t0->material = new Material();
             t0->mat()->color = color;
             t0->applyTransform();
             c->append(t0);
@@ -644,7 +644,7 @@ void containerCube(Container *c, Vec3 color) {
             t1->oB = Vec3{corners[3][0], corners[3][1], corners[3][2]};
             t1->oC = Vec3{corners[0][0], corners[0][1], corners[0][2]};
             t1->debug = true;
-            t1->material = emptyMaterial();
+            t1->material = new Material();
             t1->mat()->color = color;
             t1->applyTransform();
             c->append(t1);
@@ -664,7 +664,7 @@ void containerSphereCorners(Container *c, Vec3 color) {
         s->center = (j == 0) ? c->min : c->max;
         s->radius = 0.3f;
         s->thickness = 1.f;
-        s->material = emptyMaterial();
+        s->material = new Material();
         s->mat()->color = color;
         s->mat()->opacity = 1.f;
         s->mat()->reflectiveness = 0.f;
@@ -738,7 +738,7 @@ Container* splitVoxels(Container *o, int subdivision) {
     std::printf("global dim(%f %f %f), vox(%f %f %f)\n", dims.x, dims.y, dims.z, vox.x, vox.y, vox.z);
     size_t totalSize = subdivision*subdivision*subdivision;
     out->size = totalSize;
-    Bound *grid = (Bound*)malloc(sizeof(Bound)*totalSize);
+    Bound *grid = new Bound[totalSize];
     std::memset(grid, 0, sizeof(Bound)*totalSize);
     out->append(grid);
     for (int z = 0; z < subdivision; z++) {
