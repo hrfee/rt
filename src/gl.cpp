@@ -1008,6 +1008,7 @@ void GLWindow::showShapeEditor() {
                 ImGui::InputFloat3("Position", (float*)&(pl->center));
                 vl(ImGui::ColorEdit3("Color", (float*)&(pl->color)));
                 vl(ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f));
+                vl(ImGui::SliderFloat("Specular", &(pl->specular), 0, 100.f));
             } else {
                 std::string sel = "selected: " + sh->name();
                 ImGui::Text(sel.c_str());
@@ -1016,20 +1017,28 @@ void GLWindow::showShapeEditor() {
                 AAB *b = dynamic_cast<AAB*>(sh);
 
                 if (s != nullptr) {
-                    ImGui::InputFloat3("Position", (float*)&(s->oCenter));
-                    vl(ImGui::SliderFloat("Radius", &(s->oRadius), 0, 20.f));
+                    if (ImGui::InputFloat3("Position", (float*)&(s->oCenter)) ||
+                        vl(ImGui::SliderFloat("Radius", &(s->oRadius), 0, 20.f))) {
+                        sh->transformDirty = true;
+                    }
                     vl(ImGui::SliderFloat("\"Thickness\"", &(s->thickness), 0, 1.f));
                 } else if (t != nullptr) {
-                    ImGui::InputFloat3("Pos A", (float*)&(t->oA));
-                    ImGui::InputFloat3("Pos B", (float*)&(t->oB));
-                    ImGui::InputFloat3("Pos C", (float*)&(t->oC));
-
+                    if (ImGui::InputFloat3("Pos A", (float*)&(t->oA)) ||
+                        ImGui::InputFloat3("Pos B", (float*)&(t->oB)) ||
+                        ImGui::InputFloat3("Pos C", (float*)&(t->oC))) {
+                        sh->transformDirty = true;
+                    }
+                } else if (b != nullptr) {
+                    if (ImGui::InputFloat3("Min Corner", (float*)&(b->oMin)) ||
+                        ImGui::InputFloat3("Max Corner", (float*)&(b->oMax)) ||
+                        vl(ImGui::SliderInt("Face for UV scaling (x, y, z)", &(b->faceForUV), 0, 2))) {
+                        sh->transformDirty = true;
+                    }
+                }
+                if (t != nullptr || b != nullptr) {
                     if (ImGui::Button("Recalculate UVs")) {
                         state.recalcUVs = true;
                     }
-                } else if (b != nullptr) {
-                    ImGui::InputFloat3("Min Corner", (float*)&(b->oMin));
-                    ImGui::InputFloat3("Max Corner", (float*)&(b->oMax));
                 }
 
                 ImGui::Text("transforms (relative to origin)");

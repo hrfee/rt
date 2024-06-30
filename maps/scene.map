@@ -1,0 +1,18 @@
+map dimensions 10 10 10 brightness 0.3 shininess 5 movespeed 3
+campreset "outer box" pos -15.6456 10.8533 -14.0611 phi -0.806354 theta -0.372622 fov 60
+
+
+// material wall color #ffffff reflectiveness 0 specular 0.5 tex assets/checker.tga:a,3,x
+// norm assets/whitewall/white-brick-wall_normal-ogl.tga
+
+material wall color #ffffff reflectiveness 0 specular 0.5 tex assets/whitewall/white-brick-wall_albedo.tga:a,6,x norm assets/whitewall/white-brick-wall_normal-ogl.tga:a,6,x
+
+box a -5 0 -5 b 5 8 10 material wall
+
+plight center 0 5.8 0 brightness 1.3 color #fffafa specular 1 color #fffafa
+
+// SKYBOX
+// "nolighting" tag so its entirely lit
+sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga
+
+plight center -11.43 43.99 15.58 brightness 1.3 color #fffafa specular 0.9 color #fffafa

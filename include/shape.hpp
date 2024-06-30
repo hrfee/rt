@@ -110,6 +110,7 @@ class Shape {
         virtual std::string name() = 0;
         virtual int type() = 0;
         virtual void flattenTo(Container *dst, bool root = true); // Defined in shape.cpp due to Container usage
+        virtual Vec3 sampleTexture(Vec2 uv, Texture *tx);
         virtual ~Shape() {};
     // Note no destructor for the dynamically allocated "material",
     // This is because the material is allocated and given by a MaterialStore,
@@ -193,6 +194,8 @@ class AAB: public Shape {
         AAB() {
             min = {0, 0, 0};
             max = {0, 0, 0};
+            uvScale = {1.f, 1.f};
+            faceForUV = 0;
             oMin = min;
             oMax = max;
         };
@@ -202,11 +205,15 @@ class AAB: public Shape {
             max = b->max;
             oMin = b->oMin;
             oMax = b->oMax;
+            faceForUV = b->faceForUV;
+            uvScale = b->uvScale;
         };
         virtual Shape *clone() {
             return new AAB(this);
         };
 
+        int faceForUV;
+        Vec2 uvScale;
         Vec2 getUV(Vec3 hit, Vec3 normal);
         AAB(Vec3 mn, Vec3 mx): min(mn), max(mx) {};
         virtual std::string name() { return std::string("Box"); };
@@ -218,6 +225,7 @@ class AAB: public Shape {
         virtual void bakeTransform();
         virtual bool envelops(Vec3 mn, Vec3 mx);
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual Vec3 sampleTexture(Vec2 uv, Texture *tx);
 };
 // See note in shape.cpp for why this is here.
 float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b);
@@ -408,6 +416,7 @@ struct Decoder {
     AAB *decodeAAB(std::string in);
     
     void recalculateTriUVs(Triangle *tri);
+    void recalculateAABUVs(AAB *box);
     
     Material *usedMaterial;
     void usingMaterial(std::string name);

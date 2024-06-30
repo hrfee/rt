@@ -372,7 +372,7 @@ void Decoder::recalculateTriUVs(Triangle *tri) {
     }
     
     float range[2] = {max[0] - min[0], max[1] - min[1]};
-    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to the normal too!
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
     Texture *t = NULL;
     Vec2 scale = {1.f, 1.f};
     float iw = 0.f, ih = 0.f;
@@ -383,7 +383,7 @@ void Decoder::recalculateTriUVs(Triangle *tri) {
     } else if (tri->mat()->refId != -1) {
         t = ref->at(tri->mat()->refId);
     }
-    scale = t->scale;
+    scale = {1.f, 1.f}; // t->scale;
     iw = t->img->w;
     ih = t->img->h;
 
@@ -399,6 +399,48 @@ void Decoder::recalculateTriUVs(Triangle *tri) {
 
     for (int i = 0; i < 3; i++) {
         tri->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
+    }
+}
+
+void Decoder::recalculateAABUVs(AAB *box) {
+    // Ensure coordinates are loaded
+    box->applyTransform();
+    
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
+    Texture *t = NULL;
+    if (box->mat()->texId != -1) {
+        t = tex->at(box->mat()->texId);
+    } else if (box->mat()->normId != -1) {
+        t = norm->at(box->mat()->normId);
+    } else if (box->mat()->refId != -1) {
+        t = ref->at(box->mat()->refId);
+    }
+    if (t == NULL) return;
+
+    box->uvScale = t->scale;
+
+    float range[2];
+    int faceIdx = 0;
+    for (int i = 0; i < 3; i++) {
+        if (i == box->faceForUV) continue;
+        range[faceIdx] = box->max(i) - box->min(i);
+        faceIdx++;
+    }
+
+    // Ignoring x would give us y,z, which we don't want.
+    // so we swap them around.
+    if (box->faceForUV == 0) {
+        std::swap(range[0], range[1]);
+    }
+
+    if (box->uvScale.x == -1.f) {
+        float H = range[1] / box->uvScale.y;
+        float W = (H / t->img->h) * t->img->w;
+        box->uvScale.x = range[0] / W;
+    } else if (box->uvScale.y == -1.f) {
+        float W = range[0] / box->uvScale.x;
+        float H = (W / t->img->w) * t->img->h;
+        box->uvScale.y = range[1] / H;
     }
 }
 
@@ -439,8 +481,23 @@ AAB *Decoder::decodeAAB(std::string in) {
         }
     } while (stream);
 
-    // Potential FIXME: Texture mapping improvments for AABs
-    // if (sh->mat()->hasTexture()) { }
+    // Potential FIXME: Texture mapping improvements for AABs
+    if (sh->mat()->hasTexture()) {
+        // This copy is only done here,
+        // later on we want the AAB to be the source of truth on this value.
+        Texture *t = NULL;
+        if (sh->mat()->texId != -1) {
+            t = tex->at(sh->mat()->texId);
+        } else if (sh->mat()->normId != -1) {
+            t = norm->at(sh->mat()->normId);
+        } else if (sh->mat()->refId != -1) {
+            t = ref->at(sh->mat()->refId);
+        }
+        if (t != NULL) {
+            sh->faceForUV = t->face;
+        }
+        recalculateAABUVs(sh);
+    }
 
     return sh;
 }
@@ -510,6 +567,10 @@ Vec3 decodeColour(std::stringstream *stream) {
         };
     }
     return c;
+}
+
+Vec3 Shape::sampleTexture(Vec2 uv, Texture *tx) {
+    return tx->at(uv.x, uv.y);
 }
 
 void Shape::flattenTo(Container *dst, bool /*root*/) { 
@@ -698,6 +759,9 @@ void Decoder::usingMaterial(std::string name) {
     }
 }
 
+Vec3 AAB::sampleTexture(Vec2 uv, Texture *tx) {
+    return tx->at(uv.x, uv.y, &uvScale);
+}
 
 void AAB::bounds(Bound *bo) {
     bo->min = min;
@@ -786,11 +850,36 @@ bool AAB::intersects(Vec3 p0, Vec3 delta) {
 Vec2 AAB::getUV(Vec3 hit, Vec3 normal) {
     int uvIdx = 0;
     Vec2 uv = {0.f, 0.f};
-    for (int i = 0; i < 3; i++) {
+    /*for (int i = 0; i < 3; i++) {
         if (normal(i) != 0.f) continue;
         uv(uvIdx) = (hit(i) - min(i)) / (max(i) - min(i));
         uvIdx++;
+    }*/
+
+    for (int i = 0; i < 3; i++) {
+        if (normal(i) != 0.f) continue;
+        uv(uvIdx) = (hit(i) - min(i));
+        uvIdx++;
     }
+    // Stinky hack to make sure textures are horizontal
+    if (normal(0) != 0.f) {
+        std::swap(uv(0), uv(1));
+    }
+    uvIdx = 0;
+    Vec2 faceDims = {0.f, 0.f};
+    for (int i = 0; i < 3; i++) {
+        if (i == faceForUV) continue;
+        faceDims(uvIdx) = (max(i) - min(i));
+        uvIdx++;
+    }
+    // Stinky hack to make sure textures are horizontal
+    if (faceForUV == 0) {
+        std::swap(faceDims(0), faceDims(1));
+    }
+
+    uv(0) /= faceDims(0);
+    uv(1) /= faceDims(1);
+
     return uv;
 }
 
@@ -850,21 +939,22 @@ float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
     float discrimRoot = std::sqrt(discrim);
     float denom = 0.5f / a;
     float t = (-b - discrimRoot) * denom;
-    if (discrim > 0 && t < 0) {
+    // if (discrim > 0 && t < 0) {
         float t_1 = (-b + discrimRoot) * denom;
-        /*float t_ = 0.f;*/
+        float t_ = 0.f;
         if (t < 0 || (t > t_1 && t_1 > 0)) {
-            /*t_ = t;*/
+            t_ = t;
             t = t_1;
-            /*t_1 = t_;*/
+            t_1 = t_;
         }
         /* if (t1 != NULL) {
             *t1 = t_1;
         } */
-    }
+    // }
+    //
     if (normal != NULL) {
         Vec3 hit = p0 + (t * delta);
-        *normal = hit - center;
+        *normal = ((t <= t_1) ? 1 : -1) * (hit - center);
         if (uv != NULL) {
             *uv = getUV(hit);
         }

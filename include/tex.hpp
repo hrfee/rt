@@ -9,7 +9,8 @@
 struct Texture {
     Image *img;
     Vec2 scale;
-    Vec3 at(float u, float v);
+    int face;
+    Vec3 at(float u, float v, Vec2 *customScale = NULL);
     Texture(Image *image);
     Texture(std::string fname);
     ~Texture() { delete img; };

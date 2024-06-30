@@ -14,7 +14,7 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-#define MAP_PATH "maps/box.map"
+#define MAP_PATH "maps/scene.map"
 
 namespace {
     WorldMap *map;
@@ -133,7 +133,10 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.recalcUVs) {
         Shape *sh = window->getShapePointer();
         if (sh != NULL) {
-            map->dec.recalculateTriUVs(dynamic_cast<Triangle*>(sh));
+            Triangle *t = dynamic_cast<Triangle*>(sh);
+            AAB *b = dynamic_cast<AAB*>(sh);
+            if (t != nullptr) map->dec.recalculateTriUVs(t);
+            else if (b != nullptr) map->dec.recalculateAABUVs(b);
         }
         window->state.recalcUVs = false;
     }
@@ -165,12 +168,12 @@ Image *mainLoop(RenderConfig *rc) {
         change = true;
     }
     if (window->state.mouse.moveForward != 0.f) {
-        map->cam->setPosition(map->cam->position + (window->state.mouse.moveForward * window->state.mouse.speedMultiplier * delta * map->cam->viewportNormal));
+        map->cam->setPosition(map->cam->position + (window->state.mouse.moveForward * window->state.mouse.speedMultiplier * map->mapStats.moveSpeedMultiplier * delta * map->cam->viewportNormal));
         rc->manualPosition = map->cam->position;
         change = true;
     }
     if (window->state.mouse.moveSideways != 0.f) {
-        map->cam->setPosition(map->cam->position + (window->state.mouse.moveSideways * window->state.mouse.speedMultiplier * delta * map->cam->viewportParallel));
+        map->cam->setPosition(map->cam->position + (window->state.mouse.moveSideways * window->state.mouse.speedMultiplier * map->mapStats.moveSpeedMultiplier * delta * map->cam->viewportParallel));
         rc->manualPosition = map->cam->position;
         change = true;
     }

@@ -455,12 +455,12 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
 
     if (res->obj->mat()->texId != -1) {
         Texture *tx = tex.at(res->obj->mat()->texId);
-        if (tx != NULL) res->color = tx->at(res->uv.x, res->uv.y);
+        if (tx != NULL) res->color = res->obj->sampleTexture(res->uv, tx);
     }
     if (rc->normalMapping && res->obj->mat()->normId != -1) {
         Texture *nm = norms.at(res->obj->mat()->normId);
         if (nm != NULL) {
-            Vec3 ts = nm->at(res->uv.x, res->uv.y); // (0,0,1) is pointing towards the normal
+            Vec3 ts = res->obj->sampleTexture(res->uv, nm); // (0,0,1) is pointing towards the normal
             // Change from 0-1 to -1-1
             ts = (ts * 2) - 1;
 
@@ -510,7 +510,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj->mat()->refId != -1))) {
         if (rc->reflectanceMapping && res->obj->mat()->refId != -1) {
             Texture *rf = refs.at(res->obj->mat()->refId);
-            if (rf != NULL) reflectiveness = rf->at(res->uv.x, res->uv.y)(0); // B&W map, so all channels are identical
+            if (rf != NULL) reflectiveness = res->obj->sampleTexture(res->uv, rf)(0); // B&W map, so all channels are identical
         }
         // Angle of reflection: \vec{d} - 2(\vec{d} \cdot \vec{n})\vec{n}
         // FIXME: Put this reflection in a shared function!
@@ -595,6 +595,7 @@ namespace {
     const char* w_map = "map";
     const char* w_dimensions = "dimensions";
     const char* w_brightness = "brightness";
+    const char* w_movespeed = "movespeed";
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
     const char* w_aab = "box";
@@ -841,6 +842,13 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
             } else {
                 globalShininess = 1.f;
                 lstream << " " << token;
+            }
+            lstream >> token;
+            if (token == w_movespeed) {
+                lstream >> token;
+                mapStats.moveSpeedMultiplier = std::stof(token);
+            } else {
+                mapStats.moveSpeedMultiplier = 1.f;
             }
         } else if (token == w_material) {
             dec.decodeMaterial(line, true);

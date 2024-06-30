@@ -80,6 +80,7 @@ struct MapStats {
     int tex, norm;
     int missingTex, missingNorm, missingRef, missingObj;
     int allocs = 0;
+    float moveSpeedMultiplier;
     void clear() {
         spheres = 0;
         tris = 0;
@@ -93,6 +94,7 @@ struct MapStats {
         missingRef = 0;
         missingObj = 0;
         allocs = 0;
+        moveSpeedMultiplier = 1.f;
         name.clear();
     }
     int size() {

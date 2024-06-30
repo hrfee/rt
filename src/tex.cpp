@@ -9,11 +9,14 @@
 #include <sstream>
 #include <iostream>
 
-Vec3 Texture::at(float u, float v) {
+Vec3 Texture::at(float u, float v, Vec2 *customScale) {
+    if (customScale == NULL) customScale = &scale;
     /* float x = std::clamp(u*float(img->w), 0.f, float(img->w-1));
     float y = std::clamp(float(img->h)-(v*float(img->h)), 0.f, float(img->h-1));
-    x *= scale.x;
-    y *= scale.y; */
+    x *= customScale->x;
+    y *= customScale->y; */
+    u *= customScale->x;
+    v *= customScale->y;
 
     u = u - int(u);
     if (u < 0) u += 1;
@@ -89,16 +92,18 @@ void TexStore::genList() {
     }
 }
 
-std::string texScaleFromFname(std::string in,  float *x, float *y) {
+std::string texScaleFromFname(std::string in,  float *x, float *y, int *face) {
     *x = 1.f;
     *y = 1.f;
     std::stringstream s(in);
     std::string f;
     std::string scaleX;
     std::string scaleY;
+    std::string faceForUVs;
     if (!std::getline(s, f, ':')) return f;
     std::getline(s, scaleX, ',');
-    std::getline(s, scaleY);
+    std::getline(s, scaleY, ',');
+    std::getline(s, faceForUVs);
     if (scaleX.length() != 0) {
         if (scaleX != "a") {
             *x = std::stof(scaleX);
@@ -113,6 +118,14 @@ std::string texScaleFromFname(std::string in,  float *x, float *y) {
             *y = -1.f;
         }
     }
+    if (face != NULL) {
+        *face = 0;
+        if (faceForUVs.length() != 0) {
+            /*if (faceForUVs == "x") *face = 0; */
+            if (faceForUVs == "y") *face = 1;
+            else if (faceForUVs == "z") *face = 2;
+        }
+    }
     return f;
 }
 
@@ -122,7 +135,7 @@ Texture::Texture(Image *image) {
 }
 
 Texture::Texture(std::string fname) {
-    auto fpath = texScaleFromFname(fname, &(scale(0)), &(scale(1))); 
+    auto fpath = texScaleFromFname(fname, &(scale(0)), &(scale(1)), &face); 
     try {
         img = TGA::read(fpath);
     } catch (ImgLoadException &e) {
