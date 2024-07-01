@@ -22,6 +22,7 @@ namespace ShapeType {
     const int Sphere = 0;
     const int Triangle = 1;
     const int AAB = 2;
+    const int CSG = 3;
 }
 
 inline const float EPSILON = 0.00001f;
@@ -99,7 +100,7 @@ class Shape {
         virtual Material *mat() { return material; };
         virtual Transform& trans() { return transform; };
         virtual void bounds(Bound *bo) = 0;
-        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL) = 0;
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL) = 0;
         virtual bool intersects(Vec3 p0, Vec3 delta) = 0;
         virtual void applyTransform() = 0;
         virtual void bakeTransform() = 0;
@@ -219,7 +220,7 @@ class AAB: public Shape {
         virtual std::string name() { return std::string("Box"); };
         virtual int type() { return ShapeType::AAB; };
         virtual void bounds(Bound *bo);
-        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual void applyTransform();
         virtual void bakeTransform();
@@ -301,7 +302,7 @@ class Sphere: public Shape {
         virtual std::string name() { return std::string("Sphere"); };
         virtual int type() { return ShapeType::Sphere; };
         virtual void bounds(Bound *bo);
-        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual void applyTransform();
         virtual void bakeTransform();
@@ -355,7 +356,7 @@ class Triangle: public Shape {
         float intersectMT(Vec3 p0, Vec3 delta, Vec3 *bary);
         
         virtual void bounds(Bound *bo);
-        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
         virtual void applyTransform();
         virtual void bakeTransform();
@@ -363,12 +364,51 @@ class Triangle: public Shape {
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
 
+class CSG: public Shape {
+    public:
+        static const char *RelationNames[];
+        static const int RelationCount = 4;
+        enum Relation { Intersection = 0, Union = 1, Difference = 2, DifferenceHollowSubject = 3 };
+        CSG::Relation relation;
+        Shape *a, *b;
+
+        CSG() {
+            a = NULL, b = NULL;
+            relation = Union;
+        };
+        CSG(Shape *sh): Shape(sh) {
+            CSG *c = static_cast<CSG*>(sh);
+            a = c->a->clone();
+            b = c->b->clone();
+            relation = c->relation;
+        };
+        virtual Shape *clone() {
+            return new CSG(this);
+        };
+        virtual std::string name() { return std::string("CSG"); };
+        virtual int type() { return ShapeType::CSG; };
+        
+        int append(Shape *sh);
+        virtual Material *mat() { return a->mat(); };
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
+        virtual float intersectUnion(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
+        virtual float intersectIntersection(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
+        virtual float intersectDifference(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
+        virtual void applyTransform();
+        virtual void bakeTransform();
+        virtual int clear(bool deleteShapes = true);
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual Vec3 sampleTexture(Vec2 uv, Texture *tx);
+};
+
 struct PointLight {
     Vec3 center;
     Vec3 color;
     float brightness;
+    // FIXME: Move specular cmpt to objects!
     Vec3 specularColor;
-    float specular;
 };
 
 struct CamPreset {

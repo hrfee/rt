@@ -2,6 +2,7 @@
 #include "ray.hpp"
 #include "util.hpp"
 
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -266,7 +267,6 @@ Sphere *Decoder::decodeSphere(std::string in) {
 PointLight Decoder::decodePointLight(std::string in) {
     std::stringstream stream(in);
     PointLight p;
-    p.specular = -1.f;
     do {
         std::string w;
         stream >> w;
@@ -284,8 +284,6 @@ PointLight Decoder::decodePointLight(std::string in) {
             p.brightness = std::stof(w);
         } else if (w == w_specular) {
             stream >> w;
-            p.specular = std::stof(w);
-            stream >> w;
             if (w == w_color) {
                 p.specularColor = decodeColour(&stream);
             } else {
@@ -294,7 +292,6 @@ PointLight Decoder::decodePointLight(std::string in) {
             }
         }
     } while (stream);
-    if (p.specular == -1.f) p.specular = p.brightness;
     return p;
 }
 
@@ -769,7 +766,7 @@ void AAB::bounds(Bound *bo) {
     bo->centroid = min + 0.5f * (max - min);
 }
 
-float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
+float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, Vec3 *normal1, Vec2 *uv1) {
     // Based on the "slab method".
     // Find the distance along (delta) you'd have to travel to hit the planes of each pair of parallel faces,
     // then select the largest distance to one of the nearer faces, and the shortest distance to one of the furthest faces.
@@ -799,20 +796,27 @@ float AAB::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
 
     if (tmax < 0) return -9999.f;
     if (tmin > tmax) return -9998.f;
-    if (normal == NULL) return tmin;
-    *normal = {0.f, 0.f, 0.f};
+    if (normal != NULL) *normal = {0.f, 0.f, 0.f};
+    if (normal1 != NULL) *normal1 = {0.f, 0.f, 0.f};
     // Inside the box
     if (tmin < 0.f) {
-        normal->idx(nmaxIdx) = delta(nmaxIdx) >= 0 ? -1.f : 1.f;
-        tmin = tmax;
+        if (normal != NULL) normal->idx(nmaxIdx) = delta(nmaxIdx) >= 0 ? -1.f : 1.f;
+        if (normal1 != NULL) normal1->idx(nminIdx) = delta(nminIdx) >= 0 ? -1.f : 1.f;
+        std::swap(tmin, tmax);
     // Outside the box
     } else {
-        normal->idx(nminIdx) = delta(nminIdx) >= 0 ? -1.f : 1.f;
+        if (normal != NULL) normal->idx(nminIdx) = delta(nminIdx) >= 0 ? -1.f : 1.f;
+        if (normal1 != NULL) normal1->idx(nmaxIdx) = delta(nmaxIdx) >= 0 ? -1.f : 1.f;
     }
     if (uv != NULL) {
         Vec3 hit = p0 + (tmin * delta);
         *uv = getUV(hit, *normal);
     }
+    if (uv1 != NULL) {
+        Vec3 hit = p0 + (tmax * delta);
+        *uv1 = getUV(hit, *normal1);
+    }
+    if (t1 != NULL) *t1 = tmax;
     return tmin;
     // normal->idx(normIdx) = 1.f;
 }
@@ -844,7 +848,7 @@ float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b) {
 }
 
 bool AAB::intersects(Vec3 p0, Vec3 delta) {
-    return intersect(p0, delta, NULL) < -9990.f ? false : true;
+    return intersect(p0, delta) < -9990.f ? false : true;
 }
 
 Vec2 AAB::getUV(Vec3 hit, Vec3 normal) {
@@ -925,7 +929,7 @@ void Sphere::bounds(Bound *bo) {
     bo->centroid = center;
 };
 
-float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
+float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, Vec3 *normal1, Vec2 *uv1) {
     // CG:PaP 2nd ed. in C, p. 703, eq. 15.17 is an expanded sphere equation with
     // substituted values for the camera position (x/y/z_0),
     // pixel vec from camera (delta x/y/z),
@@ -941,11 +945,8 @@ float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
     float t = (-b - discrimRoot) * denom;
     // if (discrim > 0 && t < 0) {
         float t_1 = (-b + discrimRoot) * denom;
-        float t_ = 0.f;
         if (t < 0 || (t > t_1 && t_1 > 0)) {
-            t_ = t;
-            t = t_1;
-            t_1 = t_;
+            std::swap(t, t_1);
         }
         /* if (t1 != NULL) {
             *t1 = t_1;
@@ -959,11 +960,19 @@ float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
             *uv = getUV(hit);
         }
     }
+    if (normal1 != NULL) {
+        Vec3 hit = p0 + (t_1 * delta);
+        *normal1 = ((t <= t_1) ? -1 : 1) * (hit - center);
+        if (uv1 != NULL) {
+            *uv1 = getUV(hit);
+        }
+    }
+    if (t1 != NULL) *t1 = t_1;
     return t;
 }
 
 bool Sphere::intersects(Vec3 p0, Vec3 delta) {
-    return intersect(p0, delta, NULL) >= 0;
+    return intersect(p0, delta) >= 0;
 }
 
 Vec2 Sphere::getUV(Vec3 hit) {
@@ -1264,7 +1273,7 @@ float Triangle::intersectMT(Vec3 p0, Vec3 delta, Vec3 *bary) {
 // intersected, only their plane was, but the potential for a collision recorded and used too
 // decide whether to cast another ray through a transparent object.
 // While the old tri collision is mostly useless now, potentially add back?
-float Triangle::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv) {
+float Triangle::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float* /*t1*/, Vec3* /*normal1*/, Vec2* /*uv1*/) {
     // FIXME: Normal calculation might not be necessary
     Vec3 n = visibleNormal(delta);
     if (normal != NULL) *normal = n;
@@ -1335,3 +1344,263 @@ void Container::grow(Bound *src) {
         max(i) = std::max(max(i), src->max(i));
     }
 }
+
+void CSG::bounds(Bound *bo) {
+    // FIXME: This behaves as if the relation is always "Union".
+    Bound gb = Bound::forGrowing();
+    a->bounds(bo);
+    gb.grow(bo);
+    b->bounds(bo);
+    gb.grow(bo);
+    std::memcpy(bo, &gb, sizeof(Bound));
+};
+
+float CSG::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, Vec3* normal1, Vec2* uv1) {
+    switch (relation) {
+        case Union:
+            return intersectUnion(p0, delta, normal, uv, t1, normal1, uv1);
+        case Difference:
+        case DifferenceHollowSubject:
+            return intersectDifference(p0, delta, normal, uv, t1, normal1, uv1);
+        case Intersection:
+            return intersectIntersection(p0, delta, normal, uv, t1, normal1, uv1);
+    }
+    return -1;
+}
+
+float CSG::intersectUnion(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float* /*t1*/, Vec3* /*normal1*/, Vec2* /*uv1*/) {
+    Vec3 n;
+    Vec2 u;
+    Vec3 *nptr = normal == NULL ? NULL : &n;
+    Vec2 *uptr = uv == NULL ? NULL : &u;
+    float tA = a->intersect(p0, delta, normal, uv);
+    float tB = b->intersect(p0, delta, nptr, uptr);
+    // FIXME: Correctly set t1, normal1 and uv1 by getting them from A and B!
+    if (tA > 0 && (tB < 0 || tA < tB)) {
+        return tA;
+    }
+    if (normal != NULL) *normal = *nptr;
+    if (uv != NULL) *uv = *uptr;
+    return tB;
+}
+
+int csgDifference(float tA, float t1A, float tB, float t1B, bool hollowSubject) {
+    if (tA < 0) {
+        return -1;
+    }
+    if (tB < 0) {
+        return 0;
+    }
+    if (t1B < 0 && t1A < 0) {
+        if (tA < tB) {
+            return -1;
+        } else {
+            if (hollowSubject) {
+                return 0;
+            } else {
+                return 2;
+            }
+        }
+    }
+    if (t1A < 0) {
+        if (tA < tB) {
+            return 0;
+        } else {
+            if (hollowSubject) {
+                if (tA > t1B) {
+                    return 0;
+                } else {
+                    return -1;
+                }
+            } else {
+                return 2;
+            }
+        }
+    }
+    if (t1B < 0) {
+        if (tA < tB) {
+            if (t1A > tB) {
+                if (hollowSubject) {
+                    return 1;
+                } else {
+                    return 2;
+                }
+            } else {
+                return -1;
+            }
+        } else {
+            return 0;
+        }
+        return -1;
+    }
+    if (tB < tA) {
+        if (t1B > t1A) return -1;
+        else if (t1B < t1A) {
+            if (tA < t1B) {
+                if (hollowSubject) {
+                    return 1;
+                } else {
+                    return 3;
+                }
+            } else {
+                return 0;
+            }
+        }
+    }
+    return 0;
+}
+
+float CSG::intersectDifference(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float* /*t1*/, Vec3* /*normal1*/, Vec2* /*uv1*/) {
+    Vec3 n;
+    Vec2 u;
+    Vec3 *nptr = normal == NULL ? NULL : &n;
+    Vec2 *uptr = uv == NULL ? NULL : &u;
+    Vec3 n1A;
+    Vec2 u1A;
+    // Note these depend on normal/uv existing, not normal1/uv1.
+    Vec3 *n1Aptr = normal == NULL ? NULL : &n1A;
+    Vec2 *u1Aptr = uv == NULL ? NULL : &u1A;
+    Vec3 n1B;
+    Vec2 u1B;
+    // Note these depend on normal/uv existing, not normal1/uv1.
+    Vec3 *n1Bptr = normal == NULL ? NULL : &n1B;
+    Vec2 *u1Bptr = uv == NULL ? NULL : &u1B;
+
+    float t1A = -1;
+    float tA = a->intersect(p0, delta, normal, uv, &t1A, n1Aptr, u1Aptr);
+    float t1B = -1;
+    float tB = b->intersect(p0, delta, nptr, uptr, &t1B, n1Bptr, u1Bptr);
+    int decision = csgDifference(tA, t1A, tB, t1B, relation == DifferenceHollowSubject ? true : false);
+    switch (decision) {
+        case 0:
+            return tA;
+        case 1:
+            if (normal != NULL) *normal = *n1Aptr;
+            if (uv != NULL) *uv = *u1Aptr;
+            return t1A;
+        case 2:
+            if (normal != NULL) *normal = *nptr;
+            if (uv != NULL) *uv = *uptr;
+            return tB;
+        case 3:
+            if (normal != NULL) *normal = *n1Bptr;
+            if (uv != NULL) *uv = *u1Bptr;
+            return t1B;
+    }
+    return -1;
+}
+
+int csgIntersection(float tA, float t1A, float tB, float t1B) {
+    if (tA < 0 || tB < 0) return -1;
+    if (tB < tA) {
+        if (t1A < 0) {
+            return 2;
+        }
+        return 0;
+    }
+    if (t1B < 0) {
+        return 0;
+    }
+    return 2;
+}
+
+float CSG::intersectIntersection(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float* /*t1*/, Vec3* /*normal1*/, Vec2* /*uv1*/) {
+    Vec3 n;
+    Vec2 u;
+    Vec3 *nptr = normal == NULL ? NULL : &n;
+    Vec2 *uptr = uv == NULL ? NULL : &u;
+    Vec3 n1A;
+    Vec2 u1A;
+    // Note these depend on normal/uv existing, not normal1/uv1.
+    Vec3 *n1Aptr = normal == NULL ? NULL : &n1A;
+    Vec2 *u1Aptr = uv == NULL ? NULL : &u1A;
+    Vec3 n1B;
+    Vec2 u1B;
+    // Note these depend on normal/uv existing, not normal1/uv1.
+    Vec3 *n1Bptr = normal == NULL ? NULL : &n1B;
+    Vec2 *u1Bptr = uv == NULL ? NULL : &u1B;
+
+    float t1A = -1;
+    float tA = a->intersect(p0, delta, normal, uv, &t1A, n1Aptr, u1Aptr);
+    float t1B = -1;
+    float tB = b->intersect(p0, delta, nptr, uptr, &t1B, n1Bptr, u1Bptr);
+    int decision = csgIntersection(tA, t1A, tB, t1B);
+    switch (decision) {
+        case 0:
+            return tA;
+        case 1:
+            if (normal != NULL) *normal = *n1Aptr;
+            if (uv != NULL) *uv = *u1Aptr;
+            return t1A;
+        case 2:
+            if (normal != NULL) *normal = *nptr;
+            if (uv != NULL) *uv = *uptr;
+            return tB;
+        case 3:
+            if (normal != NULL) *normal = *n1Bptr;
+            if (uv != NULL) *uv = *u1Bptr;
+            return t1B;
+    }
+    return -1;
+}
+
+bool CSG::intersects(Vec3 p0, Vec3 delta) {
+    return intersect(p0, delta, NULL) >= 0;
+}
+
+Vec3 CSG::sampleTexture(Vec2 uv, Texture *tx) {
+    // FIXME: Support textures of both objects in the CSG!
+    return a->sampleTexture(uv, tx);
+}
+
+void CSG::applyTransform() {
+    if (transformDirty) {
+        a->transformDirty = true;
+        b->transformDirty = true;
+    }
+    if (a->transformDirty) {
+        a->transform = transform;
+        a->applyTransform();
+    }
+    if (b->transformDirty) {
+        b->transform = transform;
+        b->applyTransform();
+    }
+    transformDirty = false;
+}
+
+void CSG::bakeTransform() {
+    // Assuming applyTransform has been called, and hence the transform copied to each child
+    a->bakeTransform();
+    b->bakeTransform();
+    transform.reset();
+}
+
+void CSG::refract(float /*ri*/, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    *p1 = p0;
+    *delta1 = delta;
+    // FIXME: CSG opacity?
+    std::printf("FIXME: CSG opacity?\n");
+}
+
+int CSG::append(Shape *sh) {
+    if (a == NULL) a = sh;
+    else if (b == NULL) b = sh;
+    // else return -1;
+    return 0;
+}
+
+int CSG::clear(bool deleteShapes) {
+    int freeCounter = 0;
+    if (deleteShapes) {
+        delete a;
+        freeCounter++;
+        delete b;
+        freeCounter++;
+    }
+    a = NULL;
+    b = NULL;
+    return freeCounter;
+}
+
+const char* CSG::RelationNames[] = {"Intersection", "Union", "Difference", "Difference (Hollow Subject)"};

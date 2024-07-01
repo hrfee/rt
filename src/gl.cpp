@@ -673,7 +673,24 @@ void GLWindow::addUI() {
         }
         IMGUIEND();
     }
-    showShapeEditor();
+
+    if (!state.currentlyLoading && !state.currentlyOptimizing) {
+        if (IMGUIBEGIN("objects")) {
+            ImGui::Text("note: non-material changes (i.e. position) made when using an acceleration structure are not reflected in the unoptimized version.");
+            ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
+            showShapeEditor();
+            IMGUIEND();
+        }
+        if (IMGUIBEGIN("materials")) {
+            ImGui::Text("\"Materials\" are created for all objects with unique material properties.");
+            ImGui::Text("Shared materials can be defined with \"material <name> <properties>\",");
+            ImGui::Text("and applied to objects by adding \"material <name>\" (+ remove other material properties).");
+            ImGui::Combo("Material", &(state.materialIndex), state.materials->names, state.materials->count);
+            showMaterialEditor();
+            IMGUIEND();
+        }
+    }
+
     if (state.csvStats.tellp() != 0) {
         if (IMGUIBEGIN("csv stats")) {
             ImGui::Text(state.csvStats.str().c_str());
@@ -969,6 +986,8 @@ Material *GLWindow::getMaterialPointer() {
 }
 
 void GLWindow::showMaterialEditor(Material *m) {
+    if (m == NULL) m = getMaterialPointer();
+    if (m == NULL) return;
     vl(ImGui::ColorEdit3("Color", (float*)&(m->color)));
     vl(ImGui::SliderFloat("Opacity", &(m->opacity), 0, 1.f));
     vl(ImGui::SliderFloat("Reflectiveness", &(m->reflectiveness), 0, 1.f));
@@ -995,75 +1014,73 @@ void GLWindow::showMaterialEditor(Material *m) {
     vl(ImGui::Combo("Reflection Map", &(m->refId), state.refs->names, state.refs->texes.size()));
 }
 
-void GLWindow::showShapeEditor() {
+void GLWindow::showShapeEditor(Shape *shape, bool hideTransforms) {
     if (state.currentlyLoading || state.currentlyOptimizing) return;
-    if (IMGUIBEGIN("edit object")) {
-        ImGui::Text("note: non-material changes (i.e. position) made when using an acceleration structure are not reflected in the unoptimized version.");
-        ImGui::Combo("Object", &(state.objectIndex), state.objectNames, state.objectCount);
-        Shape *sh = getShapePointer();
-        if (sh != NULL) {
-            if (state.objectIndex < state.plCount) {
-                PointLight *pl = (PointLight*)sh;
-                ImGui::Text("Selected: Light");
-                ImGui::InputFloat3("Position", (float*)&(pl->center));
-                vl(ImGui::ColorEdit3("Color", (float*)&(pl->color)));
-                vl(ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f));
-                vl(ImGui::SliderFloat("Specular", &(pl->specular), 0, 100.f));
-            } else {
-                std::string sel = "selected: " + sh->name();
-                ImGui::Text(sel.c_str());
-                Sphere *s = dynamic_cast<Sphere*>(sh);
-                Triangle *t = dynamic_cast<Triangle*>(sh);
-                AAB *b = dynamic_cast<AAB*>(sh);
-
-                if (s != nullptr) {
-                    if (ImGui::InputFloat3("Position", (float*)&(s->oCenter)) ||
-                        vl(ImGui::SliderFloat("Radius", &(s->oRadius), 0, 20.f))) {
-                        sh->transformDirty = true;
-                    }
-                    vl(ImGui::SliderFloat("\"Thickness\"", &(s->thickness), 0, 1.f));
-                } else if (t != nullptr) {
-                    if (ImGui::InputFloat3("Pos A", (float*)&(t->oA)) ||
-                        ImGui::InputFloat3("Pos B", (float*)&(t->oB)) ||
-                        ImGui::InputFloat3("Pos C", (float*)&(t->oC))) {
-                        sh->transformDirty = true;
-                    }
-                } else if (b != nullptr) {
-                    if (ImGui::InputFloat3("Min Corner", (float*)&(b->oMin)) ||
-                        ImGui::InputFloat3("Max Corner", (float*)&(b->oMax)) ||
-                        vl(ImGui::SliderInt("Face for UV scaling (x, y, z)", &(b->faceForUV), 0, 2))) {
-                        sh->transformDirty = true;
-                    }
-                }
-                if (t != nullptr || b != nullptr) {
-                    if (ImGui::Button("Recalculate UVs")) {
-                        state.recalcUVs = true;
-                    }
-                }
-
-                ImGui::Text("transforms (relative to origin)");
-                if (vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans().translate))) ||
-                    vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans().rotate), 0.f, 2.f*M_PI)) ||
-                    vl(ImGui::SliderFloat("Scale", &(sh->trans().scale), 0.f, 100.f))) {
-                    sh->transformDirty = true;
-                }
-
-                // material params
-                ImGui::Text("material");
-                showMaterialEditor(sh->mat());
-            }
-        }
-        IMGUIEND();
+    Shape *sh = shape;
+    if (shape == NULL) sh = getShapePointer();
+    if (sh == NULL) return;
+    // shape == NULL to check that we're looking at something from the dropdown.
+    if (shape == NULL && state.objectIndex < state.plCount) {
+        PointLight *pl = (PointLight*)sh;
+        ImGui::Text("Selected: Light");
+        ImGui::InputFloat3("Position", (float*)&(pl->center));
+        vl(ImGui::ColorEdit3("Color", (float*)&(pl->color)));
+        vl(ImGui::SliderFloat("Brightness", &(pl->brightness), 0, 100.f));
+        vl(ImGui::ColorEdit3("Specular Color", (float*)&(pl->specularColor)));
+        return;
     }
-    if (IMGUIBEGIN("edit material")) {
-        ImGui::Text("\"Materials\" are created for all objects with unique material properties.");
-        ImGui::Text("Shared materials can be defined with \"material <name> <properties>\",");
-        ImGui::Text("and applied to objects by adding \"material <name>\" (+ remove other material properties).");
-        ImGui::Combo("Material", &(state.materialIndex), state.materials->names, state.materials->count);
-        Material *m = getMaterialPointer();
-        if (m != NULL) {
-            showMaterialEditor(m);
+    std::string sel = sh->name();
+    ImGui::Text(sel.c_str());
+    Sphere *s = dynamic_cast<Sphere*>(sh);
+    Triangle *t = dynamic_cast<Triangle*>(sh);
+    AAB *b = dynamic_cast<AAB*>(sh);
+    CSG *c = dynamic_cast<CSG*>(sh);
+
+    if (s != nullptr) {
+        if (ImGui::InputFloat3("Position", (float*)&(s->oCenter)) ||
+            vl(ImGui::SliderFloat("Radius", &(s->oRadius), 0, 20.f))) {
+            sh->transformDirty = true;
         }
-        IMGUIEND();
+        vl(ImGui::SliderFloat("\"Thickness\"", &(s->thickness), 0, 1.f));
+    } else if (t != nullptr) {
+        if (ImGui::InputFloat3("Pos A", (float*)&(t->oA)) ||
+            ImGui::InputFloat3("Pos B", (float*)&(t->oB)) ||
+            ImGui::InputFloat3("Pos C", (float*)&(t->oC))) {
+            sh->transformDirty = true;
+        }
+    } else if (b != nullptr) {
+        if (ImGui::InputFloat3("Min Corner", (float*)&(b->oMin)) ||
+            ImGui::InputFloat3("Max Corner", (float*)&(b->oMax)) ||
+            vl(ImGui::SliderInt("Face for UV scaling (x, y, z)", &(b->faceForUV), 0, 2))) {
+            sh->transformDirty = true;
+        }
+    } else if (c != nullptr) {
+        vl(ImGui::Combo("CSG Operation", (int*)&(c->relation), CSG::RelationNames, CSG::RelationCount));
+        if (ImGui::Begin("csg: A")) {
+            showShapeEditor(c->a, true);
+            ImGui::End();
+        }
+        if (ImGui::Begin("csg: B")) {
+            showShapeEditor(c->b, true);
+            ImGui::End();
+        }
     }
+    if (t != nullptr || b != nullptr) {
+        if (ImGui::Button("Recalculate UVs")) {
+            state.recalcUVs = true;
+        }
+    }
+
+    if (!hideTransforms) {
+        ImGui::Text("transforms (relative to origin)");
+        if (vl(ImGui::InputFloat3("Translate", (float*)&(sh->trans().translate))) ||
+            vl(ImGui::SliderFloat3("Rotate", (float*)&(sh->trans().rotate), 0.f, 2.f*M_PI)) ||
+            vl(ImGui::SliderFloat("Scale", &(sh->trans().scale), 0.f, 100.f))) {
+            sh->transformDirty = true;
+        }
+    }
+
+    // material params
+    ImGui::Text("material");
+    showMaterialEditor(sh->mat());
 }

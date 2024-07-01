@@ -161,7 +161,7 @@ void WorldMap::castShadowRays(Vec3 viewDelta, Vec3 p0, RenderConfig *rc, RayResu
         float rDotV = std::fmax(std::pow(dot(rNorm, norm(viewDelta)), n), 0);
         // std::printf("got rDotV %f\n", rDotV);
         // std::printf("specular color %f %f %f\n", light.specularColor.x, light.specularColor.y, light.specularColor.z);
-        specularColor = specularColor + (res->obj->mat()->specular * (light.specular * light.specularColor) * rDotV);
+        specularColor = specularColor + (res->obj->mat()->specular * light.specularColor * rDotV);
     }
     res->specularColor = specularColor;
     // std::printf("%f,%f,%f * %f,%f,%f\n", res->color.x, res->color.y, res->color.z, lightColor.x, lightColor.y, lightColor.z);
@@ -617,6 +617,11 @@ namespace {
     const char* w_d = "d";
     const char* w_open = "{";
     const char* w_close = "}";
+    const char* w_union = "union";
+    const char* w_intersection = "intersection";
+    const char* w_difference = "difference";
+    const char* w_window = "window"; // Alternate name for differenceHollowSubject
+
 }
 
 // FIXME: Reimplement!
@@ -776,7 +781,6 @@ void WorldMap::genObjectList(Container *c) {
         objectPtrs[i] = (Shape *)&(pointLights.at(i));
         i++;
     }
-    // FIXME: This only works on the unoptimized object!
     Bound *bo = c->start;
     while (bo != c->end->next) {
         if (bo->s == NULL) {
@@ -806,6 +810,8 @@ void WorldMap::genObjectList(Container *c) {
     }
 }
 
+#define APPEND(sh) if (c != NULL) { mapStats.allocs += c->append(sh); } else if (csg != NULL) { csg->append(sh); } else { mapStats.allocs += unoptimizedObj.append(sh); }
+
 void WorldMap::loadObjFile(const char* path, Mat4 transform) {
     std::ifstream in(path);
     if (in.fail() || in.bad()) {
@@ -814,6 +820,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
     }
     std::string line;
     Container *c = NULL;
+    CSG *csg = NULL;
     while (std::getline(in, line)) {
         std::stringstream lstream(line);
         std::string token;
@@ -859,6 +866,18 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
         } else if (token == w_usingMaterial) {
             token = collectWordOrString(lstream);
             dec.usingMaterial(token);
+            lstream >> token;
+            if (token == w_open) {
+            } else {
+                throw std::runtime_error("Didn't find open brace");
+            }
+        } else if (token == w_union || token == w_intersection || token == w_difference || token == w_window) {
+            csg = new CSG();
+            if (token == w_difference) csg->relation = CSG::Difference;
+            else if (token == w_window) csg->relation = CSG::DifferenceHollowSubject;
+            else if (token == w_intersection) csg->relation = CSG::Intersection;
+            else /*if (token == w_union)*/ csg->relation = CSG::Union;
+
             lstream >> token;
             if (token == w_open) {
             } else {
@@ -915,6 +934,11 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 c = NULL;
             } else if (dec.isUsingMaterial()) {
                 dec.endUsingMaterial();
+            } else if (csg != NULL) {
+                dec.decodeShape(csg, line);
+                unoptimizedObj.append(csg);
+                mapStats.csgs++;
+                csg = NULL;
             }
         } else if (token == w_sphere || token == w_triangle || token == w_aab) {
             if (token == w_sphere) {
@@ -925,12 +949,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.allocs += 1; // Sphere
                 // FIXME: Scale isn't applied to the radius!
                 sphere->oCenter = sphere->oCenter * transform;
-                if (c == NULL) {
-                    mapStats.allocs += unoptimizedObj.append(sphere);
-                } else {
-                    mapStats.allocs += c->append(sphere);
-                }
-                mapStats.spheres++;
+                APPEND(sphere);
+                if (csg == NULL) mapStats.spheres++;
             } else if (token == w_triangle) {
                 Triangle *triangle = dec.decodeTriangle(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
@@ -942,14 +962,10 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 triangle->oC = triangle->oC * transform;
                 if (triangle->plane) {
                     mapStats.allocs += unoptimizable.append(triangle);
-                    mapStats.planes++;
+                    if (csg == NULL) mapStats.planes++;
                 } else {
-                    if (c == NULL) {
-                        mapStats.allocs += unoptimizedObj.append(triangle);
-                    } else {
-                        mapStats.allocs += c->append(triangle);
-                    }
-                    mapStats.tris++;
+                    APPEND(triangle);
+                    if (csg == NULL) mapStats.tris++;
                 }
             } else if (token == w_aab) {
                 AAB *aab = dec.decodeAAB(line);
@@ -959,12 +975,8 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.allocs += 1; // AAB
                 aab->oMin = aab->oMin * transform;
                 aab->oMax = aab->oMax * transform;
-                if (c == NULL) {
-                    mapStats.allocs += unoptimizedObj.append(aab);
-                } else {
-                    mapStats.allocs += c->append(aab);
-                }
-                mapStats.aabs++;
+                APPEND(aab);
+                if (csg == NULL) mapStats.aabs++;
             }
         } else if (token == w_pointLight) {
             PointLight pl = dec.decodePointLight(line);

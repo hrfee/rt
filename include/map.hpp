@@ -76,7 +76,7 @@ struct RayResult {
 
 struct MapStats {
     std::string name;
-    int spheres, tris, lights, planes, aabs;
+    int spheres, tris, lights, planes, aabs, csgs;
     int tex, norm;
     int missingTex, missingNorm, missingRef, missingObj;
     int allocs = 0;
@@ -87,6 +87,7 @@ struct MapStats {
         lights = 0;
         planes = 0;
         aabs = 0;
+        csgs = 0;
         tex = 0;
         norm = 0;
         missingTex = 0;
@@ -98,7 +99,7 @@ struct MapStats {
         name.clear();
     }
     int size() {
-        return lights + spheres + tris + planes + aabs;
+        return lights + spheres + tris + planes + aabs + csgs;
     }
 };
 

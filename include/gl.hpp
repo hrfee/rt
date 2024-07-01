@@ -142,9 +142,9 @@ class GLWindow {
         void enable();
 
         bool vl(bool t);
-
-        void showShapeEditor();
-        void showMaterialEditor(Material *m);
+        
+        void showShapeEditor(Shape *shape = NULL, bool hideTransforms = false);
+        void showMaterialEditor(Material *m = NULL);
 };
 
 void resizeWindowCallback(GLFWwindow *, int, int);
