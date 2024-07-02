@@ -49,7 +49,7 @@ struct RayResult {
     Vec3 refractColor;
     Vec2 uv;
     Vec3 p0;
-    Vec3 normal;
+    // Vec3 normal;
     Vec3 norm;
     Shape *obj;
     RayResult() { resetObj(); };
@@ -68,7 +68,7 @@ struct RayResult {
         lightColor = {0,0,0};
         refractColor = {0,0,0};
         p0 = {0,0,0};
-        normal = {0,0,0};
+        // normal = {0,0,0};
         norm = {0,0,0};
         obj = NULL;
     };

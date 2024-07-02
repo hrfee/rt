@@ -413,8 +413,7 @@ void WorldMap::traversalRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, R
                     res->obj = current;
                     res->t = t;
                     res->p0 = p0 + (res->t * delta);
-                    res->normal = normal;
-                    res->norm = norm(normal);
+                    res->norm = normal;
                     if (uvPtr != NULL) res->uv = *uvPtr;
                 }
             }
@@ -495,7 +494,6 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
                 std::printf("got nan for (%f %f %f)\n", res->norm.x, res->norm.y, res->norm.z);
             } */
             // std::printf("for normal (%f, %f, %f), got (%f, %f, %f) => (%f, %f, %f)\n", res->norm.x, res->norm.y, res->norm.z, ts.x, ts.y, ts.z, sampledNorm.x, sampledNorm.y, sampledNorm.z);
-            res->normal = sampledNorm;
             res->norm = sampledNorm;
         }
     }
@@ -505,7 +503,8 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     } */
    
     // Epsilon (small number) bias so we don't accidentally hit ourselves due to f.p. 
-    Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm);
+    // Also, scale with distance to the object, as larger t's are less precise and so might need a bigger epsilon.
+    Vec3 p0PlusABit = res->p0 + (EPSILON * res->norm * res->t);
     float reflectiveness = res->obj->mat()->reflectiveness;
     if (rc->reflections && (reflectiveness != 0 || (rc->reflectanceMapping && res->obj->mat()->refId != -1))) {
         if (rc->reflectanceMapping && res->obj->mat()->refId != -1) {

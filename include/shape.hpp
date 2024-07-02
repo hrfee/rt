@@ -448,6 +448,7 @@ class Cylinder: public Shape {
         virtual void bounds(Bound *bo);
         virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
         virtual bool intersects(Vec3 p0, Vec3 delta);
+        virtual float intersectFlatEndCaps(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
         virtual void applyTransform();
         virtual void bakeTransform();
         virtual void recalculateUVs(Texture* t = NULL);

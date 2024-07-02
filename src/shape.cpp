@@ -12,6 +12,7 @@ namespace {
     const char* w_radius = "radius";
     const char* w_length = "length";
     const char* w_thickness = "thickness";
+    const char* w_axis = "axis";
     const char* w_material = "material";
     const char* w_color = "color";
     const char* w_tex = "tex";
@@ -273,6 +274,11 @@ Cylinder *Decoder::decodeCylinder(std::string in) {
         } else if (w == w_thickness) {
             stream >> w;
             sh->thickness = std::stof(w);
+        } else if (w == w_axis) {
+            stream >> w;
+            if (w == "x") sh->axis = 0;
+            else if (w == "y") sh->axis = 1;
+            else if (w == "z") sh->axis = 2;
         }
     } while (stream);
     
@@ -953,14 +959,14 @@ float Sphere::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, 
     //
     if (normal != NULL) {
         Vec3 hit = p0 + (t * delta);
-        *normal = ((t <= t_1) ? 1 : -1) * (hit - center);
+        *normal = ((t <= t_1) ? 1 : -1) * (hit - center) / radius;
         if (uv != NULL) {
             *uv = getUV(hit);
         }
     }
     if (normal1 != NULL) {
         Vec3 hit = p0 + (t_1 * delta);
-        *normal1 = ((t <= t_1) ? -1 : 1) * (hit - center);
+        *normal1 = ((t <= t_1) ? -1 : 1) * (hit - center) / radius;
         if (uv1 != NULL) {
             *uv1 = getUV(hit);
         }
@@ -1130,9 +1136,9 @@ Vec3 Triangle::visibleNormal(Vec3 delta) {
     if (components[0] <= components[1])
         return norms[0];
     return norms[1]; */
-    Vec3 norm = cross(c-a, b-a);
-    if (dot(norm, delta) <= 0.f) return norm;
-    else return cross(a-c, b-c);
+    Vec3 normal = cross(c-a, b-a);
+    if (dot(normal, delta) <= 0.f) return norm(normal);
+    else return norm(cross(a-c, b-c));
 }
 
 float Triangle::intersectsPlane(Vec3 p0, Vec3 delta, Vec3 normal) {
@@ -1671,34 +1677,110 @@ float Cylinder::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1
     if (discrim < 0) return -1;
     float discrimRoot = std::sqrt(discrim);
     float denom = 0.5f / a;
-    float t = (-b - discrimRoot) * denom;
-    Vec3 hit = p0 + (t * delta);
-    float lengthAtHit = std::abs(hit(axis) - center(axis));
-    float t_1 = (-b + discrimRoot) * denom;
-    Vec3 hit1 = p0 + (t_1 * delta);
-    float lengthAtHit1 = std::abs(hit1(axis) - center(axis));
-    if (t < 0 || (t_1 < t && t_1 > 0 && lengthAtHit1 <= length)) {
-        std::swap(t, t_1);
-        std::swap(lengthAtHit, lengthAtHit1);
+
+    float t[2] = {(-b - discrimRoot) * denom, (-b + discrimRoot) * denom};
+    int primaryIdx = 0;
+    if (t[0] < 0 || (t[1] < t[0] && t[1] > 0)) primaryIdx = 1;
+    Vec3 hit[2];
+    bool hitsCalculated[2] = {false, false};
+    hit[primaryIdx] = p0 + t[primaryIdx]*delta;
+    hitsCalculated[primaryIdx] = true;
+    float distanceFromCenter = std::abs(hit[primaryIdx](axis) - center(axis));
+ 
+    bool capped[2] = {false, false};
+    capped[primaryIdx] = distanceFromCenter > length;
+    // Hitting only one point on the cylinder means we're inside the infinite-length cylinder,
+    // so we should check if p0 is within the finite-length one.
+    if (!capped[primaryIdx] && t[!primaryIdx] < 0) {
+        if (std::abs(p0(axis) - center(axis)) >= length) {
+            // In this case, the first point of collision is actually the second,
+            // after the cap.
+            capped[primaryIdx] = true;
+            t[!primaryIdx] = t[primaryIdx];
+            hit[!primaryIdx] = hit[primaryIdx];
+        }
+    }
+    if (capped[primaryIdx]) {
+        // The other intersection might be another end cap!
+        float capT1 = -1.f;
+        Vec3 capN1;
+        Vec2 capU1;
+        // The nearest intersection should be the end cap, the farthest will likely be inside the cylinder.
+        t[primaryIdx] = intersectFlatEndCaps(p0, delta, normal, uv, t1 != NULL ? &capT1 : NULL, normal1 != NULL ? &capN1 : NULL, uv1 != NULL ? &capU1 : NULL);
+        if (capT1 > 0.f) {
+            t[!primaryIdx] = capT1;
+            if (normal1 != NULL) *normal1 = capN1;
+            if (uv1 != NULL) *uv1 = capU1;
+            capped[!primaryIdx] = true;
+        }
     }
 
-    if (lengthAtHit > length) return -1;
-    if (normal != NULL) {
-        *normal = ((t <= t_1) ? 1 : -1) * (hit - center);
+    if (normal != NULL && !capped[primaryIdx]) {
+        *normal = ((t[primaryIdx] <= t[!primaryIdx]) ? 1 : -1) * (hit[primaryIdx] - center);
         normal->idx(axis) = 0.f;
         if (uv != NULL) {
-            *uv = getUV(hit);
+            *uv = getUV(hit[primaryIdx]);
         }
     }
-    if (normal1 != NULL) {
-        *normal1 = ((t <= t_1) ? -1 : 1) * (hit1 - center);
+    if (normal1 != NULL && !capped[!primaryIdx]) {
+        if (!hitsCalculated[!primaryIdx]) {
+            hit[!primaryIdx] = p0 + t[!primaryIdx]*delta;
+            hitsCalculated[!primaryIdx] = true;
+        }
+
+        *normal1 = ((t[!primaryIdx] <= t[primaryIdx]) ? 1 : -1) * (hit[!primaryIdx] - center);
         normal1->idx(axis) = 0.f;
         if (uv1 != NULL) {
-            *uv1 = getUV(hit);
+            *uv1 = getUV(hit[!primaryIdx]);
         }
     }
-    if (t1 != NULL) *t1 = t_1;
-    return t;
+    
+    if (t1 != NULL) *t1 = t[!primaryIdx];
+    return t[primaryIdx];
+}
+
+float Cylinder::intersectFlatEndCaps(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, Vec3 *normal1, Vec2 *uv1) {
+    // END CAPS: 
+    // Solve for ray(axis) hitting center(axis) +/- length.
+    // If mag(hit(!axis) - center(!axis)) < radius, cap it!
+    // p0(axis) + t*delta(axis) = center(axis) + sign*length
+    // t = (center(axis) + sign*length(axis) - p0(axis)) / delta(axis)
+    
+    float t[2] = {-1, -1};
+    int signs[2] = {-1, 1};
+    int idx = 0;
+    for (int sign = -1; sign < 2; sign += 2) {
+        t[idx] = (center(axis) + sign*length - p0(axis)) / delta(axis);
+        // center of cylinder to collision point
+        Vec3 hit = (p0 + t[idx]*delta) - center;
+        hit(axis) = 0.f;
+        if (mag(hit) > radius) {
+            t[idx] = -1;
+        }
+        idx++;
+    }
+    if (!(t[1] < 0 || (t[0] >= 0 && t[0] < t[1]))) {
+        std::swap(t[0], t[1]);
+        std::swap(signs[0], signs[1]);
+    }
+    if (t[0] > 0) {
+        if (normal != NULL) {
+            *normal = {0.f, 0.f, 0.f};
+            normal->idx(axis) = delta(axis) > 0 ? -1.f : 1.f;
+        }
+        // FIXME: UV end caps?
+        if (uv != NULL) *uv = {0.f, 0.f};
+    }
+    if (t[1] > 0) {
+        if (t1 != NULL) *t1 = t[1];
+        if (normal1 != NULL) {
+            *normal1 = {0.f, 0.f, 0.f};
+            normal1->idx(axis) = delta(axis) > 0 ? -1.f : 1.f;
+        }
+        // FIXME: UV end caps?
+        if (uv1 != NULL) *uv1 = {0.f, 0.f};
+    }
+    return t[0];
 }
 
 bool Cylinder::intersects(Vec3 p0, Vec3 delta) {
@@ -1860,6 +1942,5 @@ void Cylinder::recalculateUVs(Texture *t) {
         float H = (W / t->img->w) * t->img->h;
         uvScale.y = range[1] / H;
     }
-    std::printf("done scale %f, %f\n", uvScale.x, uvScale.y);
 }
 
