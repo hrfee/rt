@@ -133,10 +133,7 @@ Image *mainLoop(RenderConfig *rc) {
     if (window->state.recalcUVs) {
         Shape *sh = window->getShapePointer();
         if (sh != NULL) {
-            Triangle *t = dynamic_cast<Triangle*>(sh);
-            AAB *b = dynamic_cast<AAB*>(sh);
-            if (t != nullptr) map->dec.recalculateTriUVs(t);
-            else if (b != nullptr) map->dec.recalculateAABUVs(b);
+            sh->recalculateUVs(map->dec.getFirstTexture(sh->mat()));
         }
         window->state.recalcUVs = false;
     }

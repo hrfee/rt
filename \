@@ -1068,12 +1068,10 @@ void GLWindow::showShapeEditor(Shape *shape, bool hideTransforms) {
     } else if (cl != nullptr) {
         if (ImGui::InputFloat3("Position", (float*)&(cl->oCenter)) ||
             vl(ImGui::SliderFloat("Radius", &(cl->oRadius), 0, 20.f)) ||
-            vl(ImGui::SliderFloat("Length", &(cl->oLength), 0, 20.f)) ||
-            vl(ImGui::SliderInt("Axis", &(cl->axis), 0, 2))) {
+            vl(ImGui::SliderFloat("Length", &(cl->oLength), 0, 20.f))) {
             sh->transformDirty = true;
         }
         vl(ImGui::SliderFloat("\"Thickness\"", &(cl->thickness), 0, 1.f));
-    }
 
     if (t != nullptr || b != nullptr) {
         if (ImGui::Button("Recalculate UVs")) {

@@ -17,12 +17,17 @@ class Container;
 class AAB;
 class Material;
 class Shape;
+class Cylinder;
 
 namespace ShapeType {
     const int Sphere = 0;
     const int Triangle = 1;
     const int AAB = 2;
     const int CSG = 3;
+    const int Cylinder = 4;
+
+
+    const int Count = 5;
 }
 
 inline const float EPSILON = 0.00001f;
@@ -84,9 +89,11 @@ class Shape {
         Transform transform;
         bool transformDirty;
         bool debug;
+        Vec2 uvScale;
         Shape() {
             material = NULL;
             debug = false;
+            uvScale = {1.f, 1.f};
             transformDirty = true;
             transform.reset();
         };
@@ -95,6 +102,7 @@ class Shape {
             transform = sh->transform;
             transformDirty = sh->transformDirty;
             debug = sh->debug;
+            uvScale = sh->uvScale;
         };
         virtual Shape *clone() { return NULL; };
         virtual Material *mat() { return material; };
@@ -112,6 +120,7 @@ class Shape {
         virtual int type() = 0;
         virtual void flattenTo(Container *dst, bool root = true); // Defined in shape.cpp due to Container usage
         virtual Vec3 sampleTexture(Vec2 uv, Texture *tx);
+        virtual void recalculateUVs(Texture* /*t*/ = NULL);
         virtual ~Shape() {};
     // Note no destructor for the dynamically allocated "material",
     // This is because the material is allocated and given by a MaterialStore,
@@ -195,7 +204,6 @@ class AAB: public Shape {
         AAB() {
             min = {0, 0, 0};
             max = {0, 0, 0};
-            uvScale = {1.f, 1.f};
             faceForUV = 0;
             oMin = min;
             oMax = max;
@@ -207,14 +215,12 @@ class AAB: public Shape {
             oMin = b->oMin;
             oMax = b->oMax;
             faceForUV = b->faceForUV;
-            uvScale = b->uvScale;
         };
         virtual Shape *clone() {
             return new AAB(this);
         };
 
         int faceForUV;
-        Vec2 uvScale;
         Vec2 getUV(Vec3 hit, Vec3 normal);
         AAB(Vec3 mn, Vec3 mx): min(mn), max(mx) {};
         virtual std::string name() { return std::string("Box"); };
@@ -226,7 +232,7 @@ class AAB: public Shape {
         virtual void bakeTransform();
         virtual bool envelops(Vec3 mn, Vec3 mx);
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
-        virtual Vec3 sampleTexture(Vec2 uv, Texture *tx);
+        virtual void recalculateUVs(Texture *t = NULL);
 };
 // See note in shape.cpp for why this is here.
 float meetAABB(Vec3 p0, Vec3 delta, Vec3 a, Vec3 b);
@@ -362,6 +368,7 @@ class Triangle: public Shape {
         virtual void bakeTransform();
         // A triangle can't envelop a 3d object, so envelops() is left empty (returning false).
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual void recalculateUVs(Texture *t = NULL);
 };
 
 class CSG: public Shape {
@@ -402,6 +409,53 @@ class CSG: public Shape {
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
         virtual Vec3 sampleTexture(Vec2 uv, Texture *tx);
 };
+
+class Cylinder: public Shape {
+    public:
+        Vec3 center, oCenter;
+        float radius, oRadius;
+        float length, oLength;
+        float thickness;
+        int axis;
+
+        Vec2 getUV(Vec3 hit);
+        Cylinder() {
+            center = {0.f, 0.f, 0.f};
+            axis = 0;
+            oCenter = center;
+            radius = 0.f;
+            oRadius = radius;
+            length = 0.f;
+            oLength = length;
+            thickness = 1.f;
+        }
+        Cylinder(Shape *sh): Shape(sh) {
+            Cylinder *cl = static_cast<Cylinder*>(sh);
+            axis = cl->axis;
+            center = cl->center;
+            oCenter = cl->oCenter;
+            radius = cl->radius;
+            oRadius = cl->oRadius;
+            length = cl->length;
+            oLength = cl->oLength;
+            thickness = cl->thickness;
+        };
+        virtual Shape *clone() {
+            return new Sphere(this);
+        };
+        virtual std::string name() { return std::string("Cylinder"); };
+        virtual int type() { return ShapeType::Cylinder; };
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
+        virtual void applyTransform();
+        virtual void bakeTransform();
+        virtual void recalculateUVs(Texture* t = NULL);
+
+        void refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+};
+
 
 struct PointLight {
     Vec3 center;
@@ -446,6 +500,8 @@ struct Decoder {
     // std::string encodeSphere(Shape *sh);
 
     Sphere *decodeSphere(std::string in);
+    
+    Cylinder *decodeCylinder(std::string in);
 
     // std::string encodeTriangle(Shape *sh);
 
@@ -462,6 +518,9 @@ struct Decoder {
     void usingMaterial(std::string name);
     bool isUsingMaterial() { return usedMaterial != NULL; };
     void endUsingMaterial() { usedMaterial = NULL; };
+
+    Texture *getFirstTexture(Material *m);
+
 };
 
 std::string encodeColour(Vec3 c);

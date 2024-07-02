@@ -598,6 +598,7 @@ namespace {
     const char* w_movespeed = "movespeed";
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
+    const char* w_cylinder = "cylinder";
     const char* w_aab = "box";
     const char* w_pointLight = "plight";
     const char* w_shininess = "shininess";
@@ -940,7 +941,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.csgs++;
                 csg = NULL;
             }
-        } else if (token == w_sphere || token == w_triangle || token == w_aab) {
+        } else if (token == w_sphere || token == w_triangle || token == w_aab || token == w_cylinder) {
             if (token == w_sphere) {
                 Sphere *sphere = dec.decodeSphere(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
@@ -977,6 +978,16 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 aab->oMax = aab->oMax * transform;
                 APPEND(aab);
                 if (csg == NULL) mapStats.aabs++;
+            } else if (token == w_cylinder) {
+                Cylinder *cylinder = dec.decodeCylinder(line);
+                if (tex.lastLoadFail) mapStats.missingTex += 1;
+                if (norms.lastLoadFail) mapStats.missingNorm += 1;
+                if (refs.lastLoadFail) mapStats.missingRef += 1;
+                mapStats.allocs += 1; // Cylinder
+                // FIXME: Scale isn't applied to the radius!
+                cylinder->oCenter = cylinder->oCenter * transform;
+                APPEND(cylinder);
+                if (csg == NULL) mapStats.cylinders++;
             }
         } else if (token == w_pointLight) {
             PointLight pl = dec.decodePointLight(line);

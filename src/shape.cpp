@@ -10,6 +10,7 @@
 namespace {
     const char* w_center = "center";
     const char* w_radius = "radius";
+    const char* w_length = "length";
     const char* w_thickness = "thickness";
     const char* w_material = "material";
     const char* w_color = "color";
@@ -249,6 +250,39 @@ Sphere *Decoder::decodeSphere(std::string in) {
     return sh;
 }
 
+Cylinder *Decoder::decodeCylinder(std::string in) {
+    std::stringstream stream(in);
+    Cylinder *sh = new Cylinder();
+    decodeShape(sh, in);
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_center) {
+            stream >> w;
+            sh->oCenter.x = std::stof(w);
+            stream >> w;
+            sh->oCenter.y = std::stof(w);
+            stream >> w;
+            sh->oCenter.z = std::stof(w);
+        } else if (w == w_radius) {
+            stream >> w;
+            sh->oRadius = std::stof(w);
+        } else if (w == w_length) {
+            stream >> w;
+            sh->oLength = std::stof(w);
+        } else if (w == w_thickness) {
+            stream >> w;
+            sh->thickness = std::stof(w);
+        }
+    } while (stream);
+    
+    if (sh->mat()->hasTexture()) {
+        sh->recalculateUVs(getFirstTexture(sh->mat()));
+    }
+
+    return sh;
+}
+
 /* std::string Decoder::encodePointLight(PointLight *p) {
     std::ostringstream fmt;
     fmt << "plight ";
@@ -346,99 +380,21 @@ Triangle *Decoder::decodeTriangle(std::string in) {
     // FIXME: Maybe best to do this for all tris regardless of texture,
     // since the user can now dynamically apply them.
     if (sh->mat()->hasTexture()) {
-        recalculateTriUVs(sh);
+        sh->recalculateUVs(getFirstTexture(sh->mat()));
     }
 
     return sh;
 }
 
-void Decoder::recalculateTriUVs(Triangle *tri) {
-    // Ensure coordinates are loaded
-    tri->applyTransform();
-    // Project onto 2D plane, any'll do for now
-    float proj[3][2] = {
-        {tri->a.x, tri->a.y},
-        {tri->b.x, tri->b.y},
-        {tri->c.x, tri->c.y}
-    };
-    float min[2] = {9999.f, 9999.f};
-    float max[2] = {-9999.f, -9999.f};
-    for (int i = 0; i < 2; i++) {
-        min[i] = std::min(proj[0][i], std::min(proj[1][i], proj[2][i]));
-        max[i] = std::max(proj[0][i], std::max(proj[1][i], proj[2][i]));
+Texture *Decoder::getFirstTexture(Material *m) {
+    if (m->texId != -1) {
+        return tex->at(m->texId);
+    } else if (m->normId != -1) {
+        return norm->at(m->normId);
+    } else if (m->refId != -1) {
+        return ref->at(m->refId);
     }
-    
-    float range[2] = {max[0] - min[0], max[1] - min[1]};
-    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
-    Texture *t = NULL;
-    Vec2 scale = {1.f, 1.f};
-    float iw = 0.f, ih = 0.f;
-    if (tri->mat()->texId != -1) {
-        t = tex->at(tri->mat()->texId);
-    } else if (tri->mat()->normId != -1) {
-        t = norm->at(tri->mat()->normId);
-    } else if (tri->mat()->refId != -1) {
-        t = ref->at(tri->mat()->refId);
-    }
-    scale = {1.f, 1.f}; // t->scale;
-    iw = t->img->w;
-    ih = t->img->h;
-
-    if (scale.x == -1.f) {
-        float H = range[1] / scale.y;
-        float W = (H / ih) * iw;
-        scale.x = range[0] / W;
-    } else if (scale.y == -1.f) {
-        float W = range[0] / scale.x;
-        float H = (W / iw) * ih;
-        scale.y = range[1] / H;
-    }
-
-    for (int i = 0; i < 3; i++) {
-        tri->UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
-    }
-}
-
-void Decoder::recalculateAABUVs(AAB *box) {
-    // Ensure coordinates are loaded
-    box->applyTransform();
-    
-    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
-    Texture *t = NULL;
-    if (box->mat()->texId != -1) {
-        t = tex->at(box->mat()->texId);
-    } else if (box->mat()->normId != -1) {
-        t = norm->at(box->mat()->normId);
-    } else if (box->mat()->refId != -1) {
-        t = ref->at(box->mat()->refId);
-    }
-    if (t == NULL) return;
-
-    box->uvScale = t->scale;
-
-    float range[2];
-    int faceIdx = 0;
-    for (int i = 0; i < 3; i++) {
-        if (i == box->faceForUV) continue;
-        range[faceIdx] = box->max(i) - box->min(i);
-        faceIdx++;
-    }
-
-    // Ignoring x would give us y,z, which we don't want.
-    // so we swap them around.
-    if (box->faceForUV == 0) {
-        std::swap(range[0], range[1]);
-    }
-
-    if (box->uvScale.x == -1.f) {
-        float H = range[1] / box->uvScale.y;
-        float W = (H / t->img->h) * t->img->w;
-        box->uvScale.x = range[0] / W;
-    } else if (box->uvScale.y == -1.f) {
-        float W = range[0] / box->uvScale.x;
-        float H = (W / t->img->w) * t->img->h;
-        box->uvScale.y = range[1] / H;
-    }
+    return NULL;
 }
 
 /* std::string Decoder::encodeAAB(Shape *sh) {
@@ -482,18 +438,11 @@ AAB *Decoder::decodeAAB(std::string in) {
     if (sh->mat()->hasTexture()) {
         // This copy is only done here,
         // later on we want the AAB to be the source of truth on this value.
-        Texture *t = NULL;
-        if (sh->mat()->texId != -1) {
-            t = tex->at(sh->mat()->texId);
-        } else if (sh->mat()->normId != -1) {
-            t = norm->at(sh->mat()->normId);
-        } else if (sh->mat()->refId != -1) {
-            t = ref->at(sh->mat()->refId);
-        }
+        Texture *t = getFirstTexture(sh->mat());
         if (t != NULL) {
             sh->faceForUV = t->face;
+            sh->recalculateUVs(t);
         }
-        recalculateAABUVs(sh);
     }
 
     return sh;
@@ -567,7 +516,7 @@ Vec3 decodeColour(std::stringstream *stream) {
 }
 
 Vec3 Shape::sampleTexture(Vec2 uv, Texture *tx) {
-    return tx->at(uv.x, uv.y);
+    return tx->at(uv.x, uv.y, &uvScale);
 }
 
 void Shape::flattenTo(Container *dst, bool /*root*/) { 
@@ -577,6 +526,27 @@ void Shape::flattenTo(Container *dst, bool /*root*/) {
     dst->grow(b);
     dst->append(b);
 }
+
+void Shape::recalculateUVs(Texture *t) {
+    // Ensure coordinates are loaded
+    applyTransform();
+    
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
+    uvScale = t->scale;
+
+    float range[2] = {1, 1};
+
+    if (uvScale.x == -1.f) {
+        float H = range[1] / uvScale.y;
+        float W = (H / t->img->h) * t->img->w;
+        uvScale.x = range[0] / W;
+    } else if (uvScale.y == -1.f) {
+        float W = range[0] / uvScale.x;
+        float H = (W / t->img->w) * t->img->h;
+        uvScale.y = range[1] / H;
+    }
+}
+
 
 void Container::flattenTo(Container *dst, bool root) {
     if (root) {
@@ -756,10 +726,6 @@ void Decoder::usingMaterial(std::string name) {
     }
 }
 
-Vec3 AAB::sampleTexture(Vec2 uv, Texture *tx) {
-    return tx->at(uv.x, uv.y, &uvScale);
-}
-
 void AAB::bounds(Bound *bo) {
     bo->min = min;
     bo->max = max;
@@ -921,6 +887,38 @@ void AAB::refract(float /*ri*/, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
     *delta1 = delta;
     // FIXME: AAB opacity!
     std::printf("FIXME: AAB opacity!\n");
+}
+
+void AAB::recalculateUVs(Texture *t) {
+    // Ensure coordinates are loaded
+    applyTransform();
+    
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
+    uvScale = t->scale;
+
+    float range[2];
+    int faceIdx = 0;
+    for (int i = 0; i < 3; i++) {
+        if (i == faceForUV) continue;
+        range[faceIdx] = max(i) - min(i);
+        faceIdx++;
+    }
+
+    // Ignoring x would give us y,z, which we don't want.
+    // so we swap them around.
+    if (faceForUV == 0) {
+        std::swap(range[0], range[1]);
+    }
+
+    if (uvScale.x == -1.f) {
+        float H = range[1] / uvScale.y;
+        float W = (H / t->img->h) * t->img->w;
+        uvScale.x = range[0] / W;
+    } else if (uvScale.y == -1.f) {
+        float W = range[0] / uvScale.x;
+        float H = (W / t->img->w) * t->img->h;
+        uvScale.y = range[1] / H;
+    }
 }
 
 void Sphere::bounds(Bound *bo) {
@@ -1331,6 +1329,45 @@ void Triangle::refract(float /*ri*/, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1
     *delta1 = delta;
 }
 
+void Triangle::recalculateUVs(Texture *t) {
+    // Ensure coordinates are loaded
+    applyTransform();
+    // Project onto 2D plane, any'll do for now
+    float proj[3][2] = {
+        {a.x, a.y},
+        {b.x, b.y},
+        {c.x, c.y}
+    };
+    float min[2] = {9999.f, 9999.f};
+    float max[2] = {-9999.f, -9999.f};
+    for (int i = 0; i < 2; i++) {
+        min[i] = std::min(proj[0][i], std::min(proj[1][i], proj[2][i]));
+        max[i] = std::max(proj[0][i], std::max(proj[1][i], proj[2][i]));
+    }
+    
+    float range[2] = {max[0] - min[0], max[1] - min[1]};
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
+    Vec2 scale = {1.f, 1.f};
+    float iw = 0.f, ih = 0.f;
+    scale = {1.f, 1.f}; // t->scale;
+    iw = t->img->w;
+    ih = t->img->h;
+
+    if (scale.x == -1.f) {
+        float H = range[1] / scale.y;
+        float W = (H / ih) * iw;
+        scale.x = range[0] / W;
+    } else if (scale.y == -1.f) {
+        float W = range[0] / scale.x;
+        float H = (W / iw) * ih;
+        scale.y = range[1] / H;
+    }
+
+    for (int i = 0; i < 3; i++) {
+        UVs[i] = {(proj[i][0] - min[0])*scale.x/range[0], (proj[i][1] - min[1])*scale.y/range[1]};
+    }
+}
+
 void Bound::grow(Bound *src) {
     for (int i = 0; i < 3; i++) {
         min(i) = std::min(min(i), src->min(i));
@@ -1604,3 +1641,225 @@ int CSG::clear(bool deleteShapes) {
 }
 
 const char* CSG::RelationNames[] = {"Intersection", "Union", "Difference", "Difference (Hollow Subject)"};
+
+void Cylinder::bounds(Bound *bo) {
+    bo->min = center;
+    bo->min(axis) -= length;
+    bo->max = center;
+    bo->max(axis) += length;
+    for (int i = 0; i < 3; i++) {
+        if (i == axis) continue;
+        bo->min(i) -= radius;
+        bo->max(i) += radius;
+    }
+    bo->centroid = center;
+};
+
+float Cylinder::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, Vec3 *normal1, Vec2 *uv1) {
+    float a = 0;
+    float b = 0;
+    float c = -(radius*radius);
+    for (int i = 0; i < 3; i++) {
+        if (i == axis) continue;
+        a += delta(i)*delta(i);
+        float originToCylinder = p0(i) - center(i);
+        b += delta(i)*originToCylinder;
+        c += originToCylinder*originToCylinder;
+    }
+    b *= 2.f;
+    float discrim = b*b - 4.f*a*c;
+    if (discrim < 0) return -1;
+    float discrimRoot = std::sqrt(discrim);
+    float denom = 0.5f / a;
+    float t = (-b - discrimRoot) * denom;
+    Vec3 hit = p0 + (t * delta);
+    float lengthAtHit = std::abs(hit(axis) - center(axis));
+    float t_1 = (-b + discrimRoot) * denom;
+    Vec3 hit1 = p0 + (t_1 * delta);
+    float lengthAtHit1 = std::abs(hit1(axis) - center(axis));
+    if (t < 0 || (t_1 < t && t_1 > 0 && lengthAtHit1 <= length)) {
+        std::swap(t, t_1);
+        std::swap(lengthAtHit, lengthAtHit1);
+    }
+
+    if (lengthAtHit > length) return -1;
+    if (normal != NULL) {
+        *normal = ((t <= t_1) ? 1 : -1) * (hit - center);
+        normal->idx(axis) = 0.f;
+        if (uv != NULL) {
+            *uv = getUV(hit);
+        }
+    }
+    if (normal1 != NULL) {
+        *normal1 = ((t <= t_1) ? -1 : 1) * (hit1 - center);
+        normal1->idx(axis) = 0.f;
+        if (uv1 != NULL) {
+            *uv1 = getUV(hit);
+        }
+    }
+    if (t1 != NULL) *t1 = t_1;
+    return t;
+}
+
+bool Cylinder::intersects(Vec3 p0, Vec3 delta) {
+    return intersect(p0, delta) >= 0;
+}
+
+Vec2 Cylinder::getUV(Vec3 hit) {
+    // "Move" the sphere (and the point on it) to center O.
+    hit = hit - center;
+    Vec2 hit2D = {0.f, 0.f};
+    int idx = 0;
+    for (int i = 0; i < 3; i++) {
+        if (i == axis) continue;
+        hit2D(idx) = hit(i);
+        idx++;
+    }
+    float theta = std::atan2(hit2D.x, hit2D.y);
+    float v = hit(axis) / length;
+    // shift from -1 - 1, to 0 - 1:
+    v = (v + 1.f) / 2.f;
+
+    // Divide by 360deg so range is 1,
+    float rU = theta / (2.f*M_PI);
+
+    return Vec2{
+        1.f - (rU + 0.5f), // and shift upwards so between 0 & 1.
+        v
+    };
+}
+
+void Cylinder::applyTransform() {
+    if (!transformDirty) return;
+    if (!transform.needed()) {
+        center = oCenter;
+        radius = oRadius;
+        length = oLength;
+        transformDirty = false;
+        return;
+    }
+    Mat4 m = transform.build();
+    center = oCenter * m;
+    radius = oRadius * transform.scale;
+    length = oLength * transform.scale;
+    transformDirty = false;
+}
+
+void Cylinder::bakeTransform() {
+    oCenter = center;
+    oRadius = radius;
+    oLength = length;
+    transform.reset();
+}
+
+// Refracts through the sphere as if it were solid (i.e. ignoring thickness).
+void Cylinder::refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    Vec3 normal = p0 - center;
+    normal(axis) = 0.f;
+    bool tir = true;
+    Vec3 r = Refract(r0, r1, delta, normal, &tir);
+    if (tir) {
+        r = delta - 2.f*dot(delta, normal) * normal;
+        *delta1 = r;
+        *p1 = p0 + (EPSILON * r);
+        return;
+    }
+    tir = true;
+    while (tir) {
+        p0 = p0 + (EPSILON * r);
+        float t = intersect(p0, r);
+        p0 = p0 + (t * r);
+        Vec3 n = -1.f*(p0 - center);
+        n(axis) = 0.f;
+        Vec3 r2 = Refract(r1, r0, r, n, &tir);
+        if (tir) {
+            r = r - 2.f*dot(r, n) * n;
+        } else {
+            r = r2;
+        }
+    }
+    *p1 = p0;
+    *delta1 = r;
+}
+
+void Cylinder::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    float hollowness = 1.f - thickness;
+    if (hollowness == 1.f) {
+        ri = RI_AIR;
+        hollowness = 0.f;
+    }
+
+    if (hollowness == 0.f) {
+        refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
+        return;
+    }
+    // Into outer sphere (RI_AIR -> RI_SPHERE)
+    *p1 = p0;
+    Vec3 normal = *p1 - center;
+    normal(axis) = 0.f;
+    bool tir = true;
+    Vec3 r = Refract(RI_AIR, ri, delta, normal, &tir);
+    if (tir) {
+        // Reflect off the sphere.
+        // FIXME: Put this reflection in a shared function!
+        *delta1 = delta - 2.f * dot(delta, normal) * normal;
+        return;
+    }
+    bool escaped = false;
+    *delta1 = r;
+    // Our smaller, inner sphere, filled with RI_AIR.
+    Sphere innerSphere(this);
+    innerSphere.radius *= hollowness;
+    innerSphere.thickness = 1.f;
+    while (!escaped) {
+        // Hit the inner sphere
+        float t = innerSphere.intersect(*p1, *delta1);
+        if (t < 0) { // Missing the internal sphere means we can ignore it entirely.
+            refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
+            return;
+        }
+        *p1 = *p1 + (t * *delta1);
+        Vec3 p2; // Temp variable just in case
+        // Refract in and out of the inner sphere RI_SPHERE -> RI_AIR -> RI_SPHERE)
+        innerSphere.refractSolid(ri, RI_AIR, *p1, *delta1, &p2, &r);
+        *p1 = p2;
+        *delta1 = r;
+        // Hit the outer sphere
+        t = intersect(*p1, *delta1);
+        *p1 = *p1 + (t * *delta1);
+        normal = -1.f * (*p1 - center);
+        normal(axis) = 0.f;
+        // Out of the outer sphere (RI_SPHERE -> RI_AIR)
+        r = Refract(ri, RI_AIR, *delta1, normal, &tir);
+        if (tir) {
+            // If we have TIR, reflect back into the sphere, and loop this process again.
+            // FIXME: Put this reflection in a shared function!
+            *delta1  = *delta1 - 2.f * dot(*delta1, normal) * normal;
+            continue;
+        }
+        *delta1 = r;
+        escaped = true;
+    }
+}
+
+void Cylinder::recalculateUVs(Texture *t) {
+    // Ensure coordinates are loaded
+    applyTransform();
+    
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
+    uvScale = t->scale;
+
+    float range[2] = {2.f * float(M_PI) * radius, length * 2.f};
+
+    if (uvScale.x == -1.f) {
+        float H = range[1] / uvScale.y;
+        float W = (H / t->img->h) * t->img->w;
+        uvScale.x = range[0] / W;
+    } else if (uvScale.y == -1.f) {
+        float W = range[0] / uvScale.x;
+        float H = (W / t->img->w) * t->img->h;
+        uvScale.y = range[1] / H;
+    }
+    std::printf("done scale %f, %f\n", uvScale.x, uvScale.y);
+}
+

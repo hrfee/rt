@@ -30,6 +30,8 @@ difference {
     box a -2 1.2 -0.8 b 6 2.8 0.8 material test
 } translate 0 0 -5
 
+cylinder center 4 4 1 radius 0.8 length 2 tex assets/checker.tga:4,4
+
 // SKYBOX
 // "nolighting" tag so its entirely lit
 sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga nolighting
