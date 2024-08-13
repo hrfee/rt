@@ -1,0 +1,11 @@
+map dimensions 10 10 10 brightness 0.15 shininess 5 movespeed 3
+
+material test2 color #00ff00 tex assets/checker.tga
+
+difference {
+    sphere center 0 0 -0.4 radius 0.4 color 0.1 0.1 0.8 reflectiveness 0 specular 1 shininess 20 material test2
+    cone center 0 0 -1.5 radius 0.4 length 2 axis z material test2
+}
+
+plight center 3 3 3 brightness 5 color #ffffff specular 1 color #ffffff
+plight center 0.087 0.145 0.077 brightness 5 color #ffffff specular 1 color #ffffff

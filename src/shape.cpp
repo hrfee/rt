@@ -251,6 +251,44 @@ Sphere *Decoder::decodeSphere(std::string in) {
     return sh;
 }
 
+Cone *Decoder::decodeCone(std::string in) {
+    std::stringstream stream(in);
+    Cone *sh = new Cone();
+    decodeShape(sh, in);
+    do {
+        std::string w;
+        stream >> w;
+        if (w == w_center) {
+            stream >> w;
+            sh->oCenter.x = std::stof(w);
+            stream >> w;
+            sh->oCenter.y = std::stof(w);
+            stream >> w;
+            sh->oCenter.z = std::stof(w);
+        } else if (w == w_radius) {
+            stream >> w;
+            sh->oRadius = std::stof(w);
+        } else if (w == w_length) {
+            stream >> w;
+            sh->oLength = std::stof(w);
+        } else if (w == w_thickness) {
+            stream >> w;
+            sh->thickness = std::stof(w);
+        } else if (w == w_axis) {
+            stream >> w;
+            if (w == "x") sh->axis = 0;
+            else if (w == "y") sh->axis = 1;
+            else if (w == "z") sh->axis = 2;
+        }
+    } while (stream);
+    
+    if (sh->mat()->hasTexture()) {
+        sh->recalculateUVs(getFirstTexture(sh->mat()));
+    }
+
+    return sh;
+}
+
 Cylinder *Decoder::decodeCylinder(std::string in) {
     std::stringstream stream(in);
     Cylinder *sh = new Cylinder();
@@ -1925,6 +1963,303 @@ void Cylinder::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
 }
 
 void Cylinder::recalculateUVs(Texture *t) {
+    // Ensure coordinates are loaded
+    applyTransform();
+    
+    // FIXME: Only the scale factors of the TEXTURE are currently respected, and applied to other textures too!
+    uvScale = t->scale;
+
+    float range[2] = {2.f * float(M_PI) * radius, length * 2.f};
+
+    if (uvScale.x == -1.f) {
+        float H = range[1] / uvScale.y;
+        float W = (H / t->img->h) * t->img->w;
+        uvScale.x = range[0] / W;
+    } else if (uvScale.y == -1.f) {
+        float W = range[0] / uvScale.x;
+        float H = (W / t->img->w) * t->img->h;
+        uvScale.y = range[1] / H;
+    }
+}
+
+void Cone::bounds(Bound *bo) {
+    bo->min = center;
+    bo->max = center;
+    bo->max(axis) += length;
+    for (int i = 0; i < 3; i++) {
+        if (i == axis) continue;
+        bo->min(i) -= radius;
+        bo->max(i) += radius;
+    }
+    bo->centroid = center;
+    bo->centroid(axis) += 0.5f * length;
+};
+
+struct Hit {
+    float t;
+    Vec3 hit;
+    float toCenter;
+    Vec3 normal;
+    Vec2 uv;
+    void calcHit(Vec3 p0, Vec3 delta) { if (t < 0) return; hit = p0 + t * delta; };
+};
+
+static Hit emptyHit() { return Hit{-1.f, {0.f, 0.f, 0.f}, 0.f, {0.f, 0.f, 0.f}, {0.f, 0.f}}; };
+
+float Cone::intersect(Vec3 p0, Vec3 delta, Vec3 *normal, Vec2 *uv, float *t1, Vec3 *normal1, Vec2 *uv1) {
+    Vec2 *uvPtrs[2] = {uv, uv1};
+    Vec3 *normalPtrs[2] = {normal, normal1};
+
+    int x = 0, y = 1, z = 2;
+    if (axis == 0) {
+        x = 1;
+        y = 2;
+        z = 0;
+    } else if (axis == 1) {
+        y = 2;
+        z = 1;
+    }
+    float m = radius / length;
+    m = m*m;
+    float a = (delta(x)*delta(x) + delta(y)*delta(y)) - m*(delta(z)*delta(z));
+    Vec3 originToCone = p0 - center;
+    float b = (delta(x)*originToCone(x)) + (delta(y)*originToCone(y)) - m*(delta(z)*originToCone(z));
+    b = 2.f * b;
+    float c = (originToCone(x)*originToCone(x)) + (originToCone(y)*originToCone(y)) - m*(originToCone(z)*originToCone(z));
+    
+    float discrim = b*b - 4.f*a*c;
+    // No hits (in either direction, mind) implies we cannot
+    // hit the end cap either, so early return.
+    if (discrim < 0) {
+        return -1;
+    }
+    float denom = 0.5f / a;
+  
+    Hit h[2] = {emptyHit(), emptyHit()};
+
+    // One hit
+    if (std::abs(discrim) == /*EPSILON*/ 0) {
+        h[0].t = b * denom;
+        // Can't early return if t[0] < 0, as we could hit an end cap.
+    } else {
+        float discrimRoot = std::sqrt(discrim);
+        h[0].t = (-b - discrimRoot) * denom;
+        h[1].t = (-b + discrimRoot) * denom;;
+    }
+  
+    h[0].calcHit(p0, delta);
+    h[1].calcHit(p0, delta);
+
+    h[0].toCenter = h[0].hit(axis) - center(axis);
+    h[1].toCenter = h[1].hit(axis) - center(axis);
+
+    for (int i = 0; i < 2; i++) {
+        if (h[i].t < 0.f) continue;
+        float absLength = std::abs(length);
+        if (
+            std::abs(length + h[i].toCenter) < absLength ||
+            std::abs(h[i].toCenter) > absLength
+            ) {
+            h[i].t = -1.f;
+            continue;
+        }
+    }
+
+    if (h[0].t >= 0.f && h[1].t >= 0.f) {
+        if (h[0].t > h[1].t) std::swap(h[0], h[1]);
+    } else if (h[0].t < 0.f) std::swap(h[0], h[1]);
+
+
+    int capHitIndex = -1;
+    Hit hc = emptyHit();
+    // Distance from p0 to anywhere an axis-aligned distance of (length) away from the tip.
+    hc.toCenter = length;
+    hc.t = ((center(axis) + length) - p0(axis)) / delta(axis);
+    hc.calcHit(p0, delta);
+    Vec3 centerToHit = hc.hit - center;
+    centerToHit(axis) = 0.f;
+    if (hc.t > 0 && mag(centerToHit) < radius) {
+        capHitIndex = 0;
+
+        if (h[0].t > 0.f && hc.t > h[0].t) capHitIndex++;
+        if (h[1].t > 0.f && hc.t > h[1].t) capHitIndex = -1;
+        if (capHitIndex != -1) {
+            if (capHitIndex == 0) h[1] = h[0];
+            h[capHitIndex] = hc;
+            if (uvPtrs[capHitIndex] != NULL) {
+                Vec3 uv3 = (centerToHit / radius) + 1.f;
+                int ui = 0;
+                for (int i = 0; i < 3; i++) {
+                    if (i == axis) continue;
+                    uvPtrs[capHitIndex]->idx(ui) = uv3(i);
+                    ui++;
+                }
+            }
+            if (normalPtrs[capHitIndex] != NULL) {
+                *(normalPtrs[capHitIndex]) = {0.f, 0.f, 0.f};
+                normalPtrs[capHitIndex]->idx(axis) = length > 0 ? 1.f : -1.f;
+            }
+        }
+    }
+
+    for (int i = 0; i < 2; i++) {
+        if (capHitIndex != i && uvPtrs[i] != NULL) {
+            *(uvPtrs[i]) = getUV(h[i].hit);
+        }
+        if (capHitIndex != i && normalPtrs[i] != NULL) {
+            *(normalPtrs[i]) = h[i].hit - center;
+            normalPtrs[i]->idx(axis) = 0.f;
+            *(normalPtrs[i]) = norm(*(normalPtrs[i]));
+            *(normalPtrs[i]) = *(normalPtrs[i]) * (length / radius);
+            normalPtrs[i]->idx(axis) = radius / length;
+        }
+    }
+    if (h[1].t > 0 && t1 != NULL) *t1 = h[1].t;
+    return h[0].t;
+}
+
+bool Cone::intersects(Vec3 p0, Vec3 delta) {
+    return intersect(p0, delta) >= 0;
+}
+
+Vec2 Cone::getUV(Vec3 hit) {
+    // "Move" the sphere (and the point on it) to center O.
+    hit = hit - center;
+    Vec2 hit2D = {0.f, 0.f};
+    int idx = 0;
+    for (int i = 0; i < 3; i++) {
+        if (i == axis) continue;
+        hit2D(idx) = hit(i);
+        idx++;
+    }
+    float theta = std::atan2(hit2D.x, hit2D.y);
+    float v = hit(axis) / length;
+    // shift from -1 - 1, to 0 - 1:
+    v = (v + 1.f) / 2.f;
+
+    // Divide by 360deg so range is 1,
+    float rU = theta / (2.f*M_PI);
+
+    return Vec2{
+        1.f - (rU + 0.5f), // and shift upwards so between 0 & 1.
+        v
+    };
+}
+
+void Cone::applyTransform() {
+    if (!transformDirty) return;
+    if (!transform.needed()) {
+        center = oCenter;
+        radius = oRadius;
+        length = oLength;
+        transformDirty = false;
+        return;
+    }
+    Mat4 m = transform.build();
+    center = oCenter * m;
+    radius = oRadius * transform.scale;
+    length = oLength * transform.scale;
+    transformDirty = false;
+}
+
+void Cone::bakeTransform() {
+    oCenter = center;
+    oRadius = radius;
+    oLength = length;
+    transform.reset();
+}
+
+// Refracts through the sphere as if it were solid (i.e. ignoring thickness).
+void Cone::refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    Vec3 normal = p0 - center;
+    normal(axis) = 0.f;
+    bool tir = true;
+    Vec3 r = Refract(r0, r1, delta, normal, &tir);
+    if (tir) {
+        r = delta - 2.f*dot(delta, normal) * normal;
+        *delta1 = r;
+        *p1 = p0 + (EPSILON * r);
+        return;
+    }
+    tir = true;
+    while (tir) {
+        p0 = p0 + (EPSILON * r);
+        float t = intersect(p0, r);
+        p0 = p0 + (t * r);
+        Vec3 n = -1.f*(p0 - center);
+        n(axis) = 0.f;
+        Vec3 r2 = Refract(r1, r0, r, n, &tir);
+        if (tir) {
+            r = r - 2.f*dot(r, n) * n;
+        } else {
+            r = r2;
+        }
+    }
+    *p1 = p0;
+    *delta1 = r;
+}
+
+void Cone::refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1) {
+    float hollowness = 1.f - thickness;
+    if (hollowness == 1.f) {
+        ri = RI_AIR;
+        hollowness = 0.f;
+    }
+
+    if (hollowness == 0.f) {
+        refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
+        return;
+    }
+    // Into outer sphere (RI_AIR -> RI_SPHERE)
+    *p1 = p0;
+    Vec3 normal = *p1 - center;
+    normal(axis) = 0.f;
+    bool tir = true;
+    Vec3 r = Refract(RI_AIR, ri, delta, normal, &tir);
+    if (tir) {
+        // Reflect off the sphere.
+        // FIXME: Put this reflection in a shared function!
+        *delta1 = delta - 2.f * dot(delta, normal) * normal;
+        return;
+    }
+    bool escaped = false;
+    *delta1 = r;
+    // Our smaller, inner sphere, filled with RI_AIR.
+    Sphere innerSphere(this);
+    innerSphere.radius *= hollowness;
+    innerSphere.thickness = 1.f;
+    while (!escaped) {
+        // Hit the inner sphere
+        float t = innerSphere.intersect(*p1, *delta1);
+        if (t < 0) { // Missing the internal sphere means we can ignore it entirely.
+            refractSolid(RI_AIR, ri, p0, delta, p1, delta1);
+            return;
+        }
+        *p1 = *p1 + (t * *delta1);
+        Vec3 p2; // Temp variable just in case
+        // Refract in and out of the inner sphere RI_SPHERE -> RI_AIR -> RI_SPHERE)
+        innerSphere.refractSolid(ri, RI_AIR, *p1, *delta1, &p2, &r);
+        *p1 = p2;
+        *delta1 = r;
+        // Hit the outer sphere
+        t = intersect(*p1, *delta1);
+        *p1 = *p1 + (t * *delta1);
+        normal = -1.f * (*p1 - center);
+        normal(axis) = 0.f;
+        // Out of the outer sphere (RI_SPHERE -> RI_AIR)
+        r = Refract(ri, RI_AIR, *delta1, normal, &tir);
+        if (tir) {
+            // If we have TIR, reflect back into the sphere, and loop this process again.
+            // FIXME: Put this reflection in a shared function!
+            *delta1  = *delta1 - 2.f * dot(*delta1, normal) * normal;
+            continue;
+        }
+        *delta1 = r;
+        escaped = true;
+    }
+}
+
+void Cone::recalculateUVs(Texture *t) {
     // Ensure coordinates are loaded
     applyTransform();
     

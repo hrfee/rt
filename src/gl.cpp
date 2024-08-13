@@ -1036,6 +1036,7 @@ void GLWindow::showShapeEditor(Shape *shape, bool hideTransforms) {
     AAB *b = dynamic_cast<AAB*>(sh);
     CSG *c = dynamic_cast<CSG*>(sh);
     Cylinder *cl = dynamic_cast<Cylinder*>(sh);
+    Cone *co = dynamic_cast<Cone*>(sh);
 
     if (s != nullptr) {
         if (ImGui::InputFloat3("Position", (float*)&(s->oCenter)) ||
@@ -1073,6 +1074,14 @@ void GLWindow::showShapeEditor(Shape *shape, bool hideTransforms) {
             sh->transformDirty = true;
         }
         vl(ImGui::SliderFloat("\"Thickness\"", &(cl->thickness), 0, 1.f));
+    } else if (co != nullptr) {
+        if (ImGui::InputFloat3("Position", (float*)&(co->oCenter)) ||
+            vl(ImGui::SliderFloat("Radius", &(co->oRadius), 0, 20.f)) ||
+            vl(ImGui::SliderFloat("Length", &(co->oLength), 0, 20.f)) ||
+            vl(ImGui::SliderInt("Axis", &(co->axis), 0, 2))) {
+            sh->transformDirty = true;
+        }
+        vl(ImGui::SliderFloat("\"Thickness\"", &(co->thickness), 0, 1.f));
     }
 
     if (t != nullptr || b != nullptr) {

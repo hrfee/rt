@@ -6,15 +6,16 @@ campreset "outer box" pos -15.6456 10.8533 -14.0611 phi -0.806354 theta -0.37262
 // norm assets/whitewall/white-brick-wall_normal-ogl.tga
 
 material wall color #ffffff reflectiveness 0 specular 0.239 tex assets/whitewall/white-brick-wall_albedo.tga:a,6,x norm assets/whitewall/white-brick-wall_normal-ogl.tga:a,6,x
+material "wood floor" tex assets/woodfloor2/color.tga:a,0.08 norm assets/woodfloor2/normal.tga:a,0.08 specular 0.39 shininess 10
 
 window {
     box a -5 0 -7.5 b 5 8 7.5 material wall
-    box a -2 4 -7.7 b 2 6 7.7 material wall
+    box a -3 3 -7.7 b 3 6.5 7.7 material wall
 } translate 0 0 -10
-
+box a -5 0 -7.5 b 5 0.5 7.5 material "wood floor" translate 0 0 -10
 
 material test color #ff0000
-material test2 color #00ff00 opacity 0.1
+material test2 color #00ff00 tex assets/checker.tga
 
 // sphere center 0 1 0 radius 1 material test2
 // sphere center 0 1 1 radius 1 material test2
@@ -29,20 +30,37 @@ difference {
     box a -2 1.2 -0.8 b 6 2.8 0.8 material test
 } translate 0 0 -5
 
+material stone tex assets/stone/base.tga:a,2 norm assets/stone/normal.tga:a,2
 union {
-    cylinder center 0 0 0 radius 0.2 length 0.5 axis y material wall
+    cylinder center 0 0 0 radius 0.2 length 0.5 axis y material stone
     sphere center 0 -0.5 0 radius 0.2 opacity 0 
 } translate 0 7.5 -13
 plight center 0 6.5 -13 brightness 4 color #ffceba specular 0.2 color #ffbb9a translate 0 7.5 -13
 union {
-    cylinder center 0 0 0 radius 0.2 length 0.5 axis y material wall
+    cylinder center 0 0 0 radius 0.2 length 0.5 axis y material stone
     sphere center 0 -0.5 0 radius 0.2 opacity 0 
 } translate 0 7.5 -7
 plight center 0 6.5 -7 brightness 4 color #ffceba specular 0.2 color #ffbb9a
 
 // SKYBOX
 // "nolighting" tag so its entirely lit
-sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga nolighting
+// sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/garden.tga nolighting
 
 // Sun
-plight center -11.43 43.99 15.58 brightness 100 color #fffafa specular 1 color #fffafa
+// plight center -11.43 43.99 15.58 brightness 100 color #fffafa specular 1 color #fffafa
+
+// (NIGHT)SKYBOX
+// "nolighting" tag so its entirely lit
+sphere center 0 0 0 radius 50 thickness 1 color 1 1 1 opacity 1 reflectiveness 0 specular 0 shininess 0 tex assets/nightsky/color.tga nolighting
+
+// Light 1
+plight center 41.878 20.546 17.802 brightness 100 color #fffafa specular 1 color #fffafa
+// Light 2
+plight center -7.344 13.71 -46.97 brightness 100 color #fffafa specular 1 color #fffafa
+// Light 3
+plight center -48.168 10.264 -3.49 brightness 100 color #fffafa specular 1 color #fffafa
+// Light 4
+plight center -27.818 12.011 39.535 brightness 100 color #fffafa specular 1 color #fffafa
+
+
+cone center 5 5 5 radius 0.4 length 2 axis z material test2

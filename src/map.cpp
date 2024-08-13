@@ -546,7 +546,7 @@ void WorldMap::castRay(RayResult *res, Container *c, Vec3 p0, Vec3 delta, Render
     out = res->obj->mat()->opacity * out + (1.f - res->obj->mat()->opacity) * res->refractColor;
     // Specular highlight
     out = out + res->specularColor;
-    
+
     res->color = out;
 
     // Clamp
@@ -598,6 +598,7 @@ namespace {
     const char* w_sphere = "sphere";
     const char* w_triangle = "triangle";
     const char* w_cylinder = "cylinder";
+    const char* w_cone = "cone";
     const char* w_aab = "box";
     const char* w_pointLight = "plight";
     const char* w_shininess = "shininess";
@@ -940,7 +941,7 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 mapStats.csgs++;
                 csg = NULL;
             }
-        } else if (token == w_sphere || token == w_triangle || token == w_aab || token == w_cylinder) {
+        } else if (token == w_sphere || token == w_triangle || token == w_aab || token == w_cylinder || token == w_cone) {
             if (token == w_sphere) {
                 Sphere *sphere = dec.decodeSphere(line);
                 if (tex.lastLoadFail) mapStats.missingTex += 1;
@@ -987,6 +988,16 @@ void WorldMap::loadObjFile(const char* path, Mat4 transform) {
                 cylinder->oCenter = cylinder->oCenter * transform;
                 APPEND(cylinder);
                 if (csg == NULL) mapStats.cylinders++;
+            } else if (token == w_cone) {
+                Cone *cone = dec.decodeCone(line);
+                if (tex.lastLoadFail) mapStats.missingTex += 1;
+                if (norms.lastLoadFail) mapStats.missingNorm += 1;
+                if (refs.lastLoadFail) mapStats.missingRef += 1;
+                mapStats.allocs += 1; // Cone
+                // FIXME: Scale isn't applied to the radius!
+                cone->oCenter = cone->oCenter * transform;
+                APPEND(cone);
+                if (csg == NULL) mapStats.cones++;
             }
         } else if (token == w_pointLight) {
             PointLight pl = dec.decodePointLight(line);

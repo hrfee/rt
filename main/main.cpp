@@ -14,7 +14,8 @@
 #define INIT_FOV 60
 
 #define WINDOW_TITLE "COMP3931 Individual Project - rt"
-#define MAP_PATH "maps/scene.map"
+#define MAP_PATH "maps/cone.map"
+// #define MAP_PATH "maps/scene.map"
 
 namespace {
     WorldMap *map;

@@ -25,9 +25,9 @@ namespace ShapeType {
     const int AAB = 2;
     const int CSG = 3;
     const int Cylinder = 4;
+    const int Cone = 5;
 
-
-    const int Count = 5;
+    const int Count = 6;
 }
 
 inline const float EPSILON = 0.00001f;
@@ -457,6 +457,51 @@ class Cylinder: public Shape {
         virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
 };
 
+class Cone: public Shape {
+    public:
+        Vec3 center, oCenter; // More accurately, the start
+        float radius, oRadius;
+        float length, oLength;
+        float thickness;
+        int axis;
+
+        Vec2 getUV(Vec3 hit);
+        Cone() {
+            center = {0.f, 0.f, 0.f};
+            axis = 0;
+            oCenter = center;
+            radius = 0.f;
+            oRadius = radius;
+            length = 0.f;
+            oLength = length;
+            thickness = 1.f;
+        }
+        Cone(Shape *sh): Shape(sh) {
+            Cone *co = static_cast<Cone*>(sh);
+            axis = co->axis;
+            center = co->center;
+            oCenter = co->oCenter;
+            radius = co->radius;
+            oRadius = co->oRadius;
+            length = co->length;
+            oLength = co->oLength;
+            thickness = co->thickness;
+        };
+        virtual Shape *clone() {
+            return new Sphere(this);
+        };
+        virtual std::string name() { return std::string("Cone"); };
+        virtual int type() { return ShapeType::Cone; };
+        virtual void bounds(Bound *bo);
+        virtual float intersect(Vec3 p0, Vec3 delta, Vec3 *normal = NULL, Vec2 *uv = NULL, float *t1 = NULL, Vec3 *normal1 = NULL, Vec2 *uv1 = NULL);
+        virtual bool intersects(Vec3 p0, Vec3 delta);
+        virtual void applyTransform();
+        virtual void bakeTransform();
+        virtual void recalculateUVs(Texture* t = NULL);
+
+        void refractSolid(float r0, float r1, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+        virtual void refract(float ri, Vec3 p0, Vec3 delta, Vec3 *p1, Vec3 *delta1);
+};
 
 struct PointLight {
     Vec3 center;
@@ -503,6 +548,8 @@ struct Decoder {
     Sphere *decodeSphere(std::string in);
     
     Cylinder *decodeCylinder(std::string in);
+    
+    Cone *decodeCone(std::string in);
 
     // std::string encodeTriangle(Shape *sh);
 
