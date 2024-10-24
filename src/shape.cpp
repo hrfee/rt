@@ -160,7 +160,11 @@ Material *Decoder::decodeMaterial(std::string in, bool definition) {
             } else {
                 m = mat->byName(w);
                 if (m == NULL) {
-                    std::printf("WARNING: Couldn't resolve material \"%s\"\n", w.c_str());
+                    std::printf("WARNING: decodeMaterial couldn't resolve material \"%s\"\n", w.c_str());
+                    std::printf("on line \"%s\"\n", in.c_str());
+                } else {
+                    // User may have left material parts in a shape declaration and then added a material.
+                    newMaterial = false;
                 }
             }
         } else if (w == w_color) {
@@ -695,6 +699,7 @@ int Container::clear(bool deleteShapes) {
 }
 
 void MaterialStore::append(Material *m) {
+    m->next = NULL;
     if (start == NULL) start = m;
     if (end != NULL) end->next = m;
     end = m;
@@ -766,7 +771,7 @@ Material *MaterialStore::byName(std::string name) {
 void Decoder::usingMaterial(std::string name) {
     usedMaterial = mat->byName(name);
     if (usedMaterial == NULL) {
-        std::printf("WARNING: Couldn't resolve material \"%s\"\n", name.c_str());
+        std::printf("WARNING: usingMaterial couldn't resolve material \"%s\"\n", name.c_str());
     }
 }
 

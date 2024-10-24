@@ -680,6 +680,7 @@ WorldMap::WorldMap(char const* path) {
     objectNames = NULL;
     objectPtrs = NULL;
     objectCount = 0;
+    materials = MaterialStore();
     dec.setStores(&tex, &norms, &refs, &materials);
     loadFile(path, NULL);
 }
